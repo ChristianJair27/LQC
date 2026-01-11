@@ -1,0 +1,417 @@
+/* index.css - Tema LQC Elegante */
+@import "tailwindcss";
+
+/* Tema personalizado en azul oscuro/negro */
+@theme {
+  /* Paleta principal azul/negro */
+  --color-lqc: {
+    50: #e6f0ff;
+    100: #cce0ff;
+    200: #99c2ff;
+    300: #66a3ff;
+    400: #3385ff;
+    500: #0066ff;
+    600: #0052cc;
+    700: #003d99;
+    800: #002966;
+    900: #001433;
+    accent: #00d4ff;
+    metal: #e0f7ff;
+  }
+
+  /* Colores base */
+  --color-background: #0a0a0f;
+  --color-foreground: #ffffff;
+  
+  /* Fuentes modernas para esports */
+  --font-sans: "Inter", "SF Pro Display", system-ui, sans-serif;
+  --font-heading: "Orbitron", "Rajdhani", "Exo 2", monospace;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  
+  /* Animaciones personalizadas */
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-slow: pulse-slow 3s ease-in-out infinite;
+  --animate-shimmer: shimmer 3s ease-in-out infinite;
+  
+  /* Sombras premium */
+  --shadow-lqc: 0 10px 40px -10px rgba(0, 102, 255, 0.2);
+  --shadow-lqc-lg: 0 20px 80px -20px rgba(0, 102, 255, 0.3);
+  --shadow-lqc-xl: 0 25px 100px -25px rgba(0, 102, 255, 0.4);
+}
+
+/* Configuración base global */
+@layer base {
+  :root {
+    /* Variables CSS para control fino */
+    --gradient-primary: linear-gradient(135deg, #0066ff 0%, #00d4ff 100%);
+    --gradient-dark: linear-gradient(135deg, #001433 0%, #0a0a0f 100%);
+    --gradient-metal: linear-gradient(90deg, #e0f7ff 0%, #ffffff 50%, #e0f7ff 100%);
+    
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    font-weight: 400;
+    
+    color-scheme: dark;
+    color: rgba(255, 255, 255, 0.92);
+    background-color: var(--color-background);
+    
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: var(--gradient-dark);
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+      radial-gradient(circle at 20% 80%, rgba(0, 102, 255, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(0, 212, 255, 0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Tipografía mejorada */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    line-height: 1.1;
+    background: var(--gradient-metal);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 2px 10px rgba(0, 212, 255, 0.2);
+  }
+
+  h2 {
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1.2;
+  }
+
+  p {
+    font-size: clamp(1rem, 2vw, 1.125rem);
+    line-height: 1.7;
+  }
+
+  /* Enlaces mejorados */
+  a {
+    font-weight: 500;
+    color: #66a3ff;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  a:hover {
+    color: #00d4ff;
+  }
+
+  a::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -2px;
+    left: 0;
+    background: var(--gradient-primary);
+    transition: width 0.3s ease;
+  }
+
+  a:hover::after {
+    width: 100%;
+  }
+
+  /* Botones base */
+  button {
+    font-family: var(--font-heading);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    padding: 0.75em 1.5em;
+    font-size: 1em;
+    font-weight: 600;
+    background: var(--gradient-primary);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+  }
+
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lqc-lg);
+  }
+
+  button:focus,
+  button:focus-visible {
+    outline: 3px solid rgba(0, 212, 255, 0.5);
+    outline-offset: 2px;
+  }
+
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(10, 10, 15, 0.8);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #0066ff, #00d4ff);
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #0052cc, #00b8e6);
+  }
+
+  /* Selección de texto */
+  ::selection {
+    background: rgba(0, 102, 255, 0.3);
+    color: #ffffff;
+  }
+
+  /* Mejoras para inputs */
+  input, textarea, select {
+    font-family: var(--font-sans);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 102, 255, 0.2);
+    border-radius: 8px;
+    padding: 0.75em;
+    color: white;
+    transition: all 0.3s ease;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: #0066ff;
+    box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+  }
+}
+
+/* Utilidades personalizadas */
+@layer utilities {
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Texto con efecto metálico */
+  .text-metal {
+    background: var(--gradient-metal);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    background-size: 200% auto;
+    animation: shimmer 8s ease-in-out infinite;
+  }
+
+  /* Gradientes personalizados */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-dark {
+    background: var(--gradient-dark);
+  }
+
+  .gradient-border {
+    position: relative;
+    background: linear-gradient(var(--color-background), var(--color-background)) padding-box,
+                var(--gradient-primary) border-box;
+    border: 2px solid transparent;
+  }
+
+  /* Efectos de brillo */
+  .glow-blue {
+    box-shadow: 0 0 30px rgba(0, 102, 255, 0.4);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.4);
+  }
+
+  /* Efecto de vidrio */
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .glass-dark {
+    background: rgba(10, 10, 15, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(0, 102, 255, 0.2);
+  }
+
+  /* Animaciones */
+  .animate-shimmer {
+    animation: var(--animate-shimmer);
+  }
+
+  .animate-float {
+    animation: var(--animate-float);
+  }
+
+  .animate-pulse-slow {
+    animation: var(--animate-pulse-slow);
+  }
+
+  /* Utilidades de perspectiva */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .transform-3d {
+    transform-style: preserve-3d;
+  }
+}
+
+/* Definiciones de animaciones */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(1deg);
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-40px) rotate(2deg);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Utilidades de animación */
+.animate-slide-in-up {
+  animation: slide-in-up 0.6s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out;
+}
+
+/* Estilos para iframes integrados */
+iframe {
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+iframe:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lqc-lg);
+}
+
+/* Media queries para mejor responsividad */
+@media (max-width: 768px) {
+  :root {
+    font-size: 14px;
+  }
+  
+  h1 {
+    font-size: clamp(2rem, 8vw, 3rem);
+  }
+  
+  h2 {
+    font-size: clamp(1.5rem, 6vw, 2.25rem);
+  }
+  
+  button {
+    padding: 0.625em 1.25em;
+    font-size: 0.9em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Estilos para modo alto contraste */
+@media (prefers-contrast: high) {
+  :root {
+    --gradient-primary: linear-gradient(135deg, #0066ff 0%, #00aaff 100%);
+    --gradient-metal: linear-gradient(90deg, #ffffff 0%, #f0f0f0 100%);
+  }
+  
+  body {
+    background: #000000;
+  }
+  
+  .glass, .glass-dark {
+    background: rgba(0, 0, 0, 0.9);
+    border: 2px solid #0066ff;
+  }
+}
