@@ -1,0 +1,2 @@
+# LQC
+League Queretaro Championship
