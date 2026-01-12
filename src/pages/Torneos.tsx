@@ -1,4 +1,4 @@
-import { Trophy, Calendar, Users, Award, ChevronRight, Star, Clock, TrendingUp, Download, Share2 } from 'lucide-react'
+import { Trophy, Calendar, ChevronRight, Star  } from 'lucide-react'
 import { useState } from 'react'
 import Footer from '../components/layout/Footer'
 
