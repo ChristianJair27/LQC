@@ -3,8 +3,8 @@ import { useState } from 'react'
 import Footer from '../components/layout/Footer'
 
 export default function Home() {
-  const [streamStatus, setStreamStatus] = useState<'online' | 'offline'>('online')
-  const [streamViewers, setStreamViewers] = useState('1.2K')
+  const [streamStatus] = useState<'online' | 'offline'>('online')
+  const [streamViewers] = useState('1.2K')
   
   const streamSchedule = [
     { day: 'Lunes', time: '18:00 - 22:00', type: 'Grupos' },

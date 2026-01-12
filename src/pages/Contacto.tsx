@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { 
-  Mail, Phone, MapPin, Send, CheckCircle, 
+  Mail, MapPin, Send, CheckCircle, 
   MessageSquare, User, Globe, Clock, ChevronRight 
 } from 'lucide-react'
 import Footer from '../components/layout/Footer'

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { 
-  Image, Video, Users, Trophy, Award, Star, 
-  Filter, Grid, Calendar, MapPin, Download, Share2, X, ChevronRight 
+  Image, Video, Star, 
+  Filter, Grid, Calendar , Download, Share2, X, ChevronRight 
 } from 'lucide-react'
 import Footer from '../components/layout/Footer'
 
