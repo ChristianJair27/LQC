@@ -1,0 +1,12 @@
+# nixpacks.toml
+[phases.setup]
+nixPkgs = ['nodejs_20']  # o nodejs_18
+
+[phases.install]
+cmds = ['npm ci']
+
+[phases.build]
+cmds = ['npm run build']
+
+[start]
+cmd = ''  # vacío para static site
