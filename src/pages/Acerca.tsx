@@ -26,305 +26,265 @@ export default function Acerca() {
   ]
 
   const values = [
-    { 
-      title: "Competitividad", 
-      description: "Fomentamos el juego al más alto nivel con integridad deportiva",
-      icon: Trophy
-    },
-    { 
-      title: "Comunidad", 
-      description: "Un espacio donde jugadores y fans se unen por la pasión al juego",
-      icon: Users
-    },
-    { 
-      title: "Innovación", 
-      description: "Constantemente mejorando el formato y experiencia del torneo",
-      icon: Target
-    },
-    { 
-      title: "Accesibilidad", 
-      description: "Oportunidades para equipos de todos los niveles en Querétaro",
-      icon: Heart
-    },
+    { title: "Competitividad", description: "Fomentamos el juego al más alto nivel con integridad deportiva", icon: Trophy },
+    { title: "Comunidad", description: "Un espacio donde jugadores y fans se unen por la pasión al juego", icon: Users },
+    { title: "Innovación", description: "Constantemente mejorando el formato y experiencia del torneo", icon: Target },
+    { title: "Accesibilidad", description: "Oportunidades para equipos de todos los niveles en Querétaro", icon: Heart },
   ]
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Fondo minimalista */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-950 to-black"></div>
-        <div className="absolute inset-0 opacity-5">
-          <div className="h-full w-full bg-[linear-gradient(90deg,transparent_50%,rgba(255,255,255,0.02)_50%)] bg-[size:30px_30px]"></div>
+    <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
+      {/* Fondo decorativo sutil */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
         </div>
-        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-900/20 to-transparent"></div>
-        
-       {/* Copa minimalista - más a la izquierda y más pequeña */}
-<img
-  src="/assets/LOGO COPA.png"   // ← ruta corregida (sin "src/"), asume que está en public/assets/
-  alt="LQC Trophy Logo"
-  className="
-    absolute 
-    -left-[75%]           /* mucho más a la izquierda – ajusta entre -50% y -80% según prefieras */
-    sm:-left-[55%]
-    md:-left-[50%]
-    lg:-left-[45%]
-    xl:-left-[29%]
-    top-1/2
-    -translate-y-1/2
-    w-[90%]               /* tamaño base más pequeño que antes */
-    sm:w-[80%]
-    md:w-[70%]
-    lg:w-[60%]
-    xl:w-[55%]
-    max-w-none
-    opacity-12            /* un poco más sutil, antes era 15→10 en md+ */
-    animate-float-slow
-    pointer-events-none
-  "
-/>
+        <img
+          src="/assets/LOGO COPA.png"
+          alt="LQC Trophy Logo"
+          className="
+            absolute 
+            -left-[60%] sm:-left-[40%] md:-left-[30%] lg:-left-[20%] xl:-left-[10%]
+            top-[10%] sm:top-[5%]
+            w-[110%] sm:w-[90%] md:w-[80%] lg:w-[70%] xl:w-[60%]
+            max-w-none opacity-10
+            animate-float-slow pointer-events-none blur-[1px]
+          "
+        />
       </div>
 
-      {/* Contenido principal */}
       <div className="relative z-10">
-        {/* Hero Section */}
-        <div className="border-b border-gray-900 py-24 md:py-32">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-2 h-16 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                <div>
-                  <h1 className="text-5xl md:text-6xl font-light tracking-tight text-white mb-3">
-                    Acerca de
-                  </h1>
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-white">
-                      LQC
-                    </h1>
-                    <span className="px-3 py-1 text-sm bg-blue-900/30 text-blue-400 border border-blue-800/50 rounded-full">
-                      League Querétaro Championship
-                    </span>
-                  </div>
-                </div>
+        {/* Hero */}
+        <section className="py-32 md:py-40">
+          <div className="container mx-auto px-6 max-w-5xl text-center">
+            <div className="flex flex-col items-center gap-6">
+              <div className="flex items-center justify-center gap-6 flex-wrap">
+                <img
+                  src="/assets/2 LQC.png"
+                  alt="LQC Logo"
+                  className="h-24 md:h-32 w-auto object-contain drop-shadow-xl"
+                />
+                <Trophy className="w-20 md:w-28 h-20 md:h-28 text-blue-500 opacity-80" />
               </div>
-              
-              <p className="text-lg text-gray-400 font-light max-w-2xl leading-relaxed">
+
+              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-purple-400">
+                Acerca de LQC
+              </h1>
+
+              <p className="text-xl text-gray-300 max-w-3xl mt-6 leading-relaxed">
                 El torneo más competitivo y prestigioso de League of Legends en Querétaro, 
                 donde la pasión por los esports se encuentra con la excelencia competitiva.
               </p>
+
+              <div className="inline-flex items-center gap-4 mt-8">
+                <span className="px-6 py-2.5 text-base bg-blue-950/40 text-blue-300 backdrop-blur-sm border border-blue-800/30 rounded-full shadow-lg">
+                  Desde 2019
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Estadísticas */}
-        <div className="border-b border-gray-900 py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-6xl mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                {stats.map((stat, index) => (
-                  <div key={index} className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-800/30 flex items-center justify-center">
-                        <stat.icon className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div className="text-3xl font-light text-white">{stat.value}</div>
-                    </div>
-                    <div className="text-sm text-gray-500 uppercase tracking-wider">
-                      {stat.label}
+        <section className="py-20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {stats.map((stat, index) => (
+                <div 
+                  key={index} 
+                  className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 text-center hover:border-blue-500/30 hover:shadow-blue-900/20 transition-all duration-300 group"
+                >
+                  <div className="flex justify-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-900/40 to-blue-800/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <stat.icon className="w-8 h-8 text-blue-400" />
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="text-4xl font-light mb-2">{stat.value}</div>
+                  <div className="text-sm text-gray-400 uppercase tracking-wider">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Nuestra Historia */}
-        <div className="border-b border-gray-900 py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-6xl mx-auto">
-              <div className="flex items-center gap-3 mb-12">
-                <div className="w-1 h-10 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                <h2 className="text-2xl font-light text-white">Nuestra Historia</h2>
+        <section className="py-20 bg-black/20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="flex items-center gap-4 mb-16">
+              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+              <h2 className="text-3xl font-light">Nuestra Historia</h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-12 mb-16">
+              <div className="space-y-6">
+                <h3 className="text-2xl font-light">Orígenes</h3>
+                <p className="text-gray-300 leading-relaxed text-lg">
+                  Fundado en 2019, el LQC nació de la visión de crear un espacio competitivo serio para la creciente comunidad de League of Legends en Querétaro. Lo que comenzó como un torneo local entre amigos rápidamente evolucionó en el campeonato más importante de la región.
+                </p>
               </div>
               
-              <div className="space-y-12">
-                <div className="grid md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h3 className="text-xl font-light text-white">Orígenes</h3>
-                    <p className="text-gray-400 leading-relaxed">
-                      Fundado en 2019, el LQC nació de la visión de crear un espacio competitivo 
-                      serio para la creciente comunidad de League of Legends en Querétaro. 
-                      Lo que comenzó como un torneo local entre amigos rápidamente evolucionó 
-                      en el campeonato más importante de la región.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <h3 className="text-xl font-light text-white">Evolución</h3>
-                    <p className="text-gray-400 leading-relaxed">
-                      A lo largo de 12+ temporadas, hemos refinado nuestro formato, 
-                      implementado sistemas profesionales de competencia y construido 
-                      una comunidad sólida. Hoy, el LQC es referencia de esports 
-                      estudiantil y amateur en el centro de México.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Línea de tiempo */}
-                <div className="space-y-8">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-blue-400" />
-                    <h3 className="text-lg font-medium text-white">Hitos Importantes</h3>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    {milestones.map((milestone, index) => (
-                      <div key={index} className="flex items-start gap-4">
-                        <div className="w-16 flex-shrink-0">
-                          <div className="text-sm text-blue-400 font-medium">{milestone.year}</div>
-                        </div>
-                        <div className="flex-1 pb-6 border-b border-gray-900 last:border-0 last:pb-0">
-                          <div className="text-white font-medium mb-1">{milestone.event}</div>
-                          <div className="text-sm text-gray-500">{milestone.detail}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="space-y-6">
+                <h3 className="text-2xl font-light">Evolución</h3>
+                <p className="text-gray-300 leading-relaxed text-lg">
+                  A lo largo de más de 12 temporadas, hemos refinado nuestro formato, implementado sistemas profesionales de competencia y construido una comunidad sólida. Hoy, el LQC es referencia de esports estudiantil y amateur en el centro de México.
+                </p>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Misión y Valores */}
-        <div className="border-b border-gray-900 py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-6xl mx-auto">
-              <div className="grid md:grid-cols-2 gap-12">
-                <div className="space-y-8">
-                  <div>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-1 h-10 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                      <h2 className="text-2xl font-light text-white">Nuestra Misión</h2>
-                    </div>
-                    <p className="text-gray-400 leading-relaxed">
-                      Crear y mantener el ecosistema competitivo de esports más sólido 
-                      en Querétaro, proporcionando a jugadores de todos los niveles 
-                      una plataforma profesional para demostrar su talento, mientras 
-                      construimos una comunidad unida alrededor de la pasión por 
-                      League of Legends.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3">
-                      <MapPin className="w-5 h-5 text-blue-400" />
-                      <div>
-                        <div className="text-white font-medium">Ubicación</div>
-                        <div className="text-gray-400 text-sm">Querétaro, México</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Globe className="w-5 h-5 text-blue-400" />
-                      <div>
-                        <div className="text-white font-medium">Alcance</div>
-                        <div className="text-gray-400 text-sm">Comunidad regional y streaming internacional</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-8">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-1 h-10 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                    <h2 className="text-2xl font-light text-white">Valores Fundamentales</h2>
-                  </div>
-                  
-                  <div className="space-y-6">
-                    {values.map((value, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <value.icon className="w-5 h-5 text-blue-400" />
-                          <h3 className="text-lg font-medium text-white">{value.title}</h3>
-                        </div>
-                        <p className="text-gray-400 text-sm pl-8">
-                          {value.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {/* Línea de tiempo */}
+            <div className="space-y-10">
+              <div className="flex items-center gap-4 mb-8">
+                <Calendar className="w-6 h-6 text-blue-400" />
+                <h3 className="text-2xl font-light">Hitos Importantes</h3>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Equipo */}
-        <div className="border-b border-gray-900 py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-6xl mx-auto">
-              <div className="flex items-center gap-3 mb-12">
-                <div className="w-1 h-10 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                <h2 className="text-2xl font-light text-white">El Equipo</h2>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                {teamMembers.map((member, index) => (
-                  <div key={index} className="space-y-3 pb-6 border-b border-gray-900 last:border-0 last:pb-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-medium text-white">{member.name}</h3>
-                      <Star className="w-4 h-4 text-blue-400" />
+              <div className="space-y-8">
+                {milestones.map((milestone, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-start gap-6 bg-black/30 backdrop-blur-sm p-6 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all duration-300"
+                  >
+                    <div className="w-20 flex-shrink-0 text-center">
+                      <div className="text-2xl font-medium text-blue-400">{milestone.year}</div>
                     </div>
-                    <div className="text-sm text-gray-400">{member.role}</div>
-                    <div className="text-xs text-gray-500">{member.experience}</div>
+                    <div className="flex-1">
+                      <h4 className="text-xl font-medium mb-2">{milestone.event}</h4>
+                      <p className="text-gray-400">{milestone.detail}</p>
+                    </div>
                   </div>
                 ))}
               </div>
-              
-              <div className="mt-12 pt-8 border-t border-gray-900">
-                <div className="text-center">
-                  <p className="text-gray-400 mb-6">
-                    ¿Interesado en unirte al equipo o colaborar con el LQC?
-                  </p>
-                  <button className="px-8 py-3 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 transition-all duration-300 text-sm">
-                    Contactar al equipo
-                    <ChevronRight className="w-4 h-4 inline ml-2" />
-                  </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Misión y Valores */}
+        <section className="py-20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="grid md:grid-cols-2 gap-16">
+              <div className="space-y-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                  <h2 className="text-3xl font-light">Nuestra Misión</h2>
+                </div>
+                <p className="text-gray-300 leading-relaxed text-lg">
+                  Crear y mantener el ecosistema competitivo de esports más sólido en Querétaro, proporcionando a jugadores de todos los niveles una plataforma profesional para demostrar su talento, mientras construimos una comunidad unida alrededor de la pasión por League of Legends.
+                </p>
+
+                <div className="space-y-6 mt-10">
+                  <div className="flex items-center gap-4 bg-black/30 backdrop-blur-sm p-5 rounded-xl border border-white/5">
+                    <MapPin className="w-6 h-6 text-blue-400 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Ubicación</div>
+                      <div className="text-gray-400 text-sm">Querétaro, México</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 bg-black/30 backdrop-blur-sm p-5 rounded-xl border border-white/5">
+                    <Globe className="w-6 h-6 text-blue-400 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Alcance</div>
+                      <div className="text-gray-400 text-sm">Comunidad regional y streaming internacional</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                  <h2 className="text-3xl font-light">Valores Fundamentales</h2>
+                </div>
+
+                <div className="grid gap-6">
+                  {values.map((value, index) => (
+                    <div 
+                      key={index} 
+                      className="flex items-start gap-5 bg-black/30 backdrop-blur-sm p-6 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all duration-300 group"
+                    >
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-900/40 to-blue-800/30 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                        <value.icon className="w-7 h-7 text-blue-300" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-medium mb-2">{value.title}</h3>
+                        <p className="text-gray-400">{value.description}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Llamada a la acción */}
-        <div className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto text-center">
-              <div className="space-y-8">
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-light text-white">Forma Parte de la Historia</h2>
-                  <p className="text-gray-400 max-w-2xl mx-auto">
-                    Ya sea como jugador, espectador o patrocinador, hay un lugar para ti 
-                    en la comunidad del LQC. Únete a nosotros en la próxima temporada.
-                  </p>
+        {/* Equipo */}
+        <section className="py-20 bg-black/20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="flex items-center gap-4 mb-16">
+              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+              <h2 className="text-3xl font-light">El Equipo</h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {teamMembers.map((member, index) => (
+                <div 
+                  key={index} 
+                  className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 hover:border-blue-500/30 hover:shadow-blue-900/20 transition-all duration-300 text-center"
+                >
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-800/50 to-gray-700/30 flex items-center justify-center">
+                    <Star className="w-8 h-8 text-blue-400" />
+                  </div>
+                  <h3 className="text-xl font-medium mb-2">{member.name}</h3>
+                  <div className="text-blue-300 mb-2">{member.role}</div>
+                  <div className="text-sm text-gray-400">{member.experience}</div>
                 </div>
-                
-                <div className="flex items-center justify-center gap-4">
-                  <button className="px-8 py-3 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 transition-all duration-300 text-sm">
-                    Ver Temporada Actual
-                  </button>
-                  <button className="px-8 py-3 bg-gray-900 text-white hover:bg-gray-800 transition-all duration-300 text-sm">
-                    Unirse a Discord
-                  </button>
-                </div>
+              ))}
+            </div>
+
+            <div className="mt-16 text-center">
+              <p className="text-gray-300 mb-8 text-lg">
+                ¿Interesado en unirte al equipo o colaborar con el LQC?
+              </p>
+              <button className="inline-flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-blue-900/40 to-purple-900/20 border border-blue-700/30 text-gray-200 rounded-xl hover:from-blue-800/50 hover:to-purple-800/30 transition-all duration-300 shadow-lg shadow-blue-900/20">
+                Contactar al equipo
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA final */}
+        <section className="py-20">
+          <div className="container mx-auto px-6 max-w-4xl text-center">
+            <div className="bg-gradient-to-br from-blue-950/30 to-purple-950/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-12 shadow-2xl shadow-black/50">
+              <h2 className="text-3xl font-light mb-6">Forma Parte de la Historia</h2>
+              <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
+                Ya sea como jugador, espectador o patrocinador, hay un lugar para ti en la comunidad del LQC. Únete a nosotros en la próxima temporada.
+              </p>
+
+              <div className="flex flex-wrap justify-center gap-6">
+                <button className="px-10 py-4 border border-blue-800/40 text-gray-200 rounded-xl hover:bg-blue-900/30 transition-all duration-300">
+                  Ver Temporada Actual
+                </button>
+                <button className="px-10 py-4 bg-gradient-to-r from-blue-700 to-purple-700 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-lg shadow-blue-900/30">
+                  Unirse a Discord
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <Footer />
+        
       </div>
+
+      <style>{`
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-40px) rotate(2deg); }
+        }
+        .animate-float-slow {
+          animation: float-slow 14s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   )
 }

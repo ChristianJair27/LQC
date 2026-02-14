@@ -1,8 +1,5 @@
 import { useState } from 'react'
-import { 
-  Image as ImageIcon, Video as VideoIcon, 
-  X, 
-} from 'lucide-react'
+import { Image as ImageIcon, Video as VideoIcon, X } from 'lucide-react'
 import Footer from '../components/layout/Footer'
 
 export default function Galeria() {
@@ -10,13 +7,13 @@ export default function Galeria() {
   const [selectedMedia, setSelectedMedia] = useState<number | null>(null)
 
   const mediaItems = [
-    // 2 Videos verticales – asegúrate de tener los pósters para evitar negro
+    // Videos verticales (reels/highlights típicos de esports)
     {
       id: 1,
       title: "Resumen Final Épico",
       type: "video",
       src: "/galeria/videos/video1.mp4",
-      poster: "/galeria/posters/poster-video1.jpg", // ← importante: sube esta imagen
+      poster: "/galeria/posters/poster-video1.jpg",
       isVertical: true,
       views: "12.4K",
       duration: "1:45",
@@ -27,35 +24,32 @@ export default function Galeria() {
       title: "Ceremonia de Clausura y Premiación",
       type: "video",
       src: "/galeria/videos/video2.mp4",
-      poster: "/galeria/posters/poster-video2.jpg", // ← importante
+      poster: "/galeria/posters/poster-video2.jpg",
       isVertical: true,
       views: "9.8K",
       duration: "3:20",
       tags: ["Premiación", "Trofeos", "Celebración"]
     },
 
-    // 14 Fotos del evento pasado – reemplaza con tus nombres reales
+    // Fotos placeholders – reemplaza src con tus paths reales
     ...Array.from({ length: 14 }, (_, i) => ({
       id: 3 + i,
-      title: `Momento del Evento Pasado ${i + 1}`,
+      title: `Momento Épico ${i + 1}`,
       type: "foto",
-      src: `/galeria/evento-pasado/foto-${i + 1}.jpeg`, // ← cambia si tus nombres son distintos
-      views: `${Math.floor(Math.random() * 15 + 4)}K`,
-      tags: ["Evento", "Jugada", "Equipo"],
-      isVertical: false,
-      poster: undefined
+      src: `/galeria/evento-pasado/foto-${i + 1}.jpeg`,
+      views: `${Math.floor(Math.random() * 15 + 5)}K`,
+      tags: ["Jugada", "Equipo", "Evento"],
+      isVertical: Math.random() > 0.6 // algunos verticales para variedad
     })),
 
-    // 6 Fotos de finalistas – reemplaza con tus nombres reales
     ...Array.from({ length: 6 }, (_, i) => ({
       id: 17 + i,
-      title: `Finalista Liga Antepasada ${i + 1}`,
+      title: `Finalista Destacado ${i + 1}`,
       type: "foto",
-      src: `/galeria/finalistas/finalista-${i + 1}.jpeg`, // ← cambia si es necesario
-      views: `${Math.floor(Math.random() * 10 + 3)}K`,
-      tags: ["Finalistas", "Equipo", "Trofeo"],
-      isVertical: false,
-      poster: undefined
+      src: `/galeria/finalistas/finalista-${i + 1}.jpeg`,
+      views: `${Math.floor(Math.random() * 10 + 4)}K`,
+      tags: ["Final", "Trofeo", "Equipo"],
+      isVertical: false
     })),
   ]
 
@@ -70,77 +64,73 @@ export default function Galeria() {
     : mediaItems.filter(item => item.type === activeFilter)
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Fondo minimalista */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-950 to-black" />
-        <div className="absolute inset-0 opacity-5">
-          <div className="h-full w-full bg-[linear-gradient(90deg,transparent_50%,rgba(255,255,255,0.02)_50%)] bg-[size:30px_30px]" />
+    <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
+      {/* Fondo decorativo */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
         </div>
-        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-900/20 to-transparent" />
-        
         <img
           src="/assets/LOGO COPA.png"
           alt="LQC Trophy Logo"
           className="
             absolute 
-            -left-[75%] sm:-left-[55%] md:-left-[50%] lg:-left-[45%] xl:-left-[29%]
-            top-1/2 -translate-y-1/2
-            w-[90%] sm:w-[80%] md:w-[70%] lg:w-[60%] xl:w-[55%]
-            max-w-none opacity-12
-            animate-float-slow pointer-events-none
+            -left-[60%] sm:-left-[40%] md:-left-[30%] lg:-left-[20%] xl:-left-[10%]
+            top-[15%] sm:top-[10%]
+            w-[110%] sm:w-[90%] md:w-[80%] lg:w-[70%] xl:w-[60%]
+            max-w-none opacity-10
+            animate-float-slow pointer-events-none blur-[1px]
           "
         />
       </div>
 
       <div className="relative z-10">
         {/* Hero */}
-        <div className="border-b border-gray-900/30 py-20 md:py-32">
+        <section className="py-32 md:py-40">
           <div className="container mx-auto px-6 max-w-5xl text-center">
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
-              Galería <span className="text-blue-500">LQC</span>
+            <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-purple-400 mb-6">
+              Galería LQC
             </h1>
             <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-              Revive las jugadas legendarias, celebraciones inolvidables y los momentos que definieron nuestras temporadas.
+              Momentos legendarios, jugadas inolvidables y celebraciones que definieron nuestras temporadas.
             </p>
           </div>
-        </div>
+        </section>
 
         {/* Filtros */}
-        <div className="py-10">
+        <section className="py-12 bg-black/20">
           <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+            <div className="flex flex-wrap justify-center gap-4">
               {filters.map(filter => (
                 <button
                   key={filter.id}
                   onClick={() => setActiveFilter(filter.id)}
                   className={`
-                    px-6 py-2.5 rounded-full text-sm md:text-base font-medium transition-all duration-300
+                    px-6 py-3 rounded-full text-base font-medium transition-all duration-300 backdrop-blur-sm border
                     ${activeFilter === filter.id
-                      ? 'bg-blue-600/25 text-white border border-blue-500/40 shadow-blue-900/20 shadow-md'
-                      : 'bg-gray-900/30 text-gray-300 border border-gray-700/50 hover:bg-gray-800/40 hover:border-gray-600'
+                      ? 'bg-blue-900/40 border-blue-600 text-white shadow-lg shadow-blue-900/30'
+                      : 'bg-black/30 border-white/10 text-gray-300 hover:border-blue-500/50 hover:text-white'
                     }
                   `}
                 >
-                  {filter.label}
-                  <span className="ml-2 opacity-70">({filter.count})</span>
+                  {filter.label} <span className="ml-2 opacity-70">({filter.count})</span>
                 </button>
               ))}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Galería Masonry */}
-        <div className="py-12 pb-24">
+        {/* Masonry Grid */}
+        <section className="py-16 pb-24">
           <div className="container mx-auto px-6 max-w-7xl">
-            <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-5 md:gap-6 space-y-5 md:space-y-6">
+            <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6">
               {filteredItems.map(item => (
                 <div
                   key={item.id}
                   className="group break-inside-avoid cursor-pointer"
                   onClick={() => setSelectedMedia(item.id)}
                 >
-                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-gray-950/40 to-black/60 shadow-xl shadow-black/40 transition-all duration-500 group-hover:scale-[1.03] group-hover:shadow-blue-900/30">
+                  <div className="relative overflow-hidden rounded-2xl bg-black/40 backdrop-blur-md border border-white/5 shadow-xl shadow-black/40 transition-all duration-500 group-hover:scale-[1.03] group-hover:shadow-blue-900/40 group-hover:border-blue-500/30">
                     {item.type === 'video' ? (
                       <div className={item.isVertical ? "aspect-[9/16]" : "aspect-video"}>
                         <video
@@ -151,12 +141,12 @@ export default function Galeria() {
                           muted
                           loop
                           playsInline
-                          preload="auto"
+                          preload="metadata"
                           controls={false}
                         />
                       </div>
                     ) : (
-                      <div className="aspect-video">
+                      <div className={item.isVertical ? "aspect-[9/16]" : "aspect-square md:aspect-video"}>
                         <img
                           src={item.src}
                           alt={item.title}
@@ -166,26 +156,22 @@ export default function Galeria() {
                       </div>
                     )}
 
-                    {/* Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400 flex flex-col justify-end p-5">
-                      <h3 className="text-lg font-medium mb-1 truncate">{item.title}</h3>
+                    {/* Overlay info */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400 flex flex-col justify-end p-6">
+                      <h3 className="text-lg font-medium mb-2 truncate">{item.title}</h3>
                       <div className="flex items-center justify-between text-sm text-gray-300">
                         <span>{item.views} vistas</span>
-                        {'duration' in item && item.duration && (
-                          <span className="flex items-center gap-1">
-                            <VideoIcon className="w-3.5 h-3.5" /> {item.duration}
+                        {item.duration && (
+                          <span className="flex items-center gap-2">
+                            <VideoIcon className="w-4 h-4" /> {item.duration}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Badge tipo */}
-                    <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-black/60 text-xs backdrop-blur-md border border-white/10">
-                      {item.type === 'video' ? (
-                        <VideoIcon className="inline w-3.5 h-3.5 mr-1.5" />
-                      ) : (
-                        <ImageIcon className="inline w-3.5 h-3.5 mr-1.5" />
-                      )}
+                    {/* Badge */}
+                    <div className="absolute top-4 right-4 px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-medium flex items-center gap-2">
+                      {item.type === 'video' ? <VideoIcon className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
                       {item.type}
                     </div>
                   </div>
@@ -193,27 +179,27 @@ export default function Galeria() {
               ))}
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Modal */}
         {selectedMedia !== null && (
-          <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4"
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
             onClick={() => setSelectedMedia(null)}
           >
-            <div 
-              className="relative max-w-5xl w-full max-h-[90vh] overflow-hidden rounded-2xl"
+            <div
+              className="relative max-w-6xl w-full max-h-[95vh] overflow-hidden rounded-2xl shadow-2xl shadow-black/80"
               onClick={e => e.stopPropagation()}
             >
-              <button 
-                className="absolute top-4 right-4 z-10 p-3 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+              <button
+                className="absolute top-4 right-4 z-20 p-4 bg-black/60 rounded-full hover:bg-black/80 transition-all backdrop-blur-md"
                 onClick={() => setSelectedMedia(null)}
               >
-                <X className="w-6 h-6" />
+                <X className="w-7 h-7" />
               </button>
 
               {mediaItems.find(m => m.id === selectedMedia)?.type === 'video' ? (
-                <div className={mediaItems.find(m => m.id === selectedMedia)?.type === 'video' && mediaItems.find(m => m.id === selectedMedia)?.isVertical ? "aspect-[9/16] bg-black" : "aspect-video bg-black"}>
+                <div className={mediaItems.find(m => m.id === selectedMedia)?.isVertical ? "aspect-[9/16] bg-black" : "aspect-video bg-black"}>
                   <video
                     src={mediaItems.find(m => m.id === selectedMedia)?.src}
                     poster={mediaItems.find(m => m.id === selectedMedia)?.poster}
@@ -223,25 +209,23 @@ export default function Galeria() {
                   />
                 </div>
               ) : (
-                <div className="aspect-video bg-black">
-                  <img
-                    src={mediaItems.find(m => m.id === selectedMedia)?.src}
-                    alt="Media seleccionada"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <img
+                  src={mediaItems.find(m => m.id === selectedMedia)?.src}
+                  alt={mediaItems.find(m => m.id === selectedMedia)?.title}
+                  className="w-full h-auto max-h-[90vh] object-contain"
+                />
               )}
 
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 to-transparent">
-                <h3 className="text-2xl md:text-3xl font-light mb-2">
+              <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 to-transparent">
+                <h3 className="text-2xl md:text-4xl font-light mb-3">
                   {mediaItems.find(m => m.id === selectedMedia)?.title}
                 </h3>
-                <div className="flex gap-6 text-gray-300 text-sm md:text-base">
+                <div className="flex gap-8 text-gray-300 text-base md:text-lg">
                   <span>{mediaItems.find(m => m.id === selectedMedia)?.views} vistas</span>
-                  {'duration' in (mediaItems.find(m => m.id === selectedMedia) || {}) && (
-                    <span className="flex items-center gap-2">
-                      <VideoIcon className="w-4 h-4" />
-                      {(mediaItems.find(m => m.id === selectedMedia) as any)?.duration}
+                  {mediaItems.find(m => m.id === selectedMedia)?.duration && (
+                    <span className="flex items-center gap-3">
+                      <VideoIcon className="w-5 h-5" />
+                      {mediaItems.find(m => m.id === selectedMedia)?.duration}
                     </span>
                   )}
                 </div>
@@ -250,14 +234,12 @@ export default function Galeria() {
           </div>
         )}
 
-        <Footer />
       </div>
 
-      {/* Animación copa */}
       <style>{`
         @keyframes float-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-25px); }
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-40px) rotate(2deg); }
         }
         .animate-float-slow {
           animation: float-slow 14s ease-in-out infinite;

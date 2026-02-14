@@ -26,50 +26,50 @@ export default function Contacto() {
       icon: MessageSquare,
       title: "Discord",
       value: "discord.gg/lqc",
-      description: "Comunidad activa",
+      description: "Comunidad activa 24/7",
       action: "Unirse al servidor"
     },
     {
       icon: Globe,
       title: "Redes Sociales",
       value: "@lqroc",
-      description: "Twitter y Twitch",
-      action: "Seguir en redes"
+      description: "Twitter / Twitch",
+      action: "Seguir y chatear"
     }
   ]
 
   const faqs = [
     {
       question: "¿Cómo puedo inscribir a mi equipo?",
-      answer: "Las inscripciones se abren al inicio de cada temporada a través de Battlefy. Consulta la página principal para las fechas exactas."
+      answer: "Las inscripciones se abren al inicio de cada temporada directamente en Battlefy. Revisa la página principal para ver las fechas actuales y el botón de inscripción."
     },
     {
       question: "¿Cuáles son los requisitos para participar?",
-      answer: "Debes ser mayor de 16 años, residir en Querétaro o zonas aledañas, y contar con un equipo completo de 5 jugadores más suplentes."
+      answer: "Ser mayor de 16 años, residir en Querétaro o zonas cercanas, y formar un equipo completo (5 jugadores + suplentes opcionales)."
     },
     {
       question: "¿Hay algún costo de inscripción?",
-      answer: "El torneo es completamente gratuito para los equipos participantes. Los premios son patrocinados por nuestros aliados."
+      answer: "El torneo es 100% gratuito para todos los equipos participantes. Los premios son cubiertos por nuestros patrocinadores."
     },
     {
       question: "¿Dónde se transmiten los partidos?",
-      answer: "Todos los partidos oficiales se transmiten en Twitch.tv/lqroc con comentaristas profesionales."
+      answer: "Todos los encuentros oficiales se transmiten en vivo por Twitch.tv/lqroc con comentaristas y producción profesional."
     }
   ]
 
   const supportHours = [
-    { day: "Lunes a Viernes", hours: "10:00 - 18:00", type: "General" },
-    { day: "Sábados", hours: "12:00 - 16:00", type: "Torneos" },
-    { day: "Domingos", hours: "14:00 - 20:00", type: "Transmisión" }
+    { day: "Lunes a Viernes", hours: "10:00 - 18:00", type: "Consultas generales" },
+    { day: "Sábados", hours: "12:00 - 16:00", type: "Apoyo en torneos" },
+    { day: "Domingos", hours: "14:00 - 20:00", type: "Soporte en transmisiones" }
   ]
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Simulación de envío
+    // Aquí iría la lógica real de envío (Formspree, EmailJS, API, etc.)
     setTimeout(() => {
       setIsSubmitted(true)
       setFormData({ name: '', email: '', subject: '', message: '' })
-    }, 1000)
+    }, 1200)
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -80,322 +80,282 @@ export default function Contacto() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
-      {/* Fondo minimalista */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-950 to-black" />
-        <div className="absolute inset-0 opacity-5">
-          <div className="h-full w-full bg-[linear-gradient(90deg,transparent_50%,rgba(255,255,255,0.02)_50%)] bg-[size:30px_30px]" />
+    <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
+      {/* Fondo decorativo */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
         </div>
-        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-900/20 to-transparent" />
-        
-        {/* Copa flotante de fondo (la que ya tenías) */}
         <img
           src="/assets/LOGO COPA.png"
           alt="LQC Trophy Logo"
           className="
             absolute 
-            -left-[75%] sm:-left-[55%] md:-left-[50%] lg:-left-[45%] xl:-left-[29%]
-            top-1/2 -translate-y-1/2
-            w-[90%] sm:w-[80%] md:w-[70%] lg:w-[60%] xl:w-[55%]
-            max-w-none opacity-12
-            animate-float-slow pointer-events-none
+            -left-[60%] sm:-left-[40%] md:-left-[30%] lg:-left-[20%] xl:-left-[10%]
+            top-[15%] sm:top-[10%]
+            w-[110%] sm:w-[90%] md:w-[80%] lg:w-[70%] xl:w-[60%]
+            max-w-none opacity-10
+            animate-float-slow pointer-events-none blur-[1px]
           "
         />
       </div>
 
-      {/* Contenido principal */}
       <div className="relative z-10">
-        {/* Hero Section */}
-        <div className="border-b border-gray-900 py-24 md:py-32">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-2 h-16 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                <div>
-                  <h1 className="text-5xl md:text-6xl font-light tracking-tight text-white mb-3">
-                    Contacto
-                  </h1>
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-white">
-                      LQC
-                    </h1>
-                    <span className="px-3 py-1 text-sm bg-blue-900/30 text-blue-400 border border-blue-800/50 rounded-full">
-                      Comunícate con nosotros
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <p className="text-lg text-gray-400 font-light max-w-2xl leading-relaxed">
-                Estamos aquí para responder tus preguntas, escuchar tus sugerencias 
-                y ayudarte a ser parte de la comunidad competitiva de Querétaro.
-              </p>
-            </div>
+        {/* Hero */}
+        <section className="py-32 md:py-40">
+          <div className="container mx-auto px-6 max-w-5xl text-center">
+            <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-purple-400 mb-6">
+              Contacto LQC
+            </h1>
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
+              Estamos aquí para resolver tus dudas, recibir propuestas y ayudarte a formar parte de la comunidad competitiva de Querétaro.
+            </p>
           </div>
-        </div>
+        </section>
 
         {/* Métodos de contacto */}
-        <div className="border-b border-gray-900 py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-6xl mx-auto">
-              <div className="flex items-center gap-3 mb-12">
-                <div className="w-1 h-10 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                <h2 className="text-2xl font-light text-white">Métodos de Contacto</h2>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6">
-                {contactMethods.map((method, index) => (
-                  <div key={index} className="space-y-4 p-6 border border-gray-900 rounded-lg hover:border-gray-700 transition-all duration-300">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-800/30 flex items-center justify-center">
-                        <method.icon className="w-6 h-6 text-blue-400" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-white">{method.title}</h3>
-                        <p className="text-sm text-gray-500">{method.description}</p>
-                      </div>
+        <section className="py-20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="grid md:grid-cols-3 gap-8">
+              {contactMethods.map((method, index) => (
+                <div 
+                  key={index}
+                  className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 hover:border-blue-500/30 hover:shadow-blue-900/20 transition-all duration-300 group"
+                >
+                  <div className="flex items-center gap-5 mb-6">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-900/40 to-blue-800/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <method.icon className="w-7 h-7 text-blue-400" />
                     </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-lg text-white font-light">{method.value}</div>
-                      <button className="text-sm text-gray-500 hover:text-white transition-colors flex items-center gap-1">
-                        {method.action}
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
+                    <div>
+                      <h3 className="text-xl font-medium">{method.title}</h3>
+                      <p className="text-sm text-gray-400">{method.description}</p>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="text-2xl font-light mb-4">{method.value}</div>
+                  <button className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-2 text-sm font-medium">
+                    {method.action}
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Formulario de contacto */}
-        <div className="border-b border-gray-900 py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="grid md:grid-cols-2 gap-12">
-                <div className="space-y-8">
-                  <div>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-1 h-10 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                      <h2 className="text-2xl font-light text-white">Envía un Mensaje</h2>
-                    </div>
-                    <p className="text-gray-400 leading-relaxed">
-                      Completa el formulario y nuestro equipo se pondrá en contacto 
-                      contigo lo antes posible. Preferiblemente en horarios de atención.
-                    </p>
-                  </div>
-                  
-                  {/* Horarios de atención */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Clock className="w-5 h-5 text-blue-400" />
-                      <h3 className="text-lg font-medium text-white">Horarios de Atención</h3>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {supportHours.map((schedule, index) => (
-                        <div key={index} className="flex items-center justify-between pb-3 border-b border-gray-900 last:border-0 last:pb-0">
-                          <div>
-                            <div className="text-white">{schedule.day}</div>
-                            <div className="text-sm text-gray-500">{schedule.type}</div>
-                          </div>
-                          <div className="text-gray-400">{schedule.hours}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+        {/* Formulario + Horarios */}
+        <section className="py-20 bg-black/20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="grid lg:grid-cols-2 gap-16">
+              {/* Formulario */}
+              <div className="space-y-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                  <h2 className="text-3xl font-light">Envía un Mensaje</h2>
                 </div>
-                
-                <div>
-                  {isSubmitted ? (
-                    <div className="space-y-6 text-center py-12">
-                      <div className="w-20 h-20 rounded-full bg-gradient-to-r from-green-900/30 to-green-800/20 border border-green-800/30 flex items-center justify-center mx-auto mb-6">
-                        <CheckCircle className="w-10 h-10 text-green-400" />
-                      </div>
-                      <h3 className="text-xl font-light text-white">Mensaje Enviado</h3>
-                      <p className="text-gray-400">
-                        Hemos recibido tu mensaje. Te contactaremos en las próximas 24-48 horas.
-                      </p>
-                      <button 
-                        onClick={() => setIsSubmitted(false)}
-                        className="px-6 py-3 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 transition-all duration-300 text-sm"
-                      >
-                        Enviar otro mensaje
-                      </button>
+
+                <p className="text-gray-300 leading-relaxed">
+                  Completa el formulario y nuestro equipo te responderá lo antes posible (normalmente en 24-48 horas).
+                </p>
+
+                {isSubmitted ? (
+                  <div className="bg-black/40 backdrop-blur-md border border-green-800/30 rounded-2xl p-12 text-center">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-r from-green-900/40 to-green-800/30 flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle className="w-10 h-10 text-green-400" />
                     </div>
-                  ) : (
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm text-gray-400 mb-2">Nombre</label>
-                          <div className="relative">
-                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                              <User className="w-5 h-5 text-gray-600" />
-                            </div>
-                            <input
-                              type="text"
-                              name="name"
-                              value={formData.name}
-                              onChange={handleChange}
-                              required
-                              className="w-full pl-10 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:border-blue-600 focus:outline-none transition-colors"
-                              placeholder="Tu nombre completo"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm text-gray-400 mb-2">Correo Electrónico</label>
-                          <div className="relative">
-                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                              <Mail className="w-5 h-5 text-gray-600" />
-                            </div>
-                            <input
-                              type="email"
-                              name="email"
-                              value={formData.email}
-                              onChange={handleChange}
-                              required
-                              className="w-full pl-10 pr-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:border-blue-600 focus:outline-none transition-colors"
-                              placeholder="correo@ejemplo.com"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm text-gray-400 mb-2">Asunto</label>
-                          <select
-                            name="subject"
-                            value={formData.subject}
+                    <h3 className="text-2xl font-light mb-4">¡Mensaje Enviado!</h3>
+                    <p className="text-gray-300 mb-8">
+                      Gracias por contactarnos. Te responderemos pronto.
+                    </p>
+                    <button 
+                      onClick={() => setIsSubmitted(false)}
+                      className="px-8 py-4 bg-black/50 border border-green-800/40 text-gray-200 rounded-xl hover:bg-green-900/30 transition-all duration-300"
+                    >
+                      Enviar otro mensaje
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">Nombre</label>
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                          <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
                             onChange={handleChange}
                             required
-                            className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white focus:border-blue-600 focus:outline-none transition-colors"
-                          >
-                            <option value="">Seleccionar asunto</option>
-                            <option value="inscripcion">Inscripción de equipo</option>
-                            <option value="patrocinio">Patrocinio y colaboraciones</option>
-                            <option value="prensa">Prensa y medios</option>
-                            <option value="sugerencia">Sugerencias y feedback</option>
-                            <option value="tecnico">Problemas técnicos</option>
-                            <option value="otro">Otro</option>
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm text-gray-400 mb-2">Mensaje</label>
-                          <textarea
-                            name="message"
-                            value={formData.message}
-                            onChange={handleChange}
-                            required
-                            rows={5}
-                            className="w-full px-4 py-3 bg-gray-950 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:border-blue-600 focus:outline-none transition-colors resize-none"
-                            placeholder="Describe tu consulta o propuesta..."
+                            className="w-full pl-12 pr-4 py-4 bg-black/40 backdrop-blur-sm border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                            placeholder="Tu nombre completo"
                           />
                         </div>
                       </div>
-                      
-                      <button
-                        type="submit"
-                        className="w-full px-6 py-3 bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-800/30 text-white hover:border-blue-600 transition-all duration-300 text-sm font-medium flex items-center justify-center gap-2"
-                      >
-                        <Send className="w-4 h-4" />
-                        Enviar Mensaje
-                      </button>
-                    </form>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Preguntas frecuentes */}
-        <div className="border-b border-gray-900 py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-center gap-3 mb-12">
-                <div className="w-1 h-10 bg-gradient-to-b from-blue-600 to-blue-400"></div>
-                <h2 className="text-2xl font-light text-white">Preguntas Frecuentes</h2>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">Correo</label>
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                          <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                            className="w-full pl-12 pr-4 py-4 bg-black/40 backdrop-blur-sm border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                            placeholder="tu@correo.com"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">Asunto</label>
+                      <select
+                        name="subject"
+                        value={formData.subject}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-4 py-4 bg-black/40 backdrop-blur-sm border border-white/10 rounded-xl text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                      >
+                        <option value="">Selecciona un asunto</option>
+                        <option value="inscripcion">Inscripción de equipo</option>
+                        <option value="patrocinio">Patrocinio o colaboración</option>
+                        <option value="prensa">Prensa y medios</option>
+                        <option value="sugerencia">Sugerencias / Feedback</option>
+                        <option value="tecnico">Problema técnico</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">Mensaje</label>
+                      <textarea
+                        name="message"
+                        value={formData.message}
+                        onChange={handleChange}
+                        required
+                        rows={6}
+                        className="w-full px-4 py-4 bg-black/40 backdrop-blur-sm border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all resize-none"
+                        placeholder="Cuéntanos tu consulta, propuesta o duda..."
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-4 bg-gradient-to-r from-blue-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 rounded-xl font-medium transition-all duration-300 shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3"
+                    >
+                      <Send className="w-5 h-5" />
+                      Enviar Mensaje
+                    </button>
+                  </form>
+                )}
               </div>
-              
-              <div className="space-y-6">
-                {faqs.map((faq, index) => (
-                  <div key={index} className="pb-6 border-b border-gray-900 last:border-0 last:pb-0">
-                    <h3 className="text-lg font-medium text-white mb-3">{faq.question}</h3>
-                    <p className="text-gray-400">{faq.answer}</p>
-                  </div>
-                ))}
+
+              {/* Horarios */}
+              <div className="space-y-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                  <h2 className="text-3xl font-light">Horarios de Atención</h2>
+                </div>
+
+                <div className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 space-y-6">
+                  {supportHours.map((sch, i) => (
+                    <div key={i} className="flex justify-between items-center py-4 border-b border-white/5 last:border-0">
+                      <div>
+                        <div className="font-medium">{sch.day}</div>
+                        <div className="text-sm text-gray-400">{sch.type}</div>
+                      </div>
+                      <div className="text-blue-300 font-medium">{sch.hours}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-gray-400 text-sm">
+                  Fuera de horario puedes escribirnos por Discord o correo — te responderemos al siguiente día hábil.
+                </p>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* FAQs */}
+        <section className="py-20">
+          <div className="container mx-auto px-6 max-w-4xl">
+            <div className="flex items-center gap-4 mb-16">
+              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+              <h2 className="text-3xl font-light">Preguntas Frecuentes</h2>
+            </div>
+
+            <div className="space-y-8">
+              {faqs.map((faq, index) => (
+                <div 
+                  key={index}
+                  className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all duration-300"
+                >
+                  <h3 className="text-xl font-medium mb-4">{faq.question}</h3>
+                  <p className="text-gray-300 leading-relaxed">{faq.answer}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         {/* Ubicación */}
-        <div className="py-16">
-          <div className="container mx-auto px-4">
-            <div className="max-w-6xl mx-auto">
-              <div className="grid md:grid-cols-2 gap-12">
-                <div className="space-y-8">
-                  <div className="flex items-center gap-3">
-                    <MapPin className="w-6 h-6 text-blue-400" />
-                    <div>
-                      <h2 className="text-2xl font-light text-white">Ubicación</h2>
-                      <p className="text-gray-400">Querétaro, México</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <p className="text-gray-400 leading-relaxed">
-                      El LQC opera desde la ciudad de Querétaro, organizando torneos 
-                      tanto en línea como en eventos presenciales en diferentes sedes 
-                      de la ciudad.
-                    </p>
-                    
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                        <div className="text-white">Eventos presenciales en diferentes sedes</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                        <div className="text-white">Transmisiones desde estudio propio</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                        <div className="text-white">Cobertura en toda el área metropolitana</div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <button className="px-6 py-3 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 transition-all duration-300 text-sm">
-                    Ver ubicaciones específicas
-                  </button>
+        <section className="py-20 bg-black/20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="grid md:grid-cols-2 gap-16 items-center">
+              <div className="space-y-10">
+                <div className="flex items-center gap-4">
+                  <MapPin className="w-8 h-8 text-blue-400" />
+                  <h2 className="text-3xl font-light">Ubicación</h2>
                 </div>
-                
-                <div className="relative">
-                  <div className="aspect-[4/3] bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-800 rounded-lg overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-800/30 flex items-center justify-center mx-auto mb-4">
-                          <MapPin className="w-10 h-10 text-blue-400" />
-                        </div>
-                        <div className="text-gray-400">Mapa de ubicación</div>
-                        <div className="text-sm text-gray-500 mt-2">Querétaro, QRO</div>
-                      </div>
-                    </div>
+
+                <p className="text-gray-300 leading-relaxed text-lg">
+                  El LQC tiene su base en la hermosa ciudad de Querétaro, México. Organizamos torneos online y eventos presenciales en diferentes sedes de la capital y zona metropolitana.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-gray-200">Eventos presenciales en sedes rotativas</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-gray-200">Estudio de transmisión propio</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-gray-200">Cobertura en todo el estado y más allá</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/50 backdrop-blur-md border border-white/5 aspect-[4/3] relative">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <MapPin className="w-24 h-24 text-blue-500/30 mx-auto mb-4" />
+                    <div className="text-2xl font-light">Querétaro, México</div>
+                    <div className="text-gray-400 mt-2">Centro de operaciones LQC</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <Footer />
+        
       </div>
+
+      <style>{`
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-40px) rotate(2deg); }
+        }
+        .animate-float-slow {
+          animation: float-slow 14s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   )
 }
