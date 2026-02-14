@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { 
   Mail, MapPin, Send, CheckCircle, 
-  MessageSquare, User, Globe, Clock, ChevronRight 
+  MessageSquare, User, Globe, ChevronRight 
 } from 'lucide-react'
-import Footer from '../components/layout/Footer'
+
 
 export default function Contacto() {
   const [formData, setFormData] = useState({

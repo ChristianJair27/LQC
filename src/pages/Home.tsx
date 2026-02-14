@@ -1,6 +1,6 @@
-import { Twitch, Trophy, Users, Calendar, ChevronRight, Clock, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
-import Footer from '../components/layout/Footer'
+import { Twitch, Calendar, ChevronRight, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+
 
 const sponsors = [
   { id: 1, name: 'Yuri Japonesa', logo: '/sponsors/YuriJaponesa.png', url: 'https://example.com' },
@@ -17,10 +17,10 @@ const sponsors = [
 
 export default function Home() {
   const [streamStatus, setStreamStatus] = useState<'online' | 'offline'>('online')
-  const [streamViewers] = useState('1.2K')
+  const [] = useState('1.2K')
   const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0)
   const [isPlaying] = useState(true)
-  const sponsorsContainerRef = useRef<HTMLDivElement>(null)
+  
   
   const twitchChannel = "lqroc"
   

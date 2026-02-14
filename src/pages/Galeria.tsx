@@ -1,12 +1,24 @@
 import { useState } from 'react'
 import { Image as ImageIcon, Video as VideoIcon, X } from 'lucide-react'
-import Footer from '../components/layout/Footer'
+
+
+type MediaItem = {
+  id: number;
+  title: string;
+  type: 'foto' | 'video' | string;
+  src: string;
+  poster?: string;
+  isVertical: boolean;
+  views: string;
+  duration?: string;
+  tags: string[];
+};
 
 export default function Galeria() {
   const [activeFilter, setActiveFilter] = useState('todos')
   const [selectedMedia, setSelectedMedia] = useState<number | null>(null)
 
-  const mediaItems = [
+  const mediaItems: MediaItem[] = [
     // Videos verticales (reels/highlights típicos de esports)
     {
       id: 1,

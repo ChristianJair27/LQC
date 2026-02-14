@@ -1,5 +1,5 @@
 import { Trophy, Users, MapPin, Calendar, Award, Target, Globe, Heart, Star, ChevronRight } from 'lucide-react'
-import Footer from '../components/layout/Footer'
+
 
 export default function Acerca() { 
   const stats = [
