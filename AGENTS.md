@@ -34,8 +34,10 @@ autocontenido con su markup y sus clases de Tailwind inline.
 ## Sistema de diseño (NO negociable)
 
 - **Paleta azul/negro.** Azul principal `#0066ff`, acento cian `#00d4ff`, fondo
-  `#0a0a0f`. La escala completa vive en `--color-lqc` (`index.css`); en el markup
-  se usan las clases `blue-*` de Tailwind.
+  `#0a0a0f`. La escala vive en `index.css` como tokens planos
+  `--color-lqc-50` … `--color-lqc-900`, más `--color-lqc-accent` y
+  `--color-lqc-metal`. En el markup conviven las clases `lqc-*` (superficies de
+  marca: acento, CTA, tarjetas) y las `blue-*` de Tailwind para el resto.
 - **REGLA "sin morado": nada de clases `purple-*`.** Es la regla de color central
   del proyecto. Ya no queda morado heredado (ver más abajo): `grep -rn "purple" src/`
   debe seguir dando **0 resultados**.
@@ -78,6 +80,47 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
    Si falta un dato, marcarlo como pendiente y preguntar.
 4. Rama de trabajo: `main`. Remoto: `github.com/ChristianJair27/LQC`.
 5. Fix mínimo: no refactorizar de más ni tocar lo no relacionado.
+
+## Cómo trabajar en este proyecto
+
+- **Medí el alcance real antes de actuar.** Antes de delegar o cambiar algo,
+  contá las ocurrencias con `grep`. **No confíes en los conteos escritos en la
+  documentación**: este archivo decía "17 ocurrencias" de `purple-*` y el conteo
+  real era **25**. La doc envejece; el código no miente.
+- **Cambios mínimos, un propósito por vez.** Nada de refactors oportunistas
+  mientras arreglás otra cosa.
+- **Después de cada cambio, verificá con `npm run build`**: debe terminar con
+  **0 warnings y 0 errores**. Un warning nuevo es un fallo, no ruido.
+- **Verificación independiente.** El reporte de un agente no alcanza como prueba.
+  Confirmá por tu cuenta con `grep`, con el build y **leyendo el diff**.
+- **Pasá los cambios visibles por el agente `revisor`** antes de commitear.
+- **Un commit por propósito.** Nunca mezcles un fix de infraestructura con
+  cambios de UI.
+- **Mantené este archivo al día.** Si cambia un conteo o un canon de diseño,
+  actualizalo **en el mismo commit** que introduce el cambio.
+
+## Trampas conocidas (técnicas)
+
+- **`@theme` solo acepta custom properties planas.** Los tokens van como
+  `--color-lqc-500: #0066ff;`, uno por línea — **nunca** con sintaxis de objeto
+  anidada entre llaves. Esa forma no es CSS válido: no compila, no genera
+  utilidades y la paleta queda inerte mientras el build parece funcionar.
+- **Tailwind 4 escanea todo el repo**, incluida `.claude/agent-memory/`. Los
+  nombres de clase escritos **en prosa** (notas, documentación) se detectan como
+  uso real y se cuelan al CSS de producción. Por eso `src/index.css` tiene
+  `@source not "../.claude/agent-memory"` — **mantenelo**.
+- **La regla base `a { color: #66a3ff }`** de `index.css` pisa el color de
+  cualquier enlace. Todo `<a>` que funcione como CTA necesita `text-white`
+  explícito o el contraste falla (llega a bajar a ~1.9:1). Los `<button>` no
+  tienen el problema: la regla base ya les da `color: white`.
+- **La regla base aplica un gradiente a todo `<button>`**, y las utilidades de
+  Tailwind solo pisan `background-color`, **no `background-image`**. Un botón
+  secundario con `bg-black/50` igual se pinta con el gradiente completo y termina
+  viéndose **más vívido que el CTA primario**. Los secundarios necesitan `bg-none`.
+- **Canon del CTA primario:** `from-lqc-700 to-lqc-500` con
+  `hover:from-lqc-600 hover:to-lqc-400`.
+- **Canon del gradiente de títulos** (idéntico en las 5 páginas):
+  `from-blue-400 via-blue-300 to-lqc-accent`.
 
 ## Comandos
 

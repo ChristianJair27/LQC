@@ -1,10 +1,12 @@
 /* index.css - Tema LQC Elegante */
 @import "tailwindcss";
 
-/* La memoria de los subagentes está versionada, pero son notas en prosa que
-   mencionan nombres de clases. Sin esto, Tailwind las detecta como uso real y
-   las inyecta en el CSS de producción. */
-@source not "../.claude/agent-memory";
+/* La documentación y la memoria de los agentes están versionadas, pero son
+   prosa que menciona nombres de clases. Sin esto, Tailwind las detecta como uso
+   real y las inyecta en el CSS de producción (ver "Trampas conocidas" en
+   AGENTS.md). Cubre .claude/ (agentes + memoria) y los .md de la raíz. */
+@source not "../.claude";
+@source not "../*.md";
 
 /* Tema personalizado en azul oscuro/negro */
 @theme {
