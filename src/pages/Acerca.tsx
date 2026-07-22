@@ -67,7 +67,7 @@ export default function Acerca() {
                 <Trophy className="w-20 md:w-28 h-20 md:h-28 text-blue-500 opacity-80" />
               </div>
 
-              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-purple-400">
+              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
                 Acerca de LQC
               </h1>
 
@@ -244,7 +244,7 @@ export default function Acerca() {
               <p className="text-gray-300 mb-8 text-lg">
                 ¿Interesado en unirte al equipo o colaborar con el LQC?
               </p>
-              <button className="inline-flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-blue-900/40 to-purple-900/20 border border-blue-700/30 text-gray-200 rounded-xl hover:from-blue-800/50 hover:to-purple-800/30 transition-all duration-300 shadow-lg shadow-blue-900/20">
+              <button className="inline-flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-blue-900/40 to-blue-800/20 border border-blue-700/30 text-gray-200 rounded-xl hover:from-blue-800/50 hover:to-blue-700/30 transition-all duration-300 shadow-lg shadow-blue-900/20">
                 Contactar al equipo
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -255,7 +255,7 @@ export default function Acerca() {
         {/* CTA final */}
         <section className="py-20">
           <div className="container mx-auto px-6 max-w-4xl text-center">
-            <div className="bg-gradient-to-br from-blue-950/30 to-purple-950/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-12 shadow-2xl shadow-black/50">
+            <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-12 shadow-2xl shadow-black/50">
               <h2 className="text-3xl font-light mb-6">Forma Parte de la Historia</h2>
               <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
                 Ya sea como jugador, espectador o patrocinador, hay un lugar para ti en la comunidad del LQC. Únete a nosotros en la próxima temporada.
@@ -265,7 +265,7 @@ export default function Acerca() {
                 <button className="px-10 py-4 border border-blue-800/40 text-gray-200 rounded-xl hover:bg-blue-900/30 transition-all duration-300">
                   Ver Temporada Actual
                 </button>
-                <button className="px-10 py-4 bg-gradient-to-r from-blue-700 to-purple-700 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-lg shadow-blue-900/30">
+                <button className="px-10 py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 rounded-xl hover:from-lqc-600 hover:to-lqc-400 transition-all duration-300 shadow-lg shadow-blue-900/30">
                   Unirse a Discord
                 </button>
               </div>

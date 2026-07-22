@@ -88,7 +88,7 @@ export default function Home() {
                 />
               </div>
               
-              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-purple-400">
+              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
                 League Querétaro
               </h1>
               
@@ -140,8 +140,8 @@ export default function Home() {
                   <div className="p-5 bg-gradient-to-t from-black/80 to-transparent">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-900/40 to-blue-900/40 border border-purple-500/20 flex items-center justify-center">
-                          <Twitch className="w-6 h-6 text-purple-400" />
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lqc-900/40 to-blue-900/40 border border-lqc-accent/20 flex items-center justify-center">
+                          <Twitch className="w-6 h-6 text-lqc-accent" />
                         </div>
                         <div>
                           <div className="font-medium">LQROC</div>
@@ -202,7 +202,7 @@ export default function Home() {
                     href={`https://www.twitch.tv/${twitchChannel}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-3 w-full py-4 bg-gradient-to-r from-purple-700 to-blue-700 hover:from-purple-600 hover:to-blue-600 rounded-xl font-medium transition-all duration-300 shadow-lg shadow-purple-900/30"
+                    className="flex items-center justify-center gap-3 w-full py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 hover:from-lqc-600 hover:to-lqc-400 rounded-xl font-medium text-white transition-all duration-300 shadow-lg shadow-blue-900/30"
                   >
                     <Twitch className="w-5 h-5" />
                     Ir al canal de Twitch

@@ -14,7 +14,7 @@ const Contacto = lazy(() => import('./pages/Contacto'))
 // Componente de carga (skeleton o spinner mientras carga la página)
 const LoadingFallback = () => (
   <div className="min-h-[70vh] flex items-center justify-center">
-    <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+    <div className="w-12 h-12 border-4 border-lqc-accent border-t-transparent rounded-full animate-spin" />
   </div>
 )
 
@@ -37,11 +37,11 @@ export default function App() {
             {/* Ruta 404 básica (opcional pero recomendado) */}
             <Route path="*" element={
               <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
-                <h1 className="text-6xl md:text-8xl font-bold text-purple-500 mb-6">404</h1>
+                <h1 className="text-6xl md:text-8xl font-bold text-blue-500 mb-6">404</h1>
                 <p className="text-2xl md:text-3xl mb-8">Página no encontrada</p>
                 <a 
                   href="/" 
-                  className="px-8 py-4 bg-purple-600 hover:bg-purple-700 rounded-full text-lg font-medium transition-all"
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-full text-lg font-medium text-white transition-all"
                 >
                   Volver al Inicio
                 </a>

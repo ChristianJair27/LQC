@@ -148,7 +148,7 @@ export default function Torneos() {
                 <Trophy className="w-20 md:w-28 h-20 md:h-28 text-blue-500 opacity-80" />
               </div>
 
-              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-purple-400">
+              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
                 Archivo de Torneos
               </h1>
 
@@ -445,7 +445,7 @@ export default function Torneos() {
         {/* Próxima temporada CTA */}
         <section className="py-20">
           <div className="container mx-auto px-6 max-w-4xl text-center">
-            <div className="bg-gradient-to-br from-blue-950/30 to-purple-950/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-12 shadow-2xl shadow-black/50">
+            <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-12 shadow-2xl shadow-black/50">
               <h2 className="text-3xl font-light mb-6">Próxima Temporada</h2>
               <p className="text-xl text-gray-300 mb-10">Invierno 2026 • ¡Prepárate!</p>
 
@@ -468,7 +468,7 @@ export default function Torneos() {
                 <button className="px-10 py-4 bg-black/50 border border-blue-800/40 text-gray-200 rounded-xl hover:bg-blue-900/30 transition-all duration-300">
                   Notificarme
                 </button>
-                <button className="px-10 py-4 bg-gradient-to-r from-blue-700 to-purple-700 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-lg shadow-blue-900/30">
+                <button className="px-10 py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 rounded-xl hover:from-lqc-600 hover:to-lqc-400 transition-all duration-300 shadow-lg shadow-blue-900/30">
                   Ver detalles
                 </button>
               </div>

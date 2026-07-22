@@ -104,7 +104,7 @@ export default function Contacto() {
         {/* Hero */}
         <section className="py-32 md:py-40">
           <div className="container mx-auto px-6 max-w-5xl text-center">
-            <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-purple-400 mb-6">
+            <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent mb-6">
               Contacto LQC
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
@@ -243,7 +243,7 @@ export default function Contacto() {
 
                     <button
                       type="submit"
-                      className="w-full py-4 bg-gradient-to-r from-blue-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 rounded-xl font-medium transition-all duration-300 shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3"
+                      className="w-full py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 hover:from-lqc-600 hover:to-lqc-400 rounded-xl font-medium transition-all duration-300 shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3"
                     >
                       <Send className="w-5 h-5" />
                       Enviar Mensaje

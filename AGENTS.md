@@ -37,8 +37,8 @@ autocontenido con su markup y sus clases de Tailwind inline.
   `#0a0a0f`. La escala completa vive en `--color-lqc` (`index.css`); en el markup
   se usan las clases `blue-*` de Tailwind.
 - **REGLA "sin morado": nada de clases `purple-*`.** Es la regla de color central
-  del proyecto. Hay morado heredado pendiente de migrar (ver más abajo) — al tocar
-  un archivo que lo tenga, migrarlo a `blue-*`.
+  del proyecto. Ya no queda morado heredado (ver más abajo): `grep -rn "purple" src/`
+  debe seguir dando **0 resultados**.
 - **Tipografía:** títulos con `--font-heading` (**Orbitron**), cuerpo con
   `--font-sans` (**Inter**).
 - **Sombras:** usar los tokens `--shadow-lqc`, `--shadow-lqc-lg`, `--shadow-lqc-xl`.
@@ -47,22 +47,25 @@ autocontenido con su markup y sus clases de Tailwind inline.
 - **Mobile-first**, con breakpoints `md` y `lg`.
 - Preferir clases de Tailwind inline; CSS suelto solo para tokens en `index.css`.
 
-## Deuda conocida — morado heredado
+## Morado heredado — ya migrado
 
-`purple-*` aparece **17 veces en 6 archivos** (medido el 2026-07-22):
+**No queda morado en el sitio.** Las 25 ocurrencias de `purple-*` que había en 6
+archivos (`App.tsx`, `Home`, `Torneos`, `Acerca`, `Contacto`, `Galeria`) se
+migraron a azul/cian el 2026-07-22. La verificación es
+`grep -rn "purple" src/` → **0 resultados**.
 
-| Archivo | Ocurrencias | Qué es |
-|---|---|---|
-| `src/App.tsx` | 3 | spinner de carga + título y botón del 404 |
-| `src/pages/Acerca.tsx` | 4 | gradiente del h1, botón CTA, tarjeta, botón final |
-| `src/pages/Home.tsx` | 4 | gradiente del h1, badge de Twitch, botón CTA |
-| `src/pages/Torneos.tsx` | 3 | gradiente del h1, tarjeta, botón |
-| `src/pages/Contacto.tsx` | 2 | gradiente del h1, botón de envío |
-| `src/pages/Galeria.tsx` | 1 | gradiente del h1 |
+Convenciones que dejó esa migración, a respetar en páginas nuevas:
 
-El patrón dominante es el gradiente de títulos
-`from-blue-400 via-blue-300 to-purple-400`, repetido en las 5 páginas — conviene
-migrarlo de una sola vez y de forma consistente, no página por página.
+- **Gradiente canónico de títulos** (idéntico en las 5 páginas):
+  `from-blue-400 via-blue-300 to-lqc-accent`.
+- **CTA primario:** `from-lqc-700 to-lqc-500` con
+  `hover:from-lqc-600 hover:to-lqc-400` y `shadow-blue-900/30`. Rampa dentro de
+  la escala `lqc` (#003d99 → #0066ff): salto de luminancia visible y ~4.8:1 con
+  texto blanco. **No terminar en `lqc-accent`** (#00d4ff da 1.8:1 con blanco).
+  Si el CTA es un `<a>` y no un `<button>`, agregarle `text-white`: la regla base
+  `a { color: #66a3ff }` de `index.css` no da contraste sobre azul.
+- **Tarjetas oscuras de CTA:** `from-blue-950/30 to-lqc-900/20`.
+- Al necesitar cian, usar el token `lqc-accent` — nunca `cyan-*` ni un morado.
 
 ## Reglas de trabajo
 
