@@ -1,23 +1,26 @@
 /* index.css - Tema LQC Elegante */
 @import "tailwindcss";
 
+/* La memoria de los subagentes está versionada, pero son notas en prosa que
+   mencionan nombres de clases. Sin esto, Tailwind las detecta como uso real y
+   las inyecta en el CSS de producción. */
+@source not "../.claude/agent-memory";
+
 /* Tema personalizado en azul oscuro/negro */
 @theme {
   /* Paleta principal azul/negro */
-  --color-lqc: {
-    50: #e6f0ff;
-    100: #cce0ff;
-    200: #99c2ff;
-    300: #66a3ff;
-    400: #3385ff;
-    500: #0066ff;
-    600: #0052cc;
-    700: #003d99;
-    800: #002966;
-    900: #001433;
-    accent: #00d4ff;
-    metal: #e0f7ff;
-  }
+  --color-lqc-50: #e6f0ff;
+  --color-lqc-100: #cce0ff;
+  --color-lqc-200: #99c2ff;
+  --color-lqc-300: #66a3ff;
+  --color-lqc-400: #3385ff;
+  --color-lqc-500: #0066ff;
+  --color-lqc-600: #0052cc;
+  --color-lqc-700: #003d99;
+  --color-lqc-800: #002966;
+  --color-lqc-900: #001433;
+  --color-lqc-accent: #00d4ff;
+  --color-lqc-metal: #e0f7ff;
 
   /* Colores base */
   --color-background: #0a0a0f;
