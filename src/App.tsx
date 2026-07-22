@@ -10,6 +10,7 @@ const Torneos = lazy(() => import('./pages/Torneos'))
 const Galeria = lazy(() => import('./pages/Galeria'))
 const Acerca = lazy(() => import('./pages/Acerca'))
 const Contacto = lazy(() => import('./pages/Contacto'))
+const Registro = lazy(() => import('./pages/Registro'))
 
 // Componente de carga (skeleton o spinner mientras carga la página)
 const LoadingFallback = () => (
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/galeria" element={<Galeria />} />
             <Route path="/acerca" element={<Acerca />} />
             <Route path="/contacto" element={<Contacto />} />
+            <Route path="/registro" element={<Registro />} />
             
             {/* Ruta 404 básica (opcional pero recomendado) */}
             <Route path="*" element={

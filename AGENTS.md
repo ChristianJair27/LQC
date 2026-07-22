@@ -24,7 +24,7 @@ src/
   components/layout/
     Header.tsx             navegación (arreglo navItems) + menú móvil
     Footer.tsx
-  pages/                   Home · Torneos · Galeria · Acerca · Contacto
+  pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro
 public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico
 ```
 
@@ -58,7 +58,7 @@ migraron a azul/cian el 2026-07-22. La verificación es
 
 Convenciones que dejó esa migración, a respetar en páginas nuevas:
 
-- **Gradiente canónico de títulos** (idéntico en las 5 páginas):
+- **Gradiente canónico de títulos** (idéntico en las 6 páginas):
   `from-blue-400 via-blue-300 to-lqc-accent`.
 - **CTA primario:** `from-lqc-700 to-lqc-500` con
   `hover:from-lqc-600 hover:to-lqc-400` y `shadow-blue-900/30`. Rampa dentro de
@@ -76,6 +76,8 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
 2. Al **agregar o renombrar una página** hay que tocar **dos** lugares: la `<Route>`
    en `src/App.tsx` **y** el arreglo `navItems` en `src/components/layout/Header.tsx`.
    Olvidar el segundo es el error más fácil de cometer acá.
+   **Excepción deliberada:** `/registro` tiene `<Route>` pero **no** va en `navItems`
+   — es una página sin enlazar, accesible solo por URL, hasta que se conecte el backend.
 3. **No inventar contenido** (fechas, resultados, nombres de torneos, patrocinadores).
    Si falta un dato, marcarlo como pendiente y preguntar.
 4. Rama de trabajo: `main`. Remoto: `github.com/ChristianJair27/LQC`.
@@ -119,7 +121,7 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   viéndose **más vívido que el CTA primario**. Los secundarios necesitan `bg-none`.
 - **Canon del CTA primario:** `from-lqc-700 to-lqc-500` con
   `hover:from-lqc-600 hover:to-lqc-400`.
-- **Canon del gradiente de títulos** (idéntico en las 5 páginas):
+- **Canon del gradiente de títulos** (idéntico en las 6 páginas):
   `from-blue-400 via-blue-300 to-lqc-accent`.
 
 ## Comandos
