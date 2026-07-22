@@ -110,7 +110,7 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
 - **Tailwind 4 escanea todo el repo**, incluida `.claude/agent-memory/`. Los
   nombres de clase escritos **en prosa** (notas, documentación) se detectan como
   uso real y se cuelan al CSS de producción. Por eso `src/index.css` tiene
-  `@source not "../.claude/agent-memory"` — **mantenelo**.
+  `@source not "../.claude";` y `@source not "../*.md";` — **mantenelos**.
 - **La regla base `a { color: #66a3ff }`** de `index.css` pisa el color de
   cualquier enlace. Todo `<a>` que funcione como CTA necesita `text-white`
   explícito o el contraste falla (llega a bajar a ~1.9:1). Los `<button>` no
