@@ -3,6 +3,9 @@ import { Suspense, lazy } from 'react' // ← Para lazy loading (mejor performan
 
 import Header from './components/layout/Header'
 import Footer from './components/layout/Footer'
+// Import directo (no lazy): el boundary tiene que estar siempre disponible para
+// atrapar los errores de render y los chunks lazy que fallan al cargar.
+import ErrorBoundary from './components/ErrorBoundary'
 
 // Lazy loading de páginas (carga solo cuando se necesita)
 const Home = lazy(() => import('./pages/Home'))
@@ -21,40 +24,42 @@ const LoadingFallback = () => (
 
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col bg-black text-gray-100 antialiased">
-      {/* Header fijo */}
-      <Header />
+    <ErrorBoundary>
+      <div className="min-h-screen flex flex-col bg-black text-gray-100 antialiased">
+        {/* Header fijo */}
+        <Header />
 
-      {/* Contenido principal con Suspense para lazy loading */}
-      <main className="flex-grow relative z-10">
-        <Suspense fallback={<LoadingFallback />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/torneos" element={<Torneos />} />
-            <Route path="/galeria" element={<Galeria />} />
-            <Route path="/acerca" element={<Acerca />} />
-            <Route path="/contacto" element={<Contacto />} />
-            <Route path="/registro" element={<Registro />} />
-            
-            {/* Ruta 404 básica (opcional pero recomendado) */}
-            <Route path="*" element={
-              <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
-                <h1 className="text-6xl md:text-8xl font-bold text-blue-500 mb-6">404</h1>
-                <p className="text-2xl md:text-3xl mb-8">Página no encontrada</p>
-                <a 
-                  href="/" 
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-full text-lg font-medium text-white transition-all"
-                >
-                  Volver al Inicio
-                </a>
-              </div>
-            } />
-          </Routes>
-        </Suspense>
-      </main>
+        {/* Contenido principal con Suspense para lazy loading */}
+        <main className="flex-grow relative z-10">
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/torneos" element={<Torneos />} />
+              <Route path="/galeria" element={<Galeria />} />
+              <Route path="/acerca" element={<Acerca />} />
+              <Route path="/contacto" element={<Contacto />} />
+              <Route path="/registro" element={<Registro />} />
 
-      {/* Footer */}
-      <Footer />
-    </div>
+              {/* Ruta 404 básica (opcional pero recomendado) */}
+              <Route path="*" element={
+                <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
+                  <h1 className="text-6xl md:text-8xl font-bold text-blue-500 mb-6">404</h1>
+                  <p className="text-2xl md:text-3xl mb-8">Página no encontrada</p>
+                  <a
+                    href="/"
+                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-full text-lg font-medium text-white transition-all"
+                  >
+                    Volver al Inicio
+                  </a>
+                </div>
+              } />
+            </Routes>
+          </Suspense>
+        </main>
+
+        {/* Footer */}
+        <Footer />
+      </div>
+    </ErrorBoundary>
   )
 }
