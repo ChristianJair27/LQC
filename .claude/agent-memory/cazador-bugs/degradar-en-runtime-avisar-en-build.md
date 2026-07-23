@@ -41,3 +41,9 @@ cortar el build rompería el flujo de trabajo entero.
 - Cuidado con escribir `console` seguido de punto **incluso dentro de un comentario** en
   `src/`: el invariante se verifica con `grep -rn "console\." src/` → 0 y un comentario lo
   rompe igual. Redactalo como "sin logs" o "salida por consola".
+- **El builder de Docker corre `node:20-alpine` y `@supabase/*@2.110.x` declara
+  `engines.node >= 22`**: `npm ci` escupe seis `npm warn EBADENGINE` (uno por subpaquete) y
+  sigue de largo. Hoy no rompe nada, pero es un fallo latente —bastaría un
+  `engine-strict=true` o que la librería empiece a usar API de Node 22 para que el deploy
+  se caiga. Solo se ve corriendo `docker build`, no `npm run build` local. Verificado
+  2026-07-23; sin resolver, es decisión del coordinador.

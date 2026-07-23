@@ -111,7 +111,10 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
 - **Cambios mínimos, un propósito por vez.** Nada de refactors oportunistas
   mientras arreglás otra cosa.
 - **Después de cada cambio, verificá con `npm run build`**: debe terminar con
-  **0 warnings y 0 errores**. Un warning nuevo es un fallo, no ruido.
+  **0 warnings y 0 errores**. Un warning nuevo es un fallo, no ruido. La regla
+  es sobre `npm run build`: `docker build` emite 2 warnings esperados de
+  BuildKit (`SecretsUsedInArgOrEnv`) que **no** hay que silenciar — ver
+  "Variables de entorno".
 - **Verificación independiente.** El reporte de un agente no alcanza como prueba.
   Confirmá por tu cuenta con `grep`, con el build y **leyendo el diff**.
 - **Pasá los cambios visibles por el agente `revisor`** antes de commitear.
@@ -163,10 +166,36 @@ Un build **funcional** necesita las dos variables documentadas en `.env.example`
 Se inyectan en **tiempo de build**, así que cambiarlas exige rebuildear. No hay
 `.env` en el repo (está en `.gitignore`); copiá `.env.example` como `.env`.
 
-**Pendiente (va en su propio commit):** el pipeline de producción todavía **no**
-pasa esas variables — el `Dockerfile` no tiene `ARG` ni `ENV` para las `VITE_*` y
-no existe `.dockerignore`. Hasta que se resuelva, cualquier imagen construida
-desde un checkout limpio sale con el formulario sin guardar nada.
+**En Docker** van como build args (el `Dockerfile` las declara con `ARG` + `ENV`
+en la etapa `builder`; Vite las lee de `process.env` vía `loadEnv`, sin que haga
+falta generar un `.env`):
+
+```bash
+docker build \
+  --build-arg VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co \
+  --build-arg VITE_SUPABASE_ANON_KEY=tu-clave-anon \
+  -t lqc-web .
+```
+
+Si se omiten, la imagen se construye igual y sale con el formulario muerto: el
+aviso `[LQC]` en el log del build es la única señal. BuildKit avisa
+`SecretsUsedInArgOrEnv` por el nombre `*_KEY`: es un falso positivo esperado
+—la anon key es pública por diseño— y **no se silencia a propósito**, porque esa
+misma regla es la que avisaría si alguien pusiera la `service_role`.
+
+`.dockerignore` deja fuera `.env` y `.env.*` (también `.env.example`, que el
+build no necesita), además de `node_modules`, `dist` y `.git`.
+
+**En nixpacks** (la otra vía de deploy) no hay nada que declarar en
+`nixpacks.toml`: alcanza con configurar las dos variables en el entorno de
+**build** de la plataforma, porque `loadEnv` las toma de `process.env`. Si la
+plataforma solo las inyecta en runtime, no sirven: este es un sitio estático y
+para cuando corre nginx el bundle ya está compilado. Nunca hardcodearlas en
+`nixpacks.toml`: quedarían commiteadas.
+
+**Pendiente:** falta **configurar las variables en el deploy y verificar un
+registro real de punta a punta**. Hasta entonces `/registro` sigue fuera de
+`navItems` (regla 2).
 
 ## Comandos
 

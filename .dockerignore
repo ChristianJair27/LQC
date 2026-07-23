@@ -1,0 +1,23 @@
+# Contexto de build de Docker. El `COPY . .` del Dockerfile copia todo lo que no
+# esté acá, así que esta lista evita filtrar secretos y romper la reproducibilidad.
+
+# Secretos. Sin esta exclusión, un .env local se copiaría a la capa del builder
+# y las credenciales quedarían dentro de la imagen. Las dos líneas son
+# necesarias: `.env.*` no matchea `.env` a secas.
+# `.env.example` queda excluido a propósito (matchea `.env.*`): el build no lo
+# lee y su lugar es el repo, como documentación para quien desarrolla. Sumarlo
+# con una regla de re-inclusión (`!`) solo agregaría una negación sutil —donde
+# el orden importa— justo en las reglas que protegen las credenciales.
+.env
+.env.*
+
+# Dependencias: el builder corre `npm ci` adentro del contenedor. Copiar las del
+# host, además de pesar, mete binarios compilados para otro sistema operativo.
+node_modules
+
+# Salida del build anterior: `npm run build` la regenera dentro del contenedor y
+# la etapa 2 copia /app/dist desde el builder, no desde el host.
+dist
+
+# Historia de git: no la necesita el build y es de lo más pesado del contexto.
+.git

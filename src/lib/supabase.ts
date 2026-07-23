@@ -30,8 +30,8 @@ let cliente: ClienteSupabase | null = null
    solo captura promesas pendientes, no errores: un throw acá o al evaluar este
    módulo hace que React desmonte el root entero y el sitio se va a negro
    completo —header y footer incluidos—, no solo /registro. Y como el
-   `Dockerfile` todavía no pasa las `VITE_*`, un build desde un checkout limpio
-   cae exactamente en ese escenario.
+   `Dockerfile` solo recibe las `VITE_*` si quien despliega pasa los
+   `--build-arg`, un build que los omita cae exactamente en ese escenario.
 
    Por eso el `try/catch`: el guard de arriba no alcanza, porque `createClient`
    valida la URL y lanza por su cuenta. Casos reales verificados contra la
