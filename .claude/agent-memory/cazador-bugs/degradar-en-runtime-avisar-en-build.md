@@ -41,9 +41,10 @@ cortar el build rompería el flujo de trabajo entero.
 - Cuidado con escribir `console` seguido de punto **incluso dentro de un comentario** en
   `src/`: el invariante se verifica con `grep -rn "console\." src/` → 0 y un comentario lo
   rompe igual. Redactalo como "sin logs" o "salida por consola".
-- **El builder de Docker corre `node:20-alpine` y `@supabase/*@2.110.x` declara
-  `engines.node >= 22`**: `npm ci` escupe seis `npm warn EBADENGINE` (uno por subpaquete) y
-  sigue de largo. Hoy no rompe nada, pero es un fallo latente —bastaría un
-  `engine-strict=true` o que la librería empiece a usar API de Node 22 para que el deploy
-  se caiga. Solo se ve corriendo `docker build`, no `npm run build` local. Verificado
-  2026-07-23; sin resolver, es decisión del coordinador.
+- **`@supabase/*@2.110.x` declara `engines.node >= 22`.** El builder estaba en
+  `node:20-alpine` y `npm ci` escupía seis `npm warn EBADENGINE` (uno por subpaquete):
+  fallo latente que un `engine-strict=true` o una API de Node 22 en la librería habrían
+  convertido en deploy caído. Solo se veía corriendo `docker build`, no `npm run build`
+  local. **Resuelto 2026-07-23:** builder a `node:22-alpine` y `nixpacks.toml` a
+  `nodejs_22` en el mismo commit (las dos vías de deploy juntas, o divergen). Con Node 22
+  el build da 0 warnings y los assets salen con hash idéntico al de Node 20.
