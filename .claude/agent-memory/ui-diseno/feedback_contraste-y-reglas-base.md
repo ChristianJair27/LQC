@@ -16,7 +16,14 @@ su label quedó en #66a3ff sobre azul (1.9:1 en `Home.tsx`, y 1.4:1 en hover) �
 en el markup, pero heredaban un color distinto.
 
 **How to apply:** cuando un CTA sea `<a>`, agregarle `text-white` explícito (ya
-está en `AGENTS.md`). Cuando elija un color de fondo nuevo, verificar ≥4.5:1 con
+está en `AGENTS.md`). Y ojo con la **segunda** mitad de esa regla base, que no
+está documentada: `a::after` le dibuja a **todo** enlace una barra de gradiente
+que crece en hover. En un enlace de texto queda bien, pero en uno con forma de
+pastilla o botón aparece un subrayado de más pegado al borde inferior. Se apaga
+con `after:hidden` (genera `display:none` sobre el pseudo-elemento y gana por
+especificidad); no hace falta tocar `index.css`.
+
+Cuando elija un color de fondo nuevo, verificar ≥4.5:1 con
 el texto — eso descarta `lqc-accent` (#00d4ff) como fondo de texto blanco, sirve
 sólo como acento de iconos, bordes y degradados de título. Y en un sitio
 monocromo, revisar que los gradientes tengan salto de **luminancia**, no de tono.
