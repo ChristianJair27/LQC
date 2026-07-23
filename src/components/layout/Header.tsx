@@ -8,6 +8,7 @@ const navItems = [
   { to: '/galeria', label: 'Galería' },
   { to: '/acerca', label: 'Acerca' },
   { to: '/contacto', label: 'Contacto' },
+  { to: '/registro', label: 'Registro' },
 ]
 
 export default function Header() {
@@ -41,14 +42,18 @@ export default function Header() {
             />
           </Link>
 
-          {/* Navegación Desktop */}
-          <nav className="hidden md:flex items-center gap-2 lg:gap-8">
+          {/* Navegación Desktop.
+              En la franja md (768–1023px) el header queda sin ancho con 6 ítems,
+              así que se compacta: gap menor, enlaces con menos padding y texto más
+              chico, y el promo de Revolution505 reducido a su logo (más abajo).
+              En lg+ todo vuelve a los valores espaciosos de siempre. */}
+          <nav className="hidden md:flex items-center gap-1 lg:gap-8">
             {navItems.map(item => (
               <Link
                 key={item.to}
                 to={item.to}
                 className={`
-                  relative px-4 lg:px-5 py-2.5 text-base lg:text-lg font-medium transition-all duration-300 group
+                  relative px-2.5 lg:px-5 py-2.5 text-sm lg:text-lg font-medium transition-all duration-300 group
                   ${isActive(item.to)
                     ? 'text-white'
                     : 'text-gray-300 hover:text-white'
@@ -56,9 +61,9 @@ export default function Header() {
                 `}
               >
                 {item.label}
-                <span 
+                <span
                   className={`
-                    absolute bottom-1.5 left-4 right-4 h-0.5 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full
+                    absolute bottom-1.5 left-2.5 right-2.5 lg:left-4 lg:right-4 h-0.5 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full
                     transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-center
                     ${isActive(item.to) ? 'scale-x-100' : ''}
                   `}
@@ -81,8 +86,10 @@ export default function Header() {
                 alt="Revolution505"
                 className="w-7 h-7 object-contain rounded"
               />
-              <span>Revolution505</span>
-              <ChevronRight className="w-4 h-4" />
+              {/* Texto y chevron ocultos solo en md (768–1023px) para liberar ancho;
+                  el logo del patrocinador sigue visible y el enlace clickeable. */}
+              <span className="md:hidden lg:inline">Revolution505</span>
+              <ChevronRight className="w-4 h-4 md:hidden lg:block" />
             </a>
 
             {/* Menú móvil - siempre visible en móvil */}
