@@ -52,12 +52,17 @@ export function obtenerSupabase(): ClienteSupabase | null {
 
   try {
     cliente = createClient(url, claveAnon, {
-      /* Formulario anónimo de un solo INSERT: no hay sesión que mantener. Sin
-         esto, supabase-js arranca el timer de refresco de token, persiste la
-         sesión en localStorage y parsea el hash de la URL al cargar. */
+      /* persistSession + autoRefreshToken: el panel de admin (`/admin`) necesita
+         mantener la sesión entre recargas y refrescar el token antes de que
+         venza. El INSERT anónimo de `/registro` no se ve afectado: persistir la
+         sesión no cambia el request del insert y un usuario sin sesión sigue
+         pudiendo insertar bajo la RLS de `inscripciones`.
+         detectSessionInUrl se queda en false: el panel entra solo con
+         correo+contraseña, no hay OAuth ni magic links que dejen el token en el
+         hash de la URL para parsear al cargar. */
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+        persistSession: true,
+        autoRefreshToken: true,
         detectSessionInUrl: false
       }
     })
