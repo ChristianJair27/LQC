@@ -3,8 +3,10 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Users, Gamepad2, User, Calendar, Phone, GraduationCap,
   MapPin, Map, Mail, UserCircle, ShieldCheck, CreditCard,
-  Send, CheckCircle, AlertCircle, Check, Facebook, MessageSquare
+  Send, CheckCircle, AlertCircle, Check, Facebook, MessageSquare,
+  Loader2
 } from 'lucide-react'
+import { obtenerSupabase } from '../lib/supabase'
 
 /* ------------------------------------------------------------------ */
 /*  Estado del formulario                                              */
@@ -29,6 +31,34 @@ type FormState = {
 
 type CampoError = keyof FormState | 'privacidad'
 type FormErrors = Partial<Record<CampoError, string>>
+
+/* Contrato con las columnas de la tabla `inscripciones`. Son 12 claves: ni una
+   más (los campos `*_otro` se resuelven antes de enviar) ni una menos.
+
+   Existe porque el cliente está tipado como `SupabaseClient` sin un `Database`
+   generado, o sea que `.from()` e `.insert()` aceptan literalmente cualquier
+   cosa: sin esta anotación, un typo en una clave compila sin chistar y solo
+   falla en runtime, con el banner genérico y sin pista de la causa. Anotar el
+   objeto literal activa el chequeo de propiedades en exceso de TypeScript, así
+   que una clave de más también es error de compilación.
+
+   DEUDA: lo correcto a futuro es generar los tipos del esquema con
+   `supabase gen types typescript` y pasarlos como `SupabaseClient<Database>`,
+   cuando haya acceso al proyecto de Supabase. */
+type InscripcionPayload = {
+  equipo: string
+  gamertag: string
+  nombre: string
+  fecha_nacimiento: string
+  celular: string
+  escolaridad: string
+  municipio: string
+  localidad: string
+  correo: string
+  genero: string
+  capitan_nombre: string
+  capitan_celular: string
+}
 
 const FORM_VACIO: FormState = {
   equipo: '',
@@ -108,6 +138,11 @@ function fechaMinimaNacimiento(): string {
    abierta desde ayer como mucho tiene el calendario un día viejo. */
 const MAX_FECHA_NACIMIENTO = fechaMaximaNacimiento()
 const MIN_FECHA_NACIMIENTO = fechaMinimaNacimiento()
+
+/* Techo del envío: pasado ese tiempo el insert se aborta y se muestra el error
+   genérico, en vez de dejar el botón en "Enviando…" hasta el timeout del
+   navegador (que puede ser de minutos). */
+const TIEMPO_LIMITE_ENVIO_MS = 15_000
 
 /* Orden visual de los campos (1–12 del formulario, con los condicionales y el
    consentimiento intercalados donde aparecen en pantalla). Se usa para mover el
@@ -284,6 +319,10 @@ export default function Registro() {
   const [errores, setErrores] = useState<FormErrors>({})
   const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false)
   const [enviado, setEnviado] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  /* Bandera, no el error real: el mensaje que se muestra es literal en el JSX,
+     así que ningún detalle técnico del backend puede filtrarse a la pantalla. */
+  const [errorEnvio, setErrorEnvio] = useState(false)
   const tituloExitoRef = useRef<HTMLHeadingElement>(null)
   const tarjetaExitoRef = useRef<HTMLDivElement>(null)
   const enviadoPrevio = useRef(enviado)
@@ -399,11 +438,16 @@ export default function Registro() {
     return e
   }
 
-  const handleSubmit = (evento: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (evento: React.FormEvent<HTMLFormElement>) => {
     evento.preventDefault()
+
+    /* Segunda barrera contra el doble envío (la primera es `disabled` en el
+       botón): cubre un submit disparado con Enter mientras el insert vuela. */
+    if (enviando) return
 
     const nuevosErrores = validar()
     setErrores(nuevosErrores)
+    setErrorEnvio(false)
 
     if (Object.keys(nuevosErrores).length > 0) {
       /* Foco al primer campo inválido siguiendo el orden visual, no el orden de
@@ -429,7 +473,7 @@ export default function Registro() {
 
     /* Nombres de propiedad ya alineados con las columnas de la base de datos.
        Los celulares van normalizados a 10 dígitos, sin separadores. */
-    const payload = {
+    const payload: InscripcionPayload = {
       equipo: form.equipo.trim(),
       gamertag: form.gamertag.trim(),
       nombre: form.nombre.trim(),
@@ -444,19 +488,52 @@ export default function Registro() {
       capitan_celular: soloDigitos(form.capitan_celular)
     }
 
-    // TODO: conectar a Supabase aquí
+    setEnviando(true)
+    try {
+      /* Sin credenciales de Supabase el cliente viene en `null` (el build salió
+         sin las VITE_*). Es un fallo de envío más: mismo banner genérico, sin
+         texto especial, y la página sigue en pie. */
+      const supabase = obtenerSupabase()
+      if (!supabase) {
+        setErrorEnvio(true)
+        return
+      }
 
-    /* Sin backend todavía: el payload no se envía ni se registra en consola
-       (son datos personales). `void` lo deja explícitamente sin usar. */
-    void payload
+      /* Sin `.select()` ni `.single()`: la tabla tiene RLS con permiso de
+         INSERT pero no de SELECT para anónimos, así que pedir las filas
+         insertadas haría fallar el envío por permisos. En supabase-js v2 el
+         insert no devuelve filas por defecto.
+         El `abortSignal` corta a los 15 s: sin él, un backend colgado deja el
+         botón en "Enviando…" hasta el timeout del navegador. El aborto vuelve
+         como `error` en la respuesta, así que cae en la misma rama de abajo. */
+      const { error } = await supabase
+        .from('inscripciones')
+        .insert(payload)
+        .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_ENVIO_MS))
 
-    setEnviado(true)
+      if (error) {
+        setErrorEnvio(true)
+        return
+      }
+
+      setEnviado(true)
+    } catch {
+      /* Fallo de red o de configuración. No se captura el error ni se registra
+         en consola: el payload son datos personales y el mensaje al usuario es
+         genérico a propósito. */
+      setErrorEnvio(true)
+    } finally {
+      /* En `finally` para que un fallo de red no deje el botón trabado en
+         "Enviando…" para siempre. */
+      setEnviando(false)
+    }
   }
 
   const reiniciar = () => {
     setForm(FORM_VACIO)
     setErrores({})
     setAceptaPrivacidad(false)
+    setErrorEnvio(false)
     setEnviado(false)
   }
 
@@ -982,12 +1059,45 @@ export default function Registro() {
                     </div>
                   )}
 
+                  {errorEnvio && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-3 bg-rose-950/30 border border-rose-500/40 rounded-xl p-5"
+                    >
+                      <AlertCircle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
+                      <p className="text-sm md:text-base text-rose-200">
+                        No pudimos enviar tu registro. Revisa tu conexión e inténtalo de
+                        nuevo en unos minutos. Tus datos siguen escritos en el formulario.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* `disabled` + clases de estado en vez de un `bg-*`: la regla base
+                      de index.css le pone un gradiente a todo <button> y las utilidades
+                      de Tailwind solo pisan `background-color`, no `background-image`.
+                      Con opacidad y `cursor-not-allowed` el estado se lee sin pelearse
+                      con el gradiente; las clases de hover se quitan mientras envía. */}
                   <button
                     type="submit"
-                    className="w-full py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 hover:from-lqc-600 hover:to-lqc-400 rounded-xl font-medium transition-all duration-300 shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3"
+                    disabled={enviando}
+                    aria-busy={enviando}
+                    className={`w-full py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 rounded-xl font-medium transition-all duration-300 shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3 ${
+                      enviando
+                        ? 'opacity-60 cursor-not-allowed'
+                        : 'hover:from-lqc-600 hover:to-lqc-400'
+                    }`}
                   >
-                    <Send className="w-5 h-5" />
-                    Enviar Registro
+                    {enviando ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Enviando…
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        Enviar Registro
+                      </>
+                    )}
                   </button>
 
                   <p className="text-center text-sm text-gray-400">

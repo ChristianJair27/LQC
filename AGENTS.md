@@ -2,8 +2,19 @@
 
 Sitio web público de la **League Querétaro Championship (LQC)**, la liga de esports
 de **Revolution505** en Querétaro. Es un sitio **estático de presentación**: torneos,
-galería, información de la liga y contacto. **No hay backend ni base de datos** —
-todo el contenido vive en los componentes.
+galería, información de la liga y contacto. **No hay backend propio** y **todo el
+contenido del sitio vive en los componentes** — no se lee nada de ninguna base.
+
+La única excepción, y lo único que el código del sitio envía a un servicio de
+datos, es el **formulario de `/registro`**: hace un **INSERT anónimo** en la tabla
+`inscripciones` de Supabase. **No hay lectura**, no hay sesiones y no hay usuarios.
+(El sitio sí pide fuentes a Google Fonts desde `index.html`, pero eso no manda
+datos de nadie.)
+
+La configuración de RLS —INSERT permitido para anónimos, SELECT no— es lo
+acordado con quien administra el proyecto de Supabase, pero **no está en el repo
+y todavía no se verificó de punta a punta**. Si un día el INSERT falla por
+permisos, ese es el primer lugar donde mirar, no el código.
 
 ## Stack
 
@@ -12,6 +23,7 @@ todo el contenido vive en los componentes.
   `src/index.css`, **no** hay `tailwind.config.js`
 - **react-router-dom 7** — rutas declaradas en `src/App.tsx`
 - `lucide-react` (iconos), `react-lazy-load-image-component` (galería)
+- **`@supabase/supabase-js`** — solo para el INSERT del formulario de `/registro`
 - **Infra:** Docker + nginx (`Dockerfile`, `nginx.conf`) y `nixpacks.toml`
 
 ## Estructura
@@ -21,9 +33,12 @@ src/
   App.tsx                  rutas (<Route>) + fallback de carga + 404
   main.tsx                 entrypoint
   index.css                tema Tailwind (@theme), tokens y utilidades
+  vite-env.d.ts            tipos de las variables de entorno (VITE_*)
   components/layout/
     Header.tsx             navegación (arreglo navItems) + menú móvil
     Footer.tsx
+  lib/
+    supabase.ts            cliente de Supabase (perezoso; devuelve null sin credenciales)
   pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro
 public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico
 ```
@@ -73,11 +88,15 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
 
 1. **`npm run build` debe pasar sin errores de TypeScript antes de cualquier commit.**
    El script es `tsc -b && vite build`: si los tipos fallan, el build entero se corta.
+   Ojo: que el build pase **no** garantiza que el formulario funcione — ver
+   "Variables de entorno" más abajo.
 2. Al **agregar o renombrar una página** hay que tocar **dos** lugares: la `<Route>`
    en `src/App.tsx` **y** el arreglo `navItems` en `src/components/layout/Header.tsx`.
    Olvidar el segundo es el error más fácil de cometer acá.
    **Excepción deliberada:** `/registro` tiene `<Route>` pero **no** va en `navItems`
-   — es una página sin enlazar, accesible solo por URL, hasta que se conecte el backend.
+   — es una página sin enlazar, accesible solo por URL, hasta que el pipeline de
+   producción pase las variables de entorno y se verifique un registro real de
+   punta a punta.
 3. **No inventar contenido** (fechas, resultados, nombres de torneos, patrocinadores).
    Si falta un dato, marcarlo como pendiente y preguntar.
 4. Rama de trabajo: `main`. Remoto: `github.com/ChristianJair27/LQC`.
@@ -123,6 +142,31 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   `hover:from-lqc-600 hover:to-lqc-400`.
 - **Canon del gradiente de títulos** (idéntico en las 6 páginas):
   `from-blue-400 via-blue-300 to-lqc-accent`.
+- **Un build verde puede salir con el formulario muerto.** Si faltan las
+  variables de entorno de Supabase, `npm run build` **pasa igual** (0 errores,
+  0 warnings) y el sitio se ve perfecto, pero `/registro` no guarda nada: el
+  cliente devuelve `null` y el formulario muestra su error genérico. La única
+  señal es el aviso `[LQC] Aviso: faltan variables de entorno …` que imprime
+  `vite.config.ts`. **No lo pases por alto.** Detalle: sin credenciales Rollup
+  elimina `supabase-js` entero como código muerto, así que ese build tampoco
+  sirve para probar la ruta real (el chunk de `/registro` pasa de ~238 kB a
+  ~25 kB).
+
+## Variables de entorno
+
+Un build **funcional** necesita las dos variables documentadas en `.env.example`:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY` — la clave **anon/publishable**, nunca la
+  `service_role`: toda variable `VITE_*` se empaqueta en el bundle del navegador.
+
+Se inyectan en **tiempo de build**, así que cambiarlas exige rebuildear. No hay
+`.env` en el repo (está en `.gitignore`); copiá `.env.example` como `.env`.
+
+**Pendiente (va en su propio commit):** el pipeline de producción todavía **no**
+pasa esas variables — el `Dockerfile` no tiene `ARG` ni `ENV` para las `VITE_*` y
+no existe `.dockerignore`. Hasta que se resuelva, cualquier imagen construida
+desde un checkout limpio sale con el formulario sin guardar nada.
 
 ## Comandos
 
