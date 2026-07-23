@@ -1,34 +1,36 @@
 ---
 name: deuda-header-md
-description: Medición archivada — el header no aguanta un 6º ítem de navegación entre md y lg; revisarla antes de agregar uno
+description: RESUELTA (2026-07-23) — el header con 6 ítems entra en la franja md compactando nav+promo solo en md; lg quedó intacto
 metadata:
   type: project
 ---
 
-**Estado: latente.** El nav volvió a **5 ítems** el 2026-07-22 (el ítem
-"Registro" se quitó el mismo día por decisión de producto, ver
-[[canon-formularios]]), así que hoy no hay síntoma visible. La medición queda
-para el próximo que quiera sumar una página.
+**Estado: resuelta el 2026-07-23.** Al publicar `/registro` en `navItems` el nav
+pasó a **6 ítems** y disparó el desborde que esta medición anticipaba. Se resolvió
+en `src/components/layout/Header.tsx` **compactando solo la franja `md`
+(768–1023px)**, sin ocultar nada:
 
-La barra del header se queda **sin ancho en la franja 768–1024px** (`md` hasta
-`lg`) apenas hay **6 enlaces**, porque ahí conviven además el logo y el botón
-promocional de Revolution505.
+- **Promo de Revolution505 reducido a su logo en `md`:** el `<span>` del texto y el
+  `<ChevronRight>` llevan `md:hidden lg:inline` / `md:hidden lg:block`. El logo del
+  patrocinador sigue visible y el `<a>` clickeable — **no desaparece** (la
+  restricción dura del usuario). Vuelve completo en `lg`. Padding del promo sin
+  tocar (`px-5`), así que en sm (640–767px) se ve igual que antes.
+- **Enlaces del nav compactados en `md`:** `px-2.5 lg:px-5`, `text-sm lg:text-lg`,
+  gap del `<nav>` `gap-1 lg:gap-8`, y el subrayado activo `left-2.5 right-2.5
+  lg:left-4 lg:right-4` para que su inset siga al padding.
+- **`lg`+ quedó idéntico a antes:** no se tocó ningún valor `lg:*`.
 
-**Why:** al medir el caso peor a 768px (contenedor útil ~720px) la suma da
-~960px: nav ~590px (6 enlaces con `px-4` y `text-base`), logo ~116px y el promo
-de Revolution505 ~210px. El promo es `hidden sm:flex`, así que aparece justo en
-la franja donde el menú móvil (`md:hidden`) ya se ocultó. Con 5 enlaces la cuenta
-ya va apretada (~855px): un 6º ítem no crearía el problema, lo haría visible.
-El usuario decidió **no tocar el promo de Revolution505** para ganar ese espacio.
+**Why:** el caso peor era 768px, donde el `container` topa en 768px de ancho
+(útil ~720px con `px-6`) y conviven nav de 6 enlaces + logo + promo, con el menú
+móvil ya oculto (`md:hidden`) y el promo ya presente (`hidden sm:flex`). Con la
+compactación la cuenta baja a ~628px < 720px. La opción de mandar el promo a
+`hidden lg:flex` quedó **descartada por el usuario**: dejaría al patrocinador
+invisible entre md y lg.
 
-**How to apply:** antes de agregar una página al `navItems` de
-`src/components/layout/Header.tsx`, verificar en el navegador a 768px y a 900px.
-Si hay que ganar espacio, el orden de menor a mayor daño es: (1) compactar los
-enlaces solo en `md` (`px-2.5 lg:px-5`, `text-sm lg:text-lg`) — no alcanza solo;
-(2) pasar el promo de Revolution505 a `hidden lg:flex`, que libera ~210px pero
-**deja al patrocinador invisible entre md y lg** porque el menú móvil no está
-disponible ahí; (3) mover la navegación a un menú hamburguesa hasta `lg`.
-La opción (2) toca visibilidad de un patrocinador: **ya fue descartada una vez**,
-es decisión del usuario y no del agente.
+**How to apply:** si hay que sumar un **7º** ítem al nav, volver a medir a 768px y
+900px. Ya no queda margen fácil por compactación; la siguiente palanca que
+**preserva el promo** es pasar la navegación a hamburguesa hasta `lg` (correr
+`md:hidden`/`md:flex` a `lg:hidden`/`lg:flex`) — es más invasivo, avisar al
+usuario antes.
 
-Ver también [[canon-formularios]].
+Ver también [[canon-formularios]], [[registro-espanol-tuteo]].
