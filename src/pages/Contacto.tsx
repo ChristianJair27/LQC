@@ -41,7 +41,7 @@ export default function Contacto() {
   const faqs = [
     {
       question: "¿Cómo puedo inscribir a mi equipo?",
-      answer: "El registro se hace con un formulario en el sitio y es por jugador: cada integrante llena sus propios datos. El pago de inscripción, en cambio, es uno solo por equipo y lo realiza el capitán."
+      answer: "El registro está en la sección Registro del menú: es un formulario por jugador, así que cada integrante llena sus propios datos. El pago de inscripción, en cambio, es uno solo por equipo y lo realiza el capitán."
     },
     {
       question: "¿Cuáles son los requisitos para participar?",
