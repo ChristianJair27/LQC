@@ -25,7 +25,7 @@ export default function Contacto() {
     {
       icon: MessageSquare,
       title: "Discord",
-      value: "discord.gg/lqc",
+      value: "discord.gg/eS6zkvfkp",
       description: "Comunidad activa 24/7",
       action: "Unirse al servidor"
     },
