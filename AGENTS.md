@@ -12,9 +12,10 @@ datos, es el **formulario de `/registro`**: hace un **INSERT anónimo** en la ta
 datos de nadie.)
 
 La configuración de RLS —INSERT permitido para anónimos, SELECT no— es lo
-acordado con quien administra el proyecto de Supabase, pero **no está en el repo
-y todavía no se verificó de punta a punta**. Si un día el INSERT falla por
-permisos, ese es el primer lugar donde mirar, no el código.
+acordado con quien administra el proyecto de Supabase. **No está en el repo, pero
+se verificó de punta a punta en producción el 2026-07-23**: un INSERT anónimo
+real llegó a la tabla `inscripciones`. Si algún día el INSERT falla por permisos,
+ese es el primer lugar donde mirar, no el código.
 
 ## Stack
 
@@ -92,11 +93,8 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
    "Variables de entorno" más abajo.
 2. Al **agregar o renombrar una página** hay que tocar **dos** lugares: la `<Route>`
    en `src/App.tsx` **y** el arreglo `navItems` en `src/components/layout/Header.tsx`.
-   Olvidar el segundo es el error más fácil de cometer acá.
-   **Excepción deliberada:** `/registro` tiene `<Route>` pero **no** va en `navItems`
-   — es una página sin enlazar, accesible solo por URL, hasta que el pipeline de
-   producción pase las variables de entorno y se verifique un registro real de
-   punta a punta.
+   Olvidar el segundo es el error más fácil de cometer acá. El nav tiene hoy
+   **6 ítems** (Inicio, Torneos, Galería, Acerca, Contacto, Registro).
 3. **No inventar contenido** (fechas, resultados, nombres de torneos, patrocinadores).
    Si falta un dato, marcarlo como pendiente y preguntar.
 4. Rama de trabajo: `main`. Remoto: `github.com/ChristianJair27/LQC`.
@@ -193,9 +191,10 @@ plataforma solo las inyecta en runtime, no sirven: este es un sitio estático y
 para cuando corre nginx el bundle ya está compilado. Nunca hardcodearlas en
 `nixpacks.toml`: quedarían commiteadas.
 
-**Pendiente:** falta **configurar las variables en el deploy y verificar un
-registro real de punta a punta**. Hasta entonces `/registro` sigue fuera de
-`navItems` (regla 2).
+**Verificado (2026-07-23):** las variables ya están configuradas en el deploy y
+se confirmó un **registro real de punta a punta** — una inscripción anónima desde
+producción llegó a la tabla `inscripciones`. Por eso `/registro` ya es una página
+normal del nav (está en `navItems`).
 
 ## Comandos
 
