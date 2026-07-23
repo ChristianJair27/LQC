@@ -41,7 +41,7 @@ export default function Contacto() {
   const faqs = [
     {
       question: "¿Cómo puedo inscribir a mi equipo?",
-      answer: "Las inscripciones se abren al inicio de cada temporada directamente en Battlefy. Revisa la página principal para ver las fechas actuales y el botón de inscripción."
+      answer: "El registro se hace con un formulario en el sitio y es por jugador: cada integrante llena sus propios datos. El pago de inscripción, en cambio, es uno solo por equipo y lo realiza el capitán."
     },
     {
       question: "¿Cuáles son los requisitos para participar?",
@@ -49,7 +49,7 @@ export default function Contacto() {
     },
     {
       question: "¿Hay algún costo de inscripción?",
-      answer: "El torneo es 100% gratuito para todos los equipos participantes. Los premios son cubiertos por nuestros patrocinadores."
+      answer: "Sí: $500 MXN por equipo, no por jugador. Es un solo pago que realiza el capitán por transferencia, con el nombre del equipo como concepto."
     },
     {
       question: "¿Dónde se transmiten los partidos?",
