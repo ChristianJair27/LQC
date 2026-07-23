@@ -9,11 +9,15 @@ Config faltante o rota se maneja **degradando en runtime** (devolver `null`, mos
 mensaje genérico de error) y **avisando fuerte en el build** con un `console.warn` desde
 `vite.config.ts`. Ningún módulo bajo `src/` debe lanzar al ser evaluado.
 
-**Why:** `src/App.tsx` no tiene ErrorBoundary (`grep componentDidCatch|
-getDerivedStateFromError|ErrorBoundary src/` → 0) y `<Suspense>` solo captura promesas
-pendientes, no errores. Un throw en tiempo de módulo dentro de un chunk lazy hace que
-React desmonte el **root completo**: el sitio se va a negro con header y footer incluidos,
-aunque el usuario venga navegando desde Home. Ya me pasó al conectar Supabase
+**Why:** históricamente `src/App.tsx` no tenía ErrorBoundary y un throw en tiempo de
+módulo desmontaba el **root completo** (sitio a negro, header y footer incluidos).
+**Actualización 2026-07-23:** ya existe `src/components/ErrorBoundary.tsx` (class con
+`getDerivedStateFromError`) y `App.tsx` envuelve todo en él, así que hoy un throw en un
+chunk lazy caería en el fallback "Algo salió mal" en vez de a negro. Pero el contrato de
+`obtenerSupabase()` (nunca lanzar, degradar a `null`) **sigue vigente y se mantiene**:
+mostrar el mensaje genérico con la página en pie es mejor UX que la pantalla de error, y
+sus llamadores dependen de que no lance. `<Suspense>` sigue capturando solo promesas
+pendientes, no errores. Ya me pasó al conectar Supabase
 (2026-07-22): validé las `VITE_*` con un throw en `src/lib/supabase.ts`, el build salió
 verde con 0 warnings y el bundle quedó con un throw incondicional hardcodeado. Lo cazó el
 `revisor`. El chequeo tampoco puede ser un hard fail del build: `npm run build` es la
