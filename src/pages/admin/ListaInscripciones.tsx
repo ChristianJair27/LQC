@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from 'react'
-import { AlertCircle, CheckCircle2, ChevronDown, Clock, Inbox } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { AlertCircle, CheckCircle2, ChevronDown, Clock, Inbox, Loader2 } from 'lucide-react'
 import { obtenerSupabase } from '../../lib/supabase'
 
 /* ------------------------------------------------------------------ */
@@ -9,6 +9,7 @@ import { obtenerSupabase } from '../../lib/supabase'
 /* Una fila de la tabla `inscripciones` = un jugador. Los nombres de columna son
    los reales del esquema; un typo acá cae en el estado de error genérico. */
 type Inscripcion = {
+  id: string | number
   equipo: string
   gamertag: string
   nombre: string
@@ -17,16 +18,30 @@ type Inscripcion = {
   capitan_nombre: string
   capitan_celular: string
   pagado: boolean | null
+  pagado_en: string | null
+  notas: string | null
   creado_en: string
 }
 
-/* Columna del estado de pago aislada en una constante: si el esquema la renombra,
-   se cambia acá y en la clave `pagado` del tipo, sin tocar la lógica. */
+/* Nombres de columna aislados en constantes: si el esquema los renombra, se cambian
+   acá (y en las claves del tipo) sin tocar la lógica. `id` es el único nombre que no
+   vino literal en el contrato ("los ids de las filas"): se asume la PK por defecto de
+   Supabase; si difiere, es un cambio de una sola línea. Las escrituras (pago y notas)
+   filtran SIEMPRE por `id` con `.in()`, nunca por el texto del equipo, que se normaliza
+   para agrupar y no es clave. */
+const COL_ID = 'id' as const
 const COL_PAGADO = 'pagado' as const
+const COL_PAGADO_EN = 'pagado_en' as const
+const COL_NOTAS = 'notas' as const
 
-/* Orden de columnas tal cual lo pidió el contrato de datos. */
+/* Techo de las escrituras (marcar pago / guardar notas): pasado ese tiempo la query se
+   aborta y cae en el mensaje genérico, en vez de dejar la tarjeta trabada en
+   "Guardando…". Mismo criterio que el envío de /registro. */
+const TIEMPO_LIMITE_MS = 15_000
+
+/* Orden de columnas del contrato de datos, más las de Fase 3 (id, pagado_en, notas). */
 const SELECT =
-  `equipo, gamertag, nombre, celular, correo, capitan_nombre, capitan_celular, ${COL_PAGADO}, creado_en`
+  `${COL_ID}, equipo, gamertag, nombre, celular, correo, capitan_nombre, capitan_celular, ${COL_PAGADO}, ${COL_PAGADO_EN}, ${COL_NOTAS}, creado_en`
 
 /* ------------------------------------------------------------------ */
 /*  Agrupación por equipo (función pura, fácil de auditar)             */
@@ -39,6 +54,9 @@ type EquipoAgrupado = {
   capitanCelular: string
   jugadores: Inscripcion[] // ordenados por registro, más reciente primero
   pagado: boolean // true solo si TODAS las filas están pagadas
+  ids: (string | number)[] // todos los ids del grupo — clave de las escrituras
+  pagadoEn: string | null // fecha de pago (de la fila más antigua); null si pendiente
+  notas: string // notas del equipo (de la fila más antigua); '' si la columna es null
   ultimaActividad: number // mayor creado_en del grupo (ms) — para ordenar equipos
 }
 
@@ -85,6 +103,9 @@ function agruparPorEquipo(filas: Inscripcion[]): EquipoAgrupado[] {
     const jugadores = [...grupo].sort(
       (a, b) => tiempo(b.creado_en) - tiempo(a.creado_en)
     )
+    /* Todos los ids del grupo: son la clave de las escrituras (`.in(COL_ID, ids)`),
+       nunca el texto normalizado del equipo. */
+    const ids = grupo.map((f) => f[COL_ID])
 
     equipos.push({
       clave,
@@ -93,6 +114,11 @@ function agruparPorEquipo(filas: Inscripcion[]): EquipoAgrupado[] {
       capitanCelular: masAntigua.capitan_celular,
       jugadores,
       pagado,
+      ids,
+      /* pagadoEn y notas salen de la fila más antigua, mismo criterio que el nombre y el
+         capitán (determinístico si variaran entre filas). `null` → '' en notas. */
+      pagadoEn: masAntigua.pagado_en,
+      notas: masAntigua.notas ?? '',
       ultimaActividad
     })
   }
@@ -116,9 +142,76 @@ function fmtFecha(creadoEn: string): string {
   })
 }
 
+/* Variante con hora para la fecha de pago: `pagado_en` es un timestamp preciso y en el
+   panel importa cuándo se marcó. Usa toLocaleString (no toLocaleDateString) para que las
+   opciones de hora/minuto tengan efecto. */
+function fmtFechaHora(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 /* ------------------------------------------------------------------ */
 /*  Piezas de UI (a nivel de módulo para no remontar en cada render)   */
 /* ------------------------------------------------------------------ */
+
+/* Botones de acción de las tarjetas. Neutralizan lo que la regla base de index.css le
+   pone a todo <button>: Orbitron (`font-sans`/`tracking-normal`), el salto de -2px y el
+   glow en hover (`hover:[transform:none]`/`hover:shadow-none`) que dentro de una tarjeta
+   de datos se verían como jank y como "póster". El anillo de foco cian base se conserva.
+   PRIMARIO = CTA canónico (from-lqc-700 → lqc-500) para la acción primaria: "Marcar
+   pagado" y "Confirmar". SECUNDARIO = `bg-none` (sin el gradiente base) para acciones
+   sutiles: "Quitar pago", "Cancelar" y "Guardar notas". */
+const BTN_BASE =
+  'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-sans font-medium tracking-normal transition-colors duration-200 hover:[transform:none] hover:shadow-none disabled:opacity-60 disabled:cursor-not-allowed'
+const BTN_PRIMARIO =
+  `${BTN_BASE} border-0 bg-gradient-to-r from-lqc-700 to-lqc-500 text-white hover:from-lqc-600 hover:to-lqc-400`
+const BTN_SECUNDARIO =
+  `${BTN_BASE} bg-none bg-black/40 border border-blue-800/40 text-gray-200 hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white`
+
+/* Textarea de notas: mismo estilo de input del proyecto (ver Login/Registro), fondo
+   oscuro y foco azul; sin icono a la izquierda, así que sin el `pl-12`. */
+const CLASE_TEXTAREA =
+  'w-full px-4 py-3 bg-black/40 backdrop-blur-sm border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm resize-y min-h-[4.5rem] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed'
+
+/* Indicador de estado de las notas: sobrio, font-mono, gris/azul (rose solo en error).
+   Deriva "Sin cambios"/"Sin guardar" del prop `cambiadas` (textarea vs valor guardado). */
+function EstadoNotas({
+  estado,
+  cambiadas
+}: {
+  estado: 'idle' | 'guardando' | 'guardado' | 'error'
+  cambiadas: boolean
+}) {
+  if (estado === 'guardando') {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-blue-300">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Guardando…
+      </span>
+    )
+  }
+  if (estado === 'error') {
+    return (
+      <span role="alert" className="font-mono text-[11px] text-rose-300">
+        No pudimos guardar el cambio. Inténtalo de nuevo.
+      </span>
+    )
+  }
+  if (cambiadas) {
+    return <span className="font-mono text-[11px] text-blue-300">Sin guardar</span>
+  }
+  if (estado === 'guardado') {
+    return <span className="font-mono text-[11px] text-lqc-accent">Guardado</span>
+  }
+  return <span className="font-mono text-[11px] text-gray-500">Sin cambios</span>
+}
 
 /* Badge on-paleta: "Confirmado" en cian de marca (positivo), "Pendiente" en gris
    neutro apagado. Sin verde/ámbar; `rose` queda reservado a errores. */
@@ -166,61 +259,213 @@ function CampoJugador({
   )
 }
 
-/* Tarjeta de equipo colapsable. El disparador es un <button> real (teclado +
-   aria-expanded). Neutraliza los estilos base que index.css le pone a todo
-   <button>: `bg-none` mata el gradiente, `font-sans`/`tracking-normal` el
-   Orbitron, `border-0` el borde de 2px y `hover:[transform:none]` el salto de
-   -2px (que dentro de la tarjeta se vería como jank). El anillo de foco cian
-   base sí se conserva. */
-function TarjetaEquipo({ equipo }: { equipo: EquipoAgrupado }) {
+/* Tarjeta de equipo colapsable + acciones de Fase 3 (marcar pago, notas).
+
+   Estructura del encabezado — GOTCHA: no se puede anidar <button> dentro de <button>
+   (HTML inválido). El disparador del colapso y el botón de pago son HERMANOS dentro de
+   un contenedor flex: el área de info (nombre/contador/capitán/badge/fecha) es el
+   <button> que expande, y la acción de pago va al lado, como otra celda. El contenido del
+   disparador es solo de frase (`<span>` + iconos), nunca bloques. Las notas y su botón
+   viven en el panel expandido, que es un <div> hermano fuera del disparador.
+
+   Pago (por equipo): confirmación inline on-brand (no window.confirm, no modal), que
+   dice a cuántos jugadores afecta. Actualización PESIMISTA: se aplica solo tras el éxito;
+   el UPDATE toca TODAS las filas del grupo por id (`onMarcarPago` → `.in(COL_ID, ids)`).
+   Al éxito, el padre muta `equipos` de forma inmutable y el badge, la fecha y el número
+   "Confirmados" del resumen se recalculan solos, sin refetch (que perdería la expansión).
+   En error/timeout no se cambia nada y se muestra un texto genérico.
+
+   Notas (por equipo): textarea en el panel expandido, guardado explícito con botón
+   (nunca al teclear), con estados sin-cambios/sin-guardar/guardando/guardado/error.
+
+   Los controles de escritura de la tarjeta se deshabilitan mientras una operación vuela
+   (`ocupado`). Un flag `montado` evita setState si la tarjeta se desmonta a mitad. */
+function TarjetaEquipo({
+  equipo,
+  onMarcarPago,
+  onGuardarNotas
+}: {
+  equipo: EquipoAgrupado
+  onMarcarPago: (equipo: EquipoAgrupado, pagar: boolean) => Promise<boolean>
+  onGuardarNotas: (equipo: EquipoAgrupado, notas: string) => Promise<boolean>
+}) {
   const [expandido, setExpandido] = useState(false)
+  const [estadoPago, setEstadoPago] = useState<'idle' | 'confirmando' | 'guardando'>('idle')
+  const [errorPago, setErrorPago] = useState(false)
+  const [notasTexto, setNotasTexto] = useState(equipo.notas)
+  const [estadoNotas, setEstadoNotas] = useState<'idle' | 'guardando' | 'guardado' | 'error'>(
+    'idle'
+  )
+
   const panelId = useId()
+  const notasId = useId()
+  const confirmarRef = useRef<HTMLButtonElement>(null)
+  const botonPagoRef = useRef<HTMLButtonElement>(null)
+
+  /* Flag para no llamar setState si la tarjeta se desmonta con una escritura en vuelo.
+     Se reafirma en true en cada montaje (StrictMode monta dos veces en dev). */
+  const montado = useRef(true)
+  useEffect(() => {
+    montado.current = true
+    return () => {
+      montado.current = false
+    }
+  }, [])
+
+  /* Foco de la confirmación de pago, comparando el valor previo (no una bandera de
+     primer render) para no robar el foco al montar ni con el doble montaje de
+     StrictMode: al abrir la confirmación va a "Confirmar"; al cerrarla —cancelando
+     (confirmando→idle) o tras guardar (guardando→idle)— vuelve al botón "Marcar
+     pagado", en vez de caer a <body>. Mismo patrón de foco que /registro. */
+  const estadoPagoPrevio = useRef(estadoPago)
+  useEffect(() => {
+    const previo = estadoPagoPrevio.current
+    estadoPagoPrevio.current = estadoPago
+    if (estadoPago === 'confirmando') {
+      confirmarRef.current?.focus()
+    } else if (estadoPago === 'idle' && (previo === 'confirmando' || previo === 'guardando')) {
+      botonPagoRef.current?.focus()
+    }
+  }, [estadoPago])
+
   const cantidad = equipo.jugadores.length
+  /* Una escritura de esta tarjeta (pago o notas) bloquea sus propios controles. */
+  const ocupado = estadoPago === 'guardando' || estadoNotas === 'guardando'
+  /* Toggle: si está pagado, la acción es desmarcar; si no, marcar. */
+  const pagar = !equipo.pagado
+  const notasCambiadas = notasTexto !== equipo.notas
+
+  const confirmarPago = async () => {
+    if (ocupado) return
+    setErrorPago(false)
+    setEstadoPago('guardando')
+    const ok = await onMarcarPago(equipo, pagar)
+    if (!montado.current) return
+    setEstadoPago('idle')
+    /* En error no se toca `equipo`: no hay que revertir nada (fue pesimista). */
+    if (!ok) setErrorPago(true)
+  }
+
+  const guardarNotas = async () => {
+    if (ocupado || !notasCambiadas) return
+    setEstadoNotas('guardando')
+    const ok = await onGuardarNotas(equipo, notasTexto)
+    if (!montado.current) return
+    /* Al éxito, el padre actualiza `equipo.notas`: `notasCambiadas` vuelve a false y el
+       indicador pasa a "Guardado". Al error, el texto queda para reintentar. */
+    setEstadoNotas(ok ? 'guardado' : 'error')
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-colors hover:border-blue-800/40">
-      <button
-        type="button"
-        onClick={() => setExpandido((v) => !v)}
-        aria-expanded={expandido}
-        aria-controls={panelId}
-        className="group flex w-full items-center gap-3 border-0 bg-none px-4 py-4 text-left font-sans font-normal tracking-normal transition-colors hover:bg-white/[0.03] hover:[transform:none] md:gap-4 md:px-6 md:py-5"
-      >
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-baseline gap-2 md:gap-3">
-            <span className="truncate text-base font-semibold text-white md:text-lg">
-              {equipo.nombre || 'Sin nombre'}
+      {/* Encabezado: disparador del colapso + acción de pago, HERMANOS (no anidados).
+          En móvil se apilan; en sm+ van lado a lado, separados por un borde. */}
+      <div className="flex flex-col sm:flex-row sm:items-stretch">
+        <button
+          type="button"
+          onClick={() => setExpandido((v) => !v)}
+          aria-expanded={expandido}
+          aria-controls={panelId}
+          className="group flex min-w-0 flex-1 items-center gap-3 border-0 bg-none px-4 py-4 text-left font-sans font-normal tracking-normal transition-colors hover:bg-white/[0.03] hover:[transform:none] hover:shadow-none md:gap-4 md:px-6 md:py-5"
+        >
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex min-w-0 items-baseline gap-2 md:gap-3">
+              <span className="truncate text-base font-semibold text-white md:text-lg">
+                {equipo.nombre || 'Sin nombre'}
+              </span>
+              <span className="shrink-0 font-mono text-xs text-gray-400">
+                {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
+              </span>
             </span>
-            <span className="shrink-0 font-mono text-xs text-gray-400">
-              {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
+            <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400">
+                Capitán
+              </span>
+              <span className="text-gray-300">{equipo.capitanNombre || '—'}</span>
+              <span className="font-mono text-gray-400">
+                {equipo.capitanCelular || '—'}
+              </span>
             </span>
           </span>
-          <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-            <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400">
-              Capitán
+
+          <span className="flex shrink-0 items-center gap-2.5 md:gap-3">
+            {/* Badge + fecha de pago apilados: la fecha (`pagado_en`) solo cuando está
+                pagado. `<span>` con flex sigue siendo contenido de frase válido. */}
+            <span className="flex flex-col items-end gap-1">
+              <BadgePago pagado={equipo.pagado} />
+              {equipo.pagado && equipo.pagadoEn && (
+                <span className="whitespace-nowrap font-mono text-[10px] leading-none text-gray-500">
+                  {fmtFechaHora(equipo.pagadoEn)}
+                </span>
+              )}
             </span>
-            <span className="text-gray-300">{equipo.capitanNombre || '—'}</span>
-            <span className="font-mono text-gray-400">
-              {equipo.capitanCelular || '—'}
-            </span>
+            <ChevronDown
+              className={`h-5 w-5 shrink-0 transition-transform duration-200 ${
+                expandido
+                  ? 'text-blue-400 [transform:rotate(180deg)]'
+                  : 'text-gray-400 [transform:rotate(0deg)]'
+              }`}
+            />
           </span>
-        </span>
+        </button>
 
-        <span className="flex shrink-0 items-center gap-2.5 md:gap-3">
-          <BadgePago pagado={equipo.pagado} />
-          <ChevronDown
-            className={`h-5 w-5 shrink-0 transition-transform duration-200 ${
-              expandido
-                ? 'text-blue-400 [transform:rotate(180deg)]'
-                : 'text-gray-400 [transform:rotate(0deg)]'
-            }`}
-          />
-        </span>
-      </button>
+        {/* Acción de pago — hermana del disparador, nunca dentro de él. */}
+        <div className="flex flex-col justify-center gap-1.5 border-t border-white/10 px-4 py-3 sm:border-l sm:border-t-0 sm:px-5">
+          {estadoPago === 'guardando' ? (
+            <span className="inline-flex items-center gap-2 font-mono text-xs text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Guardando…
+            </span>
+          ) : estadoPago === 'confirmando' ? (
+            <div className="flex flex-col gap-2">
+              <p className="max-w-[15rem] text-xs leading-snug text-gray-300">
+                {pagar ? 'Marcar como pagado' : 'Marcar como pendiente'} al equipo «
+                {equipo.nombre || 'Sin nombre'}». Afecta a {cantidad}{' '}
+                {cantidad === 1 ? 'jugador' : 'jugadores'}.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  ref={confirmarRef}
+                  type="button"
+                  onClick={confirmarPago}
+                  className={BTN_PRIMARIO}
+                >
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEstadoPago('idle')}
+                  className={BTN_SECUNDARIO}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              ref={botonPagoRef}
+              type="button"
+              onClick={() => {
+                setErrorPago(false)
+                setEstadoPago('confirmando')
+              }}
+              disabled={ocupado}
+              className={equipo.pagado ? BTN_SECUNDARIO : BTN_PRIMARIO}
+            >
+              {equipo.pagado ? 'Quitar pago' : 'Marcar pagado'}
+            </button>
+          )}
+          {errorPago && (
+            <p role="alert" className="max-w-[15rem] text-xs leading-snug text-rose-300">
+              No pudimos guardar el cambio. Inténtalo de nuevo.
+            </p>
+          )}
+        </div>
+      </div>
 
-      {/* El panel se monta siempre y se oculta con `hidden`: así el id que
-          referencia `aria-controls` existe también cuando la tarjeta está
-          colapsada (un aria-controls a un id ausente es ARIA inválido). */}
+      {/* El panel se monta siempre y se oculta con `hidden`: así el id que referencia
+          `aria-controls` existe también colapsado (un aria-controls a un id ausente es
+          ARIA inválido). */}
       <div id={panelId} hidden={!expandido} className="border-t border-white/10">
         <ul className="divide-y divide-white/5">
           {equipo.jugadores.map((j, i) => (
@@ -237,6 +482,48 @@ function TarjetaEquipo({ equipo }: { equipo: EquipoAgrupado }) {
             </li>
           ))}
         </ul>
+
+        {/* Notas del equipo: guardado explícito con botón, nunca al teclear. */}
+        <div className="border-t border-white/10 px-4 py-4 md:px-6 md:py-5">
+          <label
+            htmlFor={notasId}
+            className="mb-2 block font-mono text-[11px] uppercase tracking-wider text-gray-400"
+          >
+            Notas del equipo
+          </label>
+          <textarea
+            id={notasId}
+            value={notasTexto}
+            onChange={(e) => {
+              setNotasTexto(e.target.value)
+              /* Al editar se limpia el estado transitorio (guardado/error): el indicador
+                 vuelve a derivarse de si hay cambios sin guardar. */
+              if (estadoNotas !== 'idle') setEstadoNotas('idle')
+            }}
+            disabled={ocupado}
+            rows={3}
+            placeholder="Agrega una nota para este equipo (opcional)."
+            className={CLASE_TEXTAREA}
+          />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <EstadoNotas estado={estadoNotas} cambiadas={notasCambiadas} />
+            <button
+              type="button"
+              onClick={guardarNotas}
+              disabled={ocupado || !notasCambiadas}
+              className={BTN_SECUNDARIO}
+            >
+              {estadoNotas === 'guardando' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Guardando…
+                </>
+              ) : (
+                'Guardar notas'
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -400,6 +687,65 @@ export default function ListaInscripciones() {
     }
   }, [])
 
+  /* Escritura de pago (por equipo). Toca TODAS las filas del grupo por id — nunca por el
+     texto del equipo, que se normaliza para agrupar y no es clave. Actualización
+     pesimista: al éxito muta `equipos` de forma inmutable (map por clave), así el badge,
+     la fecha y el número "Confirmados" del resumen se recalculan sin refetch (que
+     perdería el estado de expansión). El error nunca se filtra: la función devuelve un
+     booleano, no el objeto de Supabase, y no se loguea. */
+  const marcarPago = async (
+    equipo: EquipoAgrupado,
+    pagar: boolean
+  ): Promise<boolean> => {
+    const supabase = obtenerSupabase()
+    if (!supabase) return false
+    /* Timestamp del cliente: en un UPDATE no aplica el default de la DB. Skew menor,
+       aceptable. Al desmarcar, pagado_en vuelve a null. */
+    const pagadoEn = pagar ? new Date().toISOString() : null
+    try {
+      const { error } = await supabase
+        .from('inscripciones')
+        .update({ [COL_PAGADO]: pagar, [COL_PAGADO_EN]: pagadoEn })
+        .in(COL_ID, equipo.ids)
+        .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_MS))
+      if (error) return false
+      setEquipos((prev) =>
+        prev.map((e) =>
+          e.clave === equipo.clave ? { ...e, pagado: pagar, pagadoEn } : e
+        )
+      )
+      return true
+    } catch {
+      /* Timeout (abort) o red: mismo camino, sin logs ni exponer el error. */
+      return false
+    }
+  }
+
+  /* Escritura de notas (por equipo). Mismo criterio: todas las filas del grupo por id.
+     Al éxito actualiza el `notas` guardado del grupo para que la tarjeta vuelva a
+     "sin cambios". */
+  const guardarNotas = async (
+    equipo: EquipoAgrupado,
+    notas: string
+  ): Promise<boolean> => {
+    const supabase = obtenerSupabase()
+    if (!supabase) return false
+    try {
+      const { error } = await supabase
+        .from('inscripciones')
+        .update({ [COL_NOTAS]: notas })
+        .in(COL_ID, equipo.ids)
+        .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_MS))
+      if (error) return false
+      setEquipos((prev) =>
+        prev.map((e) => (e.clave === equipo.clave ? { ...e, notas } : e))
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+
   if (estado === 'cargando') return <Esqueleto />
   if (estado === 'error') return <ErrorCarga />
   if (equipos.length === 0) return <VacioInscripciones />
@@ -412,7 +758,11 @@ export default function ListaInscripciones() {
       <ul className="space-y-3 md:space-y-4">
         {equipos.map((e) => (
           <li key={e.clave}>
-            <TarjetaEquipo equipo={e} />
+            <TarjetaEquipo
+              equipo={e}
+              onMarcarPago={marcarPago}
+              onGuardarNotas={guardarNotas}
+            />
           </li>
         ))}
       </ul>
