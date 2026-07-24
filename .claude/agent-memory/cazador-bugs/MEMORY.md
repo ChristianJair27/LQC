@@ -6,3 +6,4 @@
 - [RLS de `inscripciones`](supabase-inscripciones-rls.md) — INSERT anónimo sin SELECT: un `.select()` encadenado rompe el envío del registro.
 - [Nunca lanzar al evaluar un módulo](degradar-en-runtime-avisar-en-build.md) — degradar en runtime, avisar en `vite.config.ts`; ya hay ErrorBoundary pero el contrato sigue.
 - [setState síncrono en useEffect](eslint-set-state-in-effect.md) — es ERROR de ESLint (no del build); resolver con inicializador perezoso de useState.
+- [Botón anidado en tarjeta colapsable](boton-anidado-tarjeta-colapsable.md) — el encabezado de TarjetaEquipo ES un `<button>`; anidar otro es HTML inválido que ni build ni ESLint cazan.
