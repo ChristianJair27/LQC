@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Inbox } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { obtenerSupabase } from '../../lib/supabase'
+import ListaInscripciones from './ListaInscripciones'
 
 export default function Panel() {
   const navigate = useNavigate()
@@ -93,18 +94,8 @@ export default function Panel() {
             Desde aquí vas a administrar los registros de la liga.
           </p>
 
-          {/* Placeholder de la próxima fase: sin datos ni columnas inventadas. */}
-          <div className="bg-black/30 backdrop-blur-sm border border-dashed border-white/15 rounded-2xl p-10 md:p-14 text-center">
-            <div className="w-16 h-16 rounded-full bg-blue-950/40 border border-lqc-accent/20 flex items-center justify-center mx-auto mb-6 shadow-lqc">
-              <Inbox className="w-8 h-8 text-lqc-accent" />
-            </div>
-            <h2 className="text-xl md:text-2xl font-light mb-3">
-              Aquí va el listado de inscripciones
-            </h2>
-            <p className="text-gray-400 max-w-md mx-auto leading-relaxed">
-              El listado de equipos y jugadores registrados se mostrará en la próxima fase.
-            </p>
-          </div>
+          {/* Listado real de inscripciones, agrupado por equipo (Fase 2). */}
+          <ListaInscripciones />
         </div>
       </main>
     </div>

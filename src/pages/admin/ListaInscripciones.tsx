@@ -1,0 +1,421 @@
+import { useEffect, useId, useState } from 'react'
+import { AlertCircle, CheckCircle2, ChevronDown, Clock, Inbox } from 'lucide-react'
+import { obtenerSupabase } from '../../lib/supabase'
+
+/* ------------------------------------------------------------------ */
+/*  Datos                                                              */
+/* ------------------------------------------------------------------ */
+
+/* Una fila de la tabla `inscripciones` = un jugador. Los nombres de columna son
+   los reales del esquema; un typo acá cae en el estado de error genérico. */
+type Inscripcion = {
+  equipo: string
+  gamertag: string
+  nombre: string
+  celular: string
+  correo: string
+  capitan_nombre: string
+  capitan_celular: string
+  pagado: boolean | null
+  creado_en: string
+}
+
+/* Columna del estado de pago aislada en una constante: si el esquema la renombra,
+   se cambia acá y en la clave `pagado` del tipo, sin tocar la lógica. */
+const COL_PAGADO = 'pagado' as const
+
+/* Orden de columnas tal cual lo pidió el contrato de datos. */
+const SELECT =
+  `equipo, gamertag, nombre, celular, correo, capitan_nombre, capitan_celular, ${COL_PAGADO}, creado_en`
+
+/* ------------------------------------------------------------------ */
+/*  Agrupación por equipo (función pura, fácil de auditar)             */
+/* ------------------------------------------------------------------ */
+
+type EquipoAgrupado = {
+  clave: string // clave normalizada, única por grupo (sirve de key de React)
+  nombre: string // nombre a mostrar = el original de la fila más antigua
+  capitanNombre: string
+  capitanCelular: string
+  jugadores: Inscripcion[] // ordenados por registro, más reciente primero
+  pagado: boolean // true solo si TODAS las filas están pagadas
+  ultimaActividad: number // mayor creado_en del grupo (ms) — para ordenar equipos
+}
+
+/* "Los Panditas" y "los panditas " deben caer en el mismo grupo. */
+function normalizarEquipo(equipo: string): string {
+  return equipo.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+/* creado_en → milisegundos. Se compara por tiempo real, no lexicográficamente,
+   por si el timestamp llega con distinto offset. Un valor inválido cae a 0. */
+function tiempo(creadoEn: string): number {
+  const t = new Date(creadoEn).getTime()
+  return Number.isNaN(t) ? 0 : t
+}
+
+/* La query llega DESC (lo más reciente primero), así que la fila más antigua es
+   la ÚLTIMA ocurrencia del grupo: la buscamos por el mínimo `creado_en` en vez
+   de tomar la primera que aparece. Esa fila fija el nombre a mostrar y el capitán
+   (determinístico si variaran entre filas). */
+function agruparPorEquipo(filas: Inscripcion[]): EquipoAgrupado[] {
+  const grupos = new Map<string, Inscripcion[]>()
+  for (const fila of filas) {
+    /* String(... ?? '') blinda contra una fila con `equipo` nulo: sin el guard,
+       `normalizarEquipo(null)` lanzaría y tumbaría todo el listado por una fila. */
+    const clave = normalizarEquipo(String(fila.equipo ?? ''))
+    const grupo = grupos.get(clave)
+    if (grupo) grupo.push(fila)
+    else grupos.set(clave, [fila])
+  }
+
+  const equipos: EquipoAgrupado[] = []
+  for (const [clave, grupo] of grupos) {
+    const masAntigua = grupo.reduce((a, b) =>
+      tiempo(b.creado_en) < tiempo(a.creado_en) ? b : a
+    )
+    const ultimaActividad = grupo.reduce(
+      (max, f) => Math.max(max, tiempo(f.creado_en)),
+      0
+    )
+    /* El pago es un solo depósito por equipo: el equipo está "Confirmado" solo si
+       NO le queda ninguna fila sin saldar. `null`/`false` cuentan como no pagado.
+       En Fase 3, el botón de marcar pagado debe setear TODAS las filas del grupo. */
+    const pagado = grupo.every((f) => f[COL_PAGADO] === true)
+    const jugadores = [...grupo].sort(
+      (a, b) => tiempo(b.creado_en) - tiempo(a.creado_en)
+    )
+
+    equipos.push({
+      clave,
+      nombre: masAntigua.equipo,
+      capitanNombre: masAntigua.capitan_nombre,
+      capitanCelular: masAntigua.capitan_celular,
+      jugadores,
+      pagado,
+      ultimaActividad
+    })
+  }
+
+  /* Equipo con actividad más nueva arriba, coherente con "lo más reciente arriba". */
+  equipos.sort((a, b) => b.ultimaActividad - a.ultimaActividad)
+  return equipos
+}
+
+/* ------------------------------------------------------------------ */
+/*  Formato                                                            */
+/* ------------------------------------------------------------------ */
+
+function fmtFecha(creadoEn: string): string {
+  const d = new Date(creadoEn)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+/* ------------------------------------------------------------------ */
+/*  Piezas de UI (a nivel de módulo para no remontar en cada render)   */
+/* ------------------------------------------------------------------ */
+
+/* Badge on-paleta: "Confirmado" en cian de marca (positivo), "Pendiente" en gris
+   neutro apagado. Sin verde/ámbar; `rose` queda reservado a errores. */
+function BadgePago({ pagado }: { pagado: boolean }) {
+  if (pagado) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-lqc-accent/30 bg-lqc-accent/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-lqc-accent">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        Confirmado
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-gray-400">
+      <Clock className="h-3.5 w-3.5" />
+      Pendiente
+    </span>
+  )
+}
+
+function CampoJugador({
+  label,
+  valor,
+  mono,
+  full,
+  clase = ''
+}: {
+  label: string
+  valor: string
+  mono?: boolean
+  full?: boolean
+  clase?: string
+}) {
+  return (
+    <div className={`min-w-0 ${full ? 'sm:col-span-2' : ''}`}>
+      <dt className="font-mono text-[11px] uppercase tracking-wider text-gray-400">
+        {label}
+      </dt>
+      <dd
+        className={`mt-0.5 text-sm text-gray-200 ${mono ? 'font-mono' : 'font-sans'} ${clase}`}
+      >
+        {valor || '—'}
+      </dd>
+    </div>
+  )
+}
+
+/* Tarjeta de equipo colapsable. El disparador es un <button> real (teclado +
+   aria-expanded). Neutraliza los estilos base que index.css le pone a todo
+   <button>: `bg-none` mata el gradiente, `font-sans`/`tracking-normal` el
+   Orbitron, `border-0` el borde de 2px y `hover:[transform:none]` el salto de
+   -2px (que dentro de la tarjeta se vería como jank). El anillo de foco cian
+   base sí se conserva. */
+function TarjetaEquipo({ equipo }: { equipo: EquipoAgrupado }) {
+  const [expandido, setExpandido] = useState(false)
+  const panelId = useId()
+  const cantidad = equipo.jugadores.length
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-colors hover:border-blue-800/40">
+      <button
+        type="button"
+        onClick={() => setExpandido((v) => !v)}
+        aria-expanded={expandido}
+        aria-controls={panelId}
+        className="group flex w-full items-center gap-3 border-0 bg-none px-4 py-4 text-left font-sans font-normal tracking-normal transition-colors hover:bg-white/[0.03] hover:[transform:none] md:gap-4 md:px-6 md:py-5"
+      >
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex min-w-0 items-baseline gap-2 md:gap-3">
+            <span className="truncate text-base font-semibold text-white md:text-lg">
+              {equipo.nombre || 'Sin nombre'}
+            </span>
+            <span className="shrink-0 font-mono text-xs text-gray-400">
+              {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
+            </span>
+          </span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+            <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400">
+              Capitán
+            </span>
+            <span className="text-gray-300">{equipo.capitanNombre || '—'}</span>
+            <span className="font-mono text-gray-400">
+              {equipo.capitanCelular || '—'}
+            </span>
+          </span>
+        </span>
+
+        <span className="flex shrink-0 items-center gap-2.5 md:gap-3">
+          <BadgePago pagado={equipo.pagado} />
+          <ChevronDown
+            className={`h-5 w-5 shrink-0 transition-transform duration-200 ${
+              expandido
+                ? 'text-blue-400 [transform:rotate(180deg)]'
+                : 'text-gray-400 [transform:rotate(0deg)]'
+            }`}
+          />
+        </span>
+      </button>
+
+      {/* El panel se monta siempre y se oculta con `hidden`: así el id que
+          referencia `aria-controls` existe también cuando la tarjeta está
+          colapsada (un aria-controls a un id ausente es ARIA inválido). */}
+      <div id={panelId} hidden={!expandido} className="border-t border-white/10">
+        <ul className="divide-y divide-white/5">
+          {equipo.jugadores.map((j, i) => (
+            <li key={`${equipo.clave}-${i}`} className="px-4 py-4 md:px-6 md:py-5">
+              <p className="break-words font-sans font-semibold text-white">
+                {j.gamertag || '—'}
+              </p>
+              <dl className="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                <CampoJugador label="Nombre" valor={j.nombre} />
+                <CampoJugador label="Celular" valor={j.celular} mono />
+                <CampoJugador label="Correo" valor={j.correo} mono full clase="break-all" />
+                <CampoJugador label="Registro" valor={fmtFecha(j.creado_en)} mono />
+              </dl>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+/* Resumen: tres números grandes en azul + etiqueta mono. La marca entra en el
+   número; los datos se leen como herramienta, no como póster. */
+function Resumen({
+  equipos,
+  totalJugadores
+}: {
+  equipos: EquipoAgrupado[]
+  totalJugadores: number
+}) {
+  const celdas = [
+    { etiqueta: 'Equipos', valor: equipos.length },
+    { etiqueta: 'Jugadores', valor: totalJugadores },
+    { etiqueta: 'Confirmados', valor: equipos.filter((e) => e.pagado).length }
+  ]
+  return (
+    <div className="grid grid-cols-3 gap-3 md:gap-4">
+      {celdas.map((c) => (
+        <div
+          key={c.etiqueta}
+          className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5"
+        >
+          <p className="font-sans text-3xl font-semibold leading-none text-blue-400 md:text-4xl">
+            {c.valor}
+          </p>
+          <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-gray-400 md:text-xs">
+            {c.etiqueta}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* Skeleton on-brand: el estado inicial ya es "cargando", así que no hay parpadeo.
+   role="status" + texto sr-only anuncian la carga a lectores de pantalla. */
+function Esqueleto() {
+  return (
+    <div role="status" className="space-y-6 md:space-y-8">
+      <span className="sr-only">Cargando inscripciones…</span>
+      <div className="grid grid-cols-3 gap-3 md:gap-4" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5"
+          >
+            <div className="h-8 w-12 animate-pulse rounded bg-white/10" />
+            <div className="mt-3 h-3 w-16 animate-pulse rounded bg-white/5" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-3 md:space-y-4" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5 md:px-6"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-5 w-40 max-w-full animate-pulse rounded bg-white/10" />
+                <div className="h-3 w-56 max-w-full animate-pulse rounded bg-white/5" />
+              </div>
+              <div className="h-6 w-24 shrink-0 animate-pulse rounded-full bg-white/5" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* Error genérico: familia `rose`, role="alert". Nunca se expone el error real de
+   Supabase (el estado es un enum, no guarda el objeto). */
+function ErrorCarga() {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-950/30 p-5"
+    >
+      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-300" />
+      <div>
+        <p className="font-sans text-sm text-rose-200 md:text-base">
+          No pudimos cargar las inscripciones.
+        </p>
+        <p className="mt-1 font-sans text-sm text-rose-300/80">
+          Recarga la página e inténtalo de nuevo en unos minutos.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/* Vacío: no es un error, es un mensaje amable. Reusa la caja punteada del
+   placeholder anterior. */
+function VacioInscripciones() {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/15 bg-black/30 p-10 text-center md:p-14">
+      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-lqc-accent/20 bg-blue-950/40 shadow-lqc">
+        <Inbox className="h-8 w-8 text-lqc-accent" />
+      </div>
+      <p className="font-sans text-lg text-white md:text-xl">
+        Todavía no hay inscripciones.
+      </p>
+      <p className="mx-auto mt-2 max-w-md font-sans leading-relaxed text-gray-400">
+        Cuando alguien complete el registro, su equipo aparecerá aquí.
+      </p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Componente                                                         */
+/* ------------------------------------------------------------------ */
+
+type Estado = 'cargando' | 'listo' | 'error'
+
+export default function ListaInscripciones() {
+  /* Sin cliente (build sin credenciales o URL inválida) el estado arranca en
+     'error' desde el inicializador, en vez de con un setState síncrono dentro del
+     efecto. obtenerSupabase() es idempotente y nunca lanza (memoiza el cliente). */
+  const [estado, setEstado] = useState<Estado>(() =>
+    obtenerSupabase() ? 'cargando' : 'error'
+  )
+  const [equipos, setEquipos] = useState<EquipoAgrupado[]>([])
+
+  useEffect(() => {
+    let montado = true
+
+    const supabase = obtenerSupabase()
+    if (!supabase) return
+
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('inscripciones')
+          .select(SELECT)
+          .order('creado_en', { ascending: false })
+
+        if (!montado) return
+        /* No se guarda `error` en estado ni se loguea: solo se marca el enum. */
+        if (error || !data) {
+          setEstado('error')
+          return
+        }
+        /* `data` viene como `any`/tipo de error de PostgREST porque el cliente no
+           tiene el esquema generado (ver DEUDA en Registro.tsx): se castea vía
+           `unknown` al contrato de columnas de arriba. */
+        setEquipos(agruparPorEquipo(data as unknown as Inscripcion[]))
+        setEstado('listo')
+      } catch {
+        if (montado) setEstado('error')
+      }
+    })()
+
+    return () => {
+      montado = false
+    }
+  }, [])
+
+  if (estado === 'cargando') return <Esqueleto />
+  if (estado === 'error') return <ErrorCarga />
+  if (equipos.length === 0) return <VacioInscripciones />
+
+  const totalJugadores = equipos.reduce((n, e) => n + e.jugadores.length, 0)
+
+  return (
+    <div className="space-y-6 md:space-y-8">
+      <Resumen equipos={equipos} totalJugadores={totalJugadores} />
+      <ul className="space-y-3 md:space-y-4">
+        {equipos.map((e) => (
+          <li key={e.clave}>
+            <TarjetaEquipo equipo={e} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
