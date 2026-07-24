@@ -2,20 +2,25 @@
 
 Sitio web público de la **League Querétaro Championship (LQC)**, la liga de esports
 de **Revolution505** en Querétaro. Es un sitio **estático de presentación**: torneos,
-galería, información de la liga y contacto. **No hay backend propio** y **todo el
-contenido del sitio vive en los componentes** — no se lee nada de ninguna base.
+galería, información de la liga y contacto. **No hay backend propio** y el contenido **público** del sitio vive en los
+componentes: sus páginas no leen ninguna base.
 
-La única excepción, y lo único que el código del sitio envía a un servicio de
-datos, es el **formulario de `/registro`**: hace un **INSERT anónimo** en la tabla
-`inscripciones` de Supabase. **No hay lectura**, no hay sesiones y no hay usuarios.
-(El sitio sí pide fuentes a Google Fonts desde `index.html`, pero eso no manda
+Dos cosas tocan Supabase:
+- El **formulario público de `/registro`** hace un **INSERT anónimo** en la tabla
+  `inscripciones`. No lee nada y no necesita sesión.
+- El **panel de administración (`/admin`)**, detrás de login, **lee** esa tabla con
+  un **SELECT autenticado** (agrupa las inscripciones por equipo). Tiene sesión de
+  usuario; los admins se crean a mano en Supabase, no hay alta pública.
+
+(El sitio además pide fuentes a Google Fonts desde `index.html`, pero eso no manda
 datos de nadie.)
 
-La configuración de RLS —INSERT permitido para anónimos, SELECT no— es lo
-acordado con quien administra el proyecto de Supabase. **No está en el repo, pero
-se verificó de punta a punta en producción el 2026-07-23**: un INSERT anónimo
-real llegó a la tabla `inscripciones`. Si algún día el INSERT falla por permisos,
-ese es el primer lugar donde mirar, no el código.
+La RLS de `inscripciones`: **INSERT permitido para anónimos** (el registro público)
+y **SELECT solo para usuarios autenticados** (el panel) — **nunca SELECT anónimo**.
+Es lo acordado con quien administra el proyecto de Supabase. **No está en el repo,
+pero se verificó de punta a punta en producción el 2026-07-23** (un INSERT anónimo
+real llegó a la tabla). Si algún día un INSERT o un SELECT falla por permisos, ese
+es el primer lugar donde mirar, no el código.
 
 ## Stack
 
@@ -24,7 +29,8 @@ ese es el primer lugar donde mirar, no el código.
   `src/index.css`, **no** hay `tailwind.config.js`
 - **react-router-dom 7** — rutas declaradas en `src/App.tsx`
 - `lucide-react` (iconos), `react-lazy-load-image-component` (galería)
-- **`@supabase/supabase-js`** — solo para el INSERT del formulario de `/registro`
+- **`@supabase/supabase-js`** — INSERT anónimo del formulario de `/registro` y el
+  login + SELECT autenticado del panel de `/admin`
 - **Infra:** Docker + nginx (`Dockerfile`, `nginx.conf`) y `nixpacks.toml`
 
 ## Estructura
@@ -41,6 +47,7 @@ src/
   lib/
     supabase.ts            cliente de Supabase (perezoso; devuelve null sin credenciales)
   pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro
+    admin/                 panel protegido: Login · RutaProtegida · Panel · ListaInscripciones
 public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico
 ```
 
