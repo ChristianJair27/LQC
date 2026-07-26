@@ -359,8 +359,10 @@ function TarjetaEquipo({
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition-colors hover:border-blue-800/40">
       {/* Encabezado: disparador del colapso + acción de pago, HERMANOS (no anidados).
-          En móvil se apilan; en sm+ van lado a lado, separados por un borde. */}
-      <div className="flex flex-col sm:flex-row sm:items-stretch">
+          En móvil se apilan (divisor arriba de la acción); en sm+ comparten una misma
+          banda horizontal, centrados y sin divisor, para que el botón de pago se lea como
+          parte de la tarjeta y no como un panel aparte pegado al borde. */}
+      <div className="flex flex-col sm:flex-row sm:items-center">
         <button
           type="button"
           onClick={() => setExpandido((v) => !v)}
@@ -409,8 +411,11 @@ function TarjetaEquipo({
           </span>
         </button>
 
-        {/* Acción de pago — hermana del disparador, nunca dentro de él. */}
-        <div className="flex flex-col justify-center gap-1.5 border-t border-white/10 px-4 py-3 sm:border-l sm:border-t-0 sm:px-5">
+        {/* Acción de pago — hermana del disparador, nunca dentro de él. `shrink-0` la
+            mantiene a su ancho de contenido (el disparador es flex-1 y se encoge); en sm+
+            pierde el divisor y el relleno vertical y queda en la misma banda que el badge y
+            el chevron, con `md:pr-6` de margen para no tocar la esquina redondeada. */}
+        <div className="flex shrink-0 flex-col justify-center gap-1.5 border-t border-white/10 px-4 py-3 sm:border-t-0 sm:py-0 sm:pl-0 sm:pr-5 md:pr-6">
           {estadoPago === 'guardando' ? (
             <span className="inline-flex items-center gap-2 font-mono text-xs text-gray-400">
               <Loader2 className="h-4 w-4 animate-spin" />
