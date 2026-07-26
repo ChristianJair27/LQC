@@ -82,6 +82,10 @@ const OPCIONES_GENERO = ['Masculino', 'Femenino', 'Otros']
 
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
+/* Riot ID completo: nombre (3–16 caracteres, cualquiera menos '#') + '#' + tag (2–5
+   alfanuméricos). Se valida sobre el valor con trim(); las mayúsculas se conservan. */
+const REGEX_RIOT_ID = /^[^#]{3,16}#[A-Za-z0-9]{2,5}$/
+
 /* Solo dígitos y separadores de formato. Cualquier letra u otro símbolo se
    rechaza: sin esto, "abc0123456789" pasaría porque de la cadena igual se
    pueden pescar 10 dígitos. */
@@ -199,12 +203,15 @@ type CampoTextoProps = {
   max?: string
   claseContenedor?: string
   claseInput?: string
+  /* id(s) que describen el input vía aria-describedby (p. ej. una ayuda de formato).
+     Opcional: los demás campos no lo pasan y se renderizan igual que antes. */
+  describedById?: string
 }
 
 function CampoTexto({
   id, label, icono: Icono, valor, onChange, error,
   tipo = 'text', placeholder, autoComplete, min, max,
-  claseContenedor = '', claseInput = ''
+  claseContenedor = '', claseInput = '', describedById
 }: CampoTextoProps) {
   const idError = `${id}-error`
   return (
@@ -226,7 +233,9 @@ function CampoTexto({
           max={max}
           required
           aria-invalid={error ? true : undefined}
-          aria-describedby={error ? idError : undefined}
+          aria-describedby={
+            [describedById, error ? idError : null].filter(Boolean).join(' ') || undefined
+          }
           className={`${CLASE_INPUT_BASE} ${error ? CLASE_INPUT_ERROR : CLASE_INPUT_OK} ${claseInput}`}
         />
       </div>
@@ -385,7 +394,13 @@ export default function Registro() {
     const e: FormErrors = {}
 
     if (!form.equipo.trim()) e.equipo = 'Escribe el nombre de tu equipo.'
-    if (!form.gamertag.trim()) e.gamertag = 'Escribe tu gamertag.'
+    const gamertagTrim = form.gamertag.trim()
+    if (!gamertagTrim) {
+      e.gamertag = 'Escribe tu gamertag.'
+    } else if (!REGEX_RIOT_ID.test(gamertagTrim)) {
+      e.gamertag =
+        'Escribe tu Riot ID completo, con nombre y tag: nombre#tag (por ejemplo, Jugador#MX1).'
+    }
     if (!form.nombre.trim()) e.nombre = 'Escribe tu nombre completo.'
 
     /* Orden de ramas: de lo más específico a lo más general, para que cada caso
@@ -666,16 +681,27 @@ export default function Registro() {
                         placeholder="Nombre de tu equipo"
                         claseContenedor="md:col-span-2"
                       />
-                      <CampoTexto
-                        id="gamertag"
-                        label="Gamertag"
-                        icono={Gamepad2}
-                        valor={form.gamertag}
-                        onChange={(v) => setCampo('gamertag', v)}
-                        error={errores.gamertag}
-                        placeholder="Tu nombre en el juego"
-                        autoComplete="nickname"
-                      />
+                      <div>
+                        <CampoTexto
+                          id="gamertag"
+                          label="Gamertag"
+                          icono={Gamepad2}
+                          valor={form.gamertag}
+                          onChange={(v) => setCampo('gamertag', v)}
+                          error={errores.gamertag}
+                          placeholder="Jugador#MX1"
+                          autoComplete="nickname"
+                          describedById="gamertag-ayuda"
+                        />
+                        {/* Ayuda de formato del Riot ID, asociada al input por
+                            aria-describedby (describedById). En su propio contenedor para
+                            ocupar una sola celda del grid, no una columna extra. */}
+                        <p id="gamertag-ayuda" className="mt-2 text-sm text-gray-400">
+                          Es tu Riot ID completo: nombre, luego #, luego tag (por ejemplo,
+                          Jugador#MX1). Lo encuentras en el cliente de League, en tu perfil
+                          de Riot; el tag es lo que va después del #.
+                        </p>
+                      </div>
                       <CampoTexto
                         id="nombre"
                         label="Nombre"
