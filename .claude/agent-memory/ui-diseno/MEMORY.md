@@ -6,5 +6,6 @@
 - [Canon de formularios](project_canon-formularios.md) — error en `rose`, selección con `lqc-accent`, controles con `peer sr-only`; reusar en formularios nuevos.
 - [Panel admin: modo herramienta](project_admin-panel-tool-mode.md) — /admin es sobrio (font-sans, marca solo en detalles), distinto del modo póster público.
 - [Acción en encabezado de tarjeta admin](project_admin-card-header-accion.md) — botón hermano (no anidado) en la banda del header: items-center, shrink-0, margen ≥ radio de esquina.
+- [Feedback no textual → aria-live](project_admin-feedback-no-textual.md) — descargas/copiar/refrescar del panel necesitan región sr-only role="status" que anuncie el resultado.
 - [Header md resuelto](project_deuda-header-md.md) — 6 ítems entran compactando nav+promo solo en md; un 7º exige remedir. lg intacto.
 - [Copy en tuteo mexicano](project_registro-espanol-tuteo.md) — el sitio usa "Recarga/inténtalo", no el voseo de mis instrucciones; no mezclar registros.
