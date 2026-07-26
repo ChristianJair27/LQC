@@ -40,6 +40,20 @@ vez de copiar el estilo de las páginas públicas.
   (`text-gray-400 bg-white/5 border-white/10`). **No** se introdujo verde/ámbar:
   si "Pendiente" pareciera necesitar más urgencia, se reporta en vez de romper la
   paleta. `rose` sigue reservado **solo** a errores.
+- **Tres niveles de botón, distinguidos por jerarquía, no solo por color** (en
+  `ListaInscripciones.tsx`): `BTN_PRIMARIO` (CTA en gradiente `from-lqc-700`, acción
+  primaria de una tarjeta), `BTN_SECUNDARIO` (sobrio gris-con-borde-azul, acción sutil
+  de tarjeta) y `BTN_PANEL` (acción a **nivel del panel** — la barra del listado, p. ej.
+  "Exportar CSV"). El nivel panel comparte el color sobrio del `BTN_SECUNDARIO` pero con
+  la caja de "Cerrar sesión" en `Panel.tsx` (`rounded-xl`, px mayor, `bg-black/50`). Al
+  agregar acciones de barra futuras (filtros, refrescar), usar `BTN_PANEL`, **no** el
+  nivel tarjeta. `BTN_PANEL` no extiende `BTN_BASE` (chocarían `rounded-lg`/`px`) y por
+  eso repite sus propias neutralizaciones (font-sans, sin salto -2px, sin glow).
+- **"Azul de acento sobrio" en una acción secundaria = el azul vive en el borde y el
+  hover, NUNCA en el label.** Colorear el texto de acento (cian/azul) lo haría competir
+  con el CTA primario y leerse como link/badge. El texto va `text-gray-200` (~13:1) →
+  `text-white` en hover; ambos estados con contraste de sobra. `text-blue-400`/
+  `lqc-accent` como texto quedan para números del resumen y badges, no para botones.
 - **Superficies sobrias:** tarjetas `border border-white/10 bg-white/[0.03]`,
   bordes en vez de sombras para separar (las sombras `shadow-lqc` quedan para
   acentos puntuales, no para cada tarjeta de una lista larga). Nada de glow.
