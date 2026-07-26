@@ -818,6 +818,10 @@ export default function ListaInscripciones() {
     obtenerSupabase() ? 'cargando' : 'error'
   )
   const [equipos, setEquipos] = useState<EquipoAgrupado[]>([])
+  /* Anuncio para lectores de pantalla del resultado de exportar: la única señal de que la
+     exportación funcionó es la descarga del archivo, un gesto visual que no le dice nada a
+     quien no ve la pantalla. Se lee por una región aria-live (ver el <span> del return). */
+  const [anuncioExport, setAnuncioExport] = useState('')
 
   useEffect(() => {
     let montado = true
@@ -915,10 +919,15 @@ export default function ListaInscripciones() {
   /* Exporta las inscripciones a un CSV generado y descargado en el cliente, con lo que YA
      está en memoria (sin una segunda consulta a Supabase). El guard es defensivo: este
      botón solo existe cuando hay equipos, porque el caso vacío lo cubre antes
-     <VacioInscripciones/> (no queda un botón colgado que deshabilitar). */
+     <VacioInscripciones/> (no queda un botón colgado que deshabilitar). En ambos casos se
+     fija el anuncio aria-live, la única señal audible de que la acción ocurrió. */
   const exportarCSV = () => {
-    if (equipos.length === 0) return
+    if (equipos.length === 0) {
+      setAnuncioExport('No hay inscripciones para exportar.')
+      return
+    }
     descargarArchivo(construirCSV(equipos), `inscripciones-lqc-${fechaHoyArchivo()}.csv`)
+    setAnuncioExport('CSV descargado.')
   }
 
   if (estado === 'cargando') return <Esqueleto />
@@ -959,6 +968,14 @@ export default function ListaInscripciones() {
           </li>
         ))}
       </ul>
+      {/* Región viva sr-only: anuncia el resultado de exportar a lectores de pantalla, ya
+          que el gesto visual (la descarga) no comunica nada. Va siempre montada (con texto
+          vacío al inicio) para que aria-live capte el cambio; como último hijo y con
+          `sr-only` (position:absolute) no altera el layout del encabezado. role="status"
+          ya implica aria-live="polite" —no interrumpe—; se deja explícito por claridad. */}
+      <span role="status" aria-live="polite" className="sr-only">
+        {anuncioExport}
+      </span>
     </div>
   )
 }
