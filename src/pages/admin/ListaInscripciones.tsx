@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { AlertCircle, CheckCircle2, ChevronDown, Clock, Inbox, Loader2 } from 'lucide-react'
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Download,
+  Inbox,
+  Loader2
+} from 'lucide-react'
 import { obtenerSupabase } from '../../lib/supabase'
 
 /* ------------------------------------------------------------------ */
@@ -13,8 +21,13 @@ type Inscripcion = {
   equipo: string
   gamertag: string
   nombre: string
+  fecha_nacimiento: string
   celular: string
+  escolaridad: string
+  municipio: string
+  localidad: string
   correo: string
+  genero: string
   capitan_nombre: string
   capitan_celular: string
   pagado: boolean | null
@@ -39,9 +52,12 @@ const COL_NOTAS = 'notas' as const
    "Guardando…". Mismo criterio que el envío de /registro. */
 const TIEMPO_LIMITE_MS = 15_000
 
-/* Orden de columnas del contrato de datos, más las de Fase 3 (id, pagado_en, notas). */
+/* Orden de columnas del contrato de datos, más las de Fase 3 (id, pagado_en, notas). Las
+   columnas fecha_nacimiento, escolaridad, municipio, localidad y genero no se pintan en el
+   panel, pero se traen para poder exportarlas al CSV (Fase 4) SIN una segunda consulta: la
+   exportación arma el archivo con lo que ya está en memoria. */
 const SELECT =
-  `${COL_ID}, equipo, gamertag, nombre, celular, correo, capitan_nombre, capitan_celular, ${COL_PAGADO}, ${COL_PAGADO_EN}, ${COL_NOTAS}, creado_en`
+  `${COL_ID}, equipo, gamertag, nombre, fecha_nacimiento, celular, escolaridad, municipio, localidad, correo, genero, capitan_nombre, capitan_celular, ${COL_PAGADO}, ${COL_PAGADO_EN}, ${COL_NOTAS}, creado_en`
 
 /* ------------------------------------------------------------------ */
 /*  Agrupación por equipo (función pura, fácil de auditar)             */
@@ -158,6 +174,142 @@ function fmtFechaHora(iso: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Exportación a CSV (en el cliente, sin backend)                     */
+/* ------------------------------------------------------------------ */
+
+/* Encabezados en español, en el orden exacto del contrato de exportación. Una fila del
+   CSV = un jugador; los campos de equipo se repiten en cada jugador del grupo. */
+const COLUMNAS_CSV = [
+  'Equipo',
+  'Gamertag',
+  'Nombre',
+  'Fecha de Nacimiento',
+  'Celular',
+  'Escolaridad',
+  'Municipio',
+  'Localidad',
+  'Correo',
+  'Género',
+  'Capitán',
+  'Celular del Capitán',
+  'Pagado',
+  'Fecha de Pago',
+  'Notas',
+  'Fecha de Registro'
+] as const
+
+/* BOM UTF-8 (U+FEFF). Va al inicio del archivo para que Excel detecte la codificación y
+   muestre bien los acentos (á, é, ñ) en vez de caracteres corruptos. Se construye con
+   `String.fromCharCode` en vez de pegar el carácter literal (invisible e ilegible en el
+   fuente) o un escape `U+FEFF` que se pierde de vista con facilidad. */
+const BOM_UTF8 = String.fromCharCode(0xfeff)
+
+/* Fecha solo-día ('YYYY-MM-DD', como se guarda fecha_nacimiento) → 'DD/MM/AAAA'. Se
+   parte la cadena a mano en vez de pasar por `new Date()`: `new Date('2000-05-15')` se
+   interpreta como medianoche UTC y en Querétaro (UTC−6) mostraría el día anterior (mismo
+   cuidado que `fechaLocalISO` en Registro.tsx). Vacío o inválido → celda vacía. */
+function fmtFechaSoloDiaCSV(valor: string | null | undefined): string {
+  if (!valor) return ''
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(valor)
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+
+/* Timestamp ISO (creado_en, pagado_en) → 'DD/MM/AAAA' en fecha LOCAL. Acá sí pasa por
+   `Date` porque es un instante con zona; se extraen los componentes locales, no los UTC.
+   `null` o inválido → celda vacía (nunca "null"). */
+function fmtFechaLocalDiaCSV(valor: string | null | undefined): string {
+  if (!valor) return ''
+  const d = new Date(valor)
+  if (Number.isNaN(d.getTime())) return ''
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}/${mm}/${d.getFullYear()}`
+}
+
+/* Escape RFC 4180 + saneo anti-inyección de fórmulas.
+   - Anti-inyección: los datos vienen del formulario PÚBLICO /registro (INSERT anónimo), o
+     sea entrada NO confiable. Una celda que arranque con `=`, `+`, `-`, `@` (o TAB/CR) la
+     interpreta Excel/Sheets como fórmula al abrir el archivo (p. ej. `=HYPERLINK(...)`),
+     justo cuando el que abre es un admin. Se le antepone un apóstrofo: Excel lo esconde y
+     trata el resto como texto. Va ANTES del quoting para no romperlo.
+   - RFC 4180: si el valor trae coma, comilla o salto de línea, se encierra entre comillas
+     dobles y cada comilla interna se duplica. Notas es texto libre: el campo con más
+     chance de traer comas o saltos, y este escape lo mantiene en una sola celda.
+   `null`/`undefined` → '' (nunca la palabra "null"); números → texto. */
+function celdaCSV(valor: string | number | null | undefined): string {
+  let texto = valor == null ? '' : String(valor)
+  if (/^[=+\-@\t\r]/.test(texto)) texto = `'${texto}`
+  return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto
+}
+
+/* Arma el CSV completo (con BOM) a partir de los equipos agrupados: una fila por jugador.
+   Los campos de equipo (nombre, capitán, pago, notas) se repiten en cada jugador del
+   grupo, coherente con lo que ve el panel —el pago y las notas son por equipo—. El BOM
+   UTF-8 (U+FEFF) al inicio hace que Excel muestre bien los acentos (á, é, ñ) en vez de
+   caracteres corruptos; las filas se separan con CRLF (RFC 4180). */
+function construirCSV(equipos: EquipoAgrupado[]): string {
+  const filas: string[] = [COLUMNAS_CSV.map(celdaCSV).join(',')]
+  for (const equipo of equipos) {
+    for (const j of equipo.jugadores) {
+      filas.push(
+        [
+          equipo.nombre,
+          j.gamertag,
+          j.nombre,
+          fmtFechaSoloDiaCSV(j.fecha_nacimiento),
+          j.celular,
+          j.escolaridad,
+          j.municipio,
+          j.localidad,
+          j.correo,
+          j.genero,
+          equipo.capitanNombre,
+          equipo.capitanCelular,
+          equipo.pagado ? 'Sí' : 'No',
+          fmtFechaLocalDiaCSV(equipo.pagadoEn),
+          equipo.notas,
+          fmtFechaLocalDiaCSV(j.creado_en)
+        ]
+          .map(celdaCSV)
+          .join(',')
+      )
+    }
+  }
+  return BOM_UTF8 + filas.join('\r\n')
+}
+
+/* Fecha de hoy como AAAAMMDD para el nombre del archivo, en la zona de la liga
+   (America/Mexico_City) y NO en la del navegador: el nombre debe reflejar el día en
+   Querétaro aunque el admin exporte desde otra zona horaria (o con el reloj en UTC). Se
+   arma con `formatToParts` para no depender del orden con que el locale imprime la fecha. */
+function fechaHoyArchivo(): string {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date())
+  const val = (tipo: string) => partes.find((p) => p.type === tipo)?.value ?? ''
+  return `${val('year')}${val('month')}${val('day')}`
+}
+
+/* Dispara la descarga de un texto como archivo, vía un <a download> temporal y un
+   object URL que se revoca al terminar para no filtrar memoria. */
+function descargarArchivo(contenido: string, nombreArchivo: string): void {
+  const blob = new Blob([contenido], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = nombreArchivo
+  document.body.appendChild(enlace)
+  enlace.click()
+  enlace.remove()
+  /* Diferido: revocar en la misma tanda síncrona que el click puede cancelar la descarga
+     en algunos navegadores (Firefox) antes de que terminen de leer el blob. */
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/* ------------------------------------------------------------------ */
 /*  Piezas de UI (a nivel de módulo para no remontar en cada render)   */
 /* ------------------------------------------------------------------ */
 
@@ -167,13 +319,22 @@ function fmtFechaHora(iso: string): string {
    de datos se verían como jank y como "póster". El anillo de foco cian base se conserva.
    PRIMARIO = CTA canónico (from-lqc-700 → lqc-500) para la acción primaria: "Marcar
    pagado" y "Confirmar". SECUNDARIO = `bg-none` (sin el gradiente base) para acciones
-   sutiles: "Quitar pago", "Cancelar" y "Guardar notas". */
+   sutiles: "Quitar pago", "Cancelar" y "Guardar notas".
+   PANEL = acción a nivel del panel (barra del listado: "Exportar CSV"), NO de una
+   tarjeta. Mismo tratamiento sobrio gris-con-borde-azul que "Cerrar sesión" en Panel.tsx
+   —el azul vive en el borde y el hover, no en el texto, para no competir con el CTA
+   primario de cada equipo— pero con la caja del nivel panel (rounded-xl, px mayor,
+   bg-black/50). No extiende BTN_BASE: repetiría rounded-lg/px-3.5/py-2, que en Tailwind no
+   se pisan por orden de clase; lleva sus propias neutralizaciones de la regla base de
+   <button> (font-sans, tracking-normal, sin el salto de -2px ni el glow en hover). */
 const BTN_BASE =
   'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-sans font-medium tracking-normal transition-colors duration-200 hover:[transform:none] hover:shadow-none disabled:opacity-60 disabled:cursor-not-allowed'
 const BTN_PRIMARIO =
   `${BTN_BASE} border-0 bg-gradient-to-r from-lqc-700 to-lqc-500 text-white hover:from-lqc-600 hover:to-lqc-400`
 const BTN_SECUNDARIO =
   `${BTN_BASE} bg-none bg-black/40 border border-blue-800/40 text-gray-200 hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white`
+const BTN_PANEL =
+  'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-sans font-medium tracking-normal transition-colors duration-200 bg-none bg-black/50 border border-blue-800/40 text-gray-200 hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white hover:[transform:none] hover:shadow-none disabled:opacity-60 disabled:cursor-not-allowed sm:px-5'
 
 /* Textarea de notas: mismo estilo de input del proyecto (ver Login/Registro), fondo
    oscuro y foco azul; sin icono a la izquierda, así que sin el `pl-12`. */
@@ -751,6 +912,15 @@ export default function ListaInscripciones() {
     }
   }
 
+  /* Exporta las inscripciones a un CSV generado y descargado en el cliente, con lo que YA
+     está en memoria (sin una segunda consulta a Supabase). El guard es defensivo: este
+     botón solo existe cuando hay equipos, porque el caso vacío lo cubre antes
+     <VacioInscripciones/> (no queda un botón colgado que deshabilitar). */
+  const exportarCSV = () => {
+    if (equipos.length === 0) return
+    descargarArchivo(construirCSV(equipos), `inscripciones-lqc-${fechaHoyArchivo()}.csv`)
+  }
+
   if (estado === 'cargando') return <Esqueleto />
   if (estado === 'error') return <ErrorCarga />
   if (equipos.length === 0) return <VacioInscripciones />
@@ -759,7 +929,25 @@ export default function ListaInscripciones() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <Resumen equipos={equipos} totalJugadores={totalJugadores} />
+      {/* Encabezado: resumen a la izquierda + acción de exportar a la derecha; en móvil se
+          apilan (botón debajo de los contadores, alineado a la izquierda). Exportar es una
+          acción a NIVEL DE PANEL (todo el listado), no de una tarjeta, así que usa el estilo
+          BTN_PANEL —el mismo tratamiento sobrio de "Cerrar sesión"— en vez del BTN_SECUNDARIO
+          del nivel tarjeta; el azul solo en borde y hover para no competir con el CTA
+          primario de cada equipo. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <Resumen equipos={equipos} totalJugadores={totalJugadores} />
+        </div>
+        <button
+          type="button"
+          onClick={exportarCSV}
+          className={`${BTN_PANEL} shrink-0 self-start sm:self-auto`}
+        >
+          <Download className="h-4 w-4" />
+          Exportar CSV
+        </button>
+      </div>
       <ul className="space-y-3 md:space-y-4">
         {equipos.map((e) => (
           <li key={e.clave}>
