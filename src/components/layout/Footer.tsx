@@ -160,20 +160,16 @@ export default function Footer() {
             </div>
           </div>
           
-          <div className="text-right space-y-2">
+          {/* Acá había tres enlaces —Términos, Privacidad y Cookies— apuntando a '#'. En
+              una franja legal eso es peor que en cualquier otro lugar del sitio: promete
+              documentos exigibles que no existen, y quien los busca es justo quien más
+              necesita encontrarlos.
+              El aviso de privacidad SÍ está escrito: vive dentro de /registro. Cuando se
+              extraiga a su propia página, este enlace vuelve apuntando a esa ruta. Los otros
+              dos documentos todavía no existen ni redactados. */}
+          <div className="text-right">
             <div className="text-xs text-gray-600">
               Este evento no está afiliado con Riot Games ni League of Legends.
-            </div>
-            <div className="flex items-center justify-end gap-4">
-              <a href="#" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
-                Términos
-              </a>
-              <a href="#" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
-                Privacidad
-              </a>
-              <a href="#" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
-                Cookies
-              </a>
             </div>
           </div>
         </div>
