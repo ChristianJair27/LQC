@@ -8,10 +8,14 @@ const CLASE_ENLACE =
 const CLASE_PUNTO =
   'w-1 h-1 rounded-full bg-gray-700 group-hover:bg-blue-400 transition-colors'
 
-/* Botonera de iconos de "Conectar". En constante porque ahora son cuatro enlaces con la
-   misma caja; el de Twitch además le suma `group` para su punto pulsante. */
+/* Botonera de iconos de "Conectar". En constante porque son cuatro enlaces con la misma
+   caja; el de Twitch además le suma `group` para su punto pulsante.
+   `after:hidden` desactiva la barra de gradiente que la regla base `a::after` de index.css
+   dibuja al 100% del ancho en hover: pensada para enlaces de texto, en estos botones
+   cuadrados con borde quedaba colgando 2px por debajo de la caja. Mismo parche —y misma
+   razón— que `CLASE_ENLACE_COMUNIDAD` en Registro.tsx. */
 const CLASE_ICONO =
-  'p-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-700 transition-all duration-300 rounded-lg'
+  'after:hidden p-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-700 transition-all duration-300 rounded-lg'
 
 /* Al pasar de <a href> a <Link>, la navegación deja de recargar el documento y el navegador
    ya no lleva la página nueva al tope: React Router en modo declarativo (<BrowserRouter> +
