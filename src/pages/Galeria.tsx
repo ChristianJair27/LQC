@@ -7,6 +7,9 @@ type MediaItem = {
   title: string;
   type: 'foto' | 'video' | string;
   src: string;
+  /** Miniatura del video. Hoy NINGÚN ítem la define: /galeria/posters/ no existe en
+   *  public/ (los .mp4 sí están), así que el atributo solo pedía un 404 y el navegador
+   *  terminaba mostrando el primer fotograma igual. Reponerla cuando haya miniaturas. */
   poster?: string;
   isVertical: boolean;
   views: string;
@@ -25,7 +28,6 @@ export default function Galeria() {
       title: "Resumen Final Épico",
       type: "video",
       src: "/galeria/videos/video1.mp4",
-      poster: "/galeria/posters/poster-video1.jpg",
       isVertical: true,
       views: "12.4K",
       duration: "1:45",
@@ -36,7 +38,6 @@ export default function Galeria() {
       title: "Ceremonia de Clausura y Premiación",
       type: "video",
       src: "/galeria/videos/video2.mp4",
-      poster: "/galeria/posters/poster-video2.jpg",
       isVertical: true,
       views: "9.8K",
       duration: "3:20",

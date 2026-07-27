@@ -291,11 +291,17 @@ export default function Home() {
                       <div className="bg-gradient-to-br from-gray-900/30 to-gray-800/20 backdrop-blur-md border border-white/5 rounded-2xl p-10 hover:border-blue-500/30 transition-all duration-500 group max-w-2xl mx-auto">
                         <div className="flex flex-col items-center space-y-8">
                           <div className="w-56 h-56 rounded-xl bg-black/40 border border-white/5 p-6 group-hover:border-blue-500/20 transition-all overflow-hidden flex items-center justify-center">
+                            {/* Si el logo no carga se oculta la <img>: el nombre del
+                                patrocinador queda en el <h3> de abajo. El fallback no
+                                apunta a ningún archivo a propósito, así que no puede
+                                romperse él mismo. */}
                             <img
                               src={sponsor.logo}
                               alt={sponsor.name}
                               className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                              onError={(e) => (e.currentTarget.src = '/placeholder-logo.png')}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                              }}
                             />
                           </div>
                           <div className="text-center space-y-3">
