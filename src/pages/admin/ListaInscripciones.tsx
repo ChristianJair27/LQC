@@ -960,9 +960,9 @@ function TarjetaEquipo({
         </div>
 
         {/* Zona de archivado. Va al FINAL del panel expandido y a propósito no comparte
-            banda con "Marcar pagado" ni con "Guardar notas": archivar retira al equipo del
-            listado y del CSV, así que no debe quedar a un clic de distraído ni leerse como
-            una acción más. El fondo rose apenas teñido y el botón fantasma la marcan como
+            banda con "Marcar pagado" ni con "Guardar notas": archivar saca al equipo del
+            listado, del CSV y del torneo en ATAK.GG, así que no debe quedar a un clic
+            de distraído ni leerse como una acción más. El fondo rose apenas teñido y el botón fantasma la marcan como
             destructiva sin robarle protagonismo al CTA azul del encabezado. */}
         <div className="border-t border-rose-900/30 bg-rose-950/10 px-4 py-4 md:px-6 md:py-5">
           {modoArchivar === 'idle' ? (
@@ -972,7 +972,7 @@ function TarjetaEquipo({
                   ? yaArchivadas === 1
                     ? `Este equipo quedó archivado a medias: 1 de ${cantidad} inscripciones está archivada y no se exporta. Termina de archivarlo o restaura la que quedó.`
                     : `Este equipo quedó archivado a medias: ${yaArchivadas} de ${cantidad} inscripciones están archivadas y no se exportan. Termina de archivarlo o restaura las que quedaron.`
-                  : 'Archivar saca al equipo del listado y del CSV. No borra nada: puedes restaurarlo desde «Ver archivados».'}
+                  : 'Archivar saca al equipo del listado, del CSV y del torneo en ATAK.GG. No borra nada: puedes restaurarlo desde «Ver archivados».'}
               </p>
               <div className="flex flex-wrap gap-2">
                 {/* Salida del estado 'parcial': sin esto, un archivado a medias solo se puede
@@ -1037,13 +1037,18 @@ function TarjetaEquipo({
                 {yaArchivadas > 0 && ` (${yaArchivadas} ya lo ${
                   yaArchivadas === 1 ? 'está' : 'están'
                 }, así que el equipo queda archivado entero: ${cantidad})`}
-                . Las inscripciones no se borran: dejan de aparecer en el listado y en el CSV,
-                y puedes restaurarlas cuando quieras.
+                . Las inscripciones no se borran: el equipo sale del listado, del CSV y del
+                torneo, y puedes restaurarlo cuando quieras desde «Ver archivados» — al
+                restaurarlo vuelve a quedar inscrito.
               </p>
+              {/* El recuadro de alerta CIERRA con la consecuencia, no con la tranquilización:
+                  si terminara en "se puede deshacer", el peso de la advertencia se diluye y
+                  archivar se lee como inocuo. Lo reversible se cuenta arriba, en el párrafo
+                  gris, que es donde vive el resto del contexto. */}
               <p className="rounded-xl border border-rose-800/40 bg-rose-950/30 px-4 py-3 text-sm leading-relaxed text-rose-100">
-                Ojo: el equipo <strong className="font-semibold">sigue existiendo en
-                ATAK.GG</strong>. Archivarlo aquí no lo da de baja allá — tienes que darlo
-                de baja por separado.
+                Ojo: esto no se queda en el panel. Al archivarlo, el equipo{' '}
+                <strong className="font-semibold">también se da de baja del torneo en
+                ATAK.GG</strong>.
               </p>
               <div>
                 <label

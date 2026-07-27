@@ -396,7 +396,7 @@ export default function Registro() {
     if (!form.equipo.trim()) e.equipo = 'Escribe el nombre de tu equipo.'
     const gamertagTrim = form.gamertag.trim()
     if (!gamertagTrim) {
-      e.gamertag = 'Escribe tu gamertag.'
+      e.gamertag = 'Escribe tu Riot ID.'
     } else if (!REGEX_RIOT_ID.test(gamertagTrim)) {
       e.gamertag =
         'Escribe tu Riot ID completo, con nombre y tag: nombre#tag (por ejemplo, Jugador#MX1).'
@@ -684,7 +684,10 @@ export default function Registro() {
                       <div>
                         <CampoTexto
                           id="gamertag"
-                          label="Gamertag"
+                          /* El label es «Riot ID» (lo que valida REGEX_RIOT_ID), pero el id,
+                             la clave del estado y la columna de la base se llaman `gamertag`:
+                             renombrarlos rompe el INSERT. */
+                          label="Riot ID"
                           icono={Gamepad2}
                           valor={form.gamertag}
                           onChange={(v) => setCampo('gamertag', v)}
@@ -989,8 +992,11 @@ export default function Registro() {
                       <li className="flex items-start gap-3">
                         <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
                         <span className="text-gray-300">
+                          {/* La relación con Revolution505 va explícita porque el correo ARCO
+                              es @revolution505.com: si no, el titular no sabe si le escribe
+                              al responsable o a un tercero. */}
                           <span className="text-white font-medium">Responsable:</span> League
-                          Querétaro Championship (LQC).
+                          Querétaro Championship (LQC), liga organizada por Revolution505.
                         </span>
                       </li>
                       <li className="flex items-start gap-3">
