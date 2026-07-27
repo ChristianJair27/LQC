@@ -30,11 +30,15 @@ export default function Contacto() {
       action: "Unirse al servidor"
     },
     {
+      /* Acá decía «@lqroc — Twitter / Twitch». La cuenta de Twitter NO existe: por eso ya
+         se quitó del footer y del sameAs del JSON-LD. El handle @lqroc suelto además se
+         leía como un usuario de Twitter, que era justo la confusión. Los canales reales de
+         la liga son los tres de esta lista más Facebook; las URLs viven en Footer.tsx. */
       icon: Globe,
       title: "Redes Sociales",
-      value: "@lqroc",
-      description: "Twitter / Twitch",
-      action: "Seguir y chatear"
+      value: "twitch.tv/lqroc",
+      description: "Twitch y Facebook",
+      action: "Seguir a la liga"
     }
   ]
 
