@@ -1,6 +1,5 @@
 import { Trophy, Calendar, Star } from 'lucide-react'
 import { useState } from 'react'
-import Footer from '../components/layout/Footer'
 
 export default function Torneos() {
   const [activeSeason, setActiveSeason] = useState("Otoño 2025")
@@ -475,8 +474,6 @@ export default function Torneos() {
             </div>
           </div>
         </section>
-
-        <Footer />
       </div>
 
       <style>{`
