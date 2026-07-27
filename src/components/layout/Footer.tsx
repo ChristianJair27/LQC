@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom'
 import { Twitch, Facebook, MessageSquare, Mail, Trophy, MapPin } from 'lucide-react'
 
-/* Clases compartidas por los enlaces de las listas (Navegación y Recursos). Viven en
-   constantes porque el mismo enlace se pinta como <Link> o como <a> según a dónde vaya, y
-   duplicar la cadena en cada rama es la forma más fácil de que se desincronicen. */
+/* Enlaces de la lista de Navegación. Quedan en constantes —aunque hoy cada una se use en un
+   solo lugar— para reponer una segunda lista con el mismo aspecto sin copiar la cadena. */
 const CLASE_ENLACE =
   'text-sm text-gray-500 hover:text-white transition-colors flex items-center gap-2 group'
 const CLASE_PUNTO =
@@ -37,22 +36,21 @@ const NAVEGACION = [
   { label: 'Registro', to: '/registro' }
 ]
 
-/* Recursos: `to: null` = todavía no hay página a dónde apuntar. Esos cuatro siguen en '#'
-   a la espera de una decisión de contenido; NO son un olvido. «Inscripciones» sí tiene
-   destino real desde que /registro existe. */
-const RECURSOS: { label: string; to: string | null }[] = [
-  { label: 'Reglamento', to: null },
-  { label: 'Inscripciones', to: '/registro' },
-  { label: 'Calendario', to: null },
-  { label: 'Estadísticas', to: null },
-  { label: 'FAQ', to: null }
-]
+/* NO HAY BLOQUE "RECURSOS". Tenía cinco ítems y cuatro —Reglamento, Calendario,
+   Estadísticas y FAQ— apuntaban a '#': prometían páginas que no existen. El quinto,
+   «Inscripciones», iba a /registro, o sea al mismo destino que «Registro» de acá arriba: una
+   sección de un solo enlace, duplicando con otro nombre al de la columna de al lado.
+   Cuando alguna de esas cuatro páginas exista de verdad, se repone la sección con su ruta
+   real y su <Link> — NUNCA con '#'. Un enlace a '#' no es un placeholder: es una promesa
+   rota que el usuario descubre recién al hacer clic. */
 
 export default function Footer() {
   return (
     <footer className="bg-black border-t border-gray-900">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        {/* Tres columnas, no cuatro: al irse el bloque "Recursos" quedaba una columna
+            fantasma y las tres restantes apretadas contra el borde izquierdo. */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Logo y descripción */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -91,36 +89,6 @@ export default function Footer() {
                   </Link>
                 </li>
               ))}
-            </ul>
-          </div>
-
-          {/* Recursos */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-white uppercase tracking-wider">Recursos</h4>
-            <ul className="space-y-3">
-              {RECURSOS.map((item) => {
-                /* El interior se arma una sola vez: escribirlo en las dos ramas es la misma
-                   duplicación que las constantes de clases vinieron a evitar. */
-                const contenido = (
-                  <>
-                    <div className={CLASE_PUNTO}></div>
-                    {item.label}
-                  </>
-                )
-                return (
-                  <li key={item.label}>
-                    {item.to ? (
-                      <Link to={item.to} onClick={irAlTope} className={CLASE_ENLACE}>
-                        {contenido}
-                      </Link>
-                    ) : (
-                      <a href="#" className={CLASE_ENLACE}>
-                        {contenido}
-                      </a>
-                    )}
-                  </li>
-                )
-              })}
             </ul>
           </div>
 
