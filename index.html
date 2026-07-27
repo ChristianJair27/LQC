@@ -15,23 +15,15 @@
     
     <!-- Autor y derechos -->
     <meta name="author" content="League Querétaro Championship">
-    <meta name="copyright" content="© 2026 LQC - League Querétaro Championship">
+    <!-- Sin año: un <meta> es estático y envejecería solo (el footer usa getFullYear). -->
+    <meta name="copyright" content="© LQC - League Querétaro Championship">
     
     <!-- Robots (permite indexación) -->
     <meta name="robots" content="index, follow" />
     
-    <!-- FAVICONS - Usando tu LOGO-COPA.ico + versiones recomendadas -->
+    <!-- Solo el .ico: los PNG de 16/32/180/192/512 no existen en public/. Ver AGENTS.md. -->
     <link rel="icon" type="image/x-icon" href="/LOGO-COPA.ico" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/LOGO-COPA-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/LOGO-COPA-16.png" />
-    
-    <!-- Apple Touch Icon (para iOS y agregar a pantalla de inicio) -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/LOGO-COPA-180.png" />
-    
-    <!-- Android/Chrome icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/LOGO-COPA-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/LOGO-COPA-512.png" />
-    
+
     <!-- Manifest para PWA (agregar a pantalla de inicio en móviles) -->
     <link rel="manifest" href="/site.webmanifest" />
     
@@ -44,15 +36,26 @@
     <meta property="og:url" content="https://lqc.revolution505.com/" />
     <meta property="og:title" content="LQC | League Querétaro Championship" />
     <meta property="og:description" content="El torneo más competitivo de League of Legends en Querétaro. Inscripciones, brackets, transmisiones en vivo y premios." />
-    <meta property="og:image" content="https://lqc.revolution505.com/assets/og-image.jpg" /> <!-- Cambia por tu imagen real -->
+    <!-- PROVISIONAL: falta una imagen propia de 1200x630. Esta es 1024x1024 y el trofeo
+         está cortado contra el borde izquierdo, así que la tarjeta sale con el logo a
+         medias y mucho negro. No cambiar a 2 LQC.png ni a LOGO COPA.png: son RGBA con
+         fondo transparente y los scrapers aplanan el alfa contra blanco — quedarían
+         blanco sobre blanco, invisibles. width/height evitan que la primera vez que se
+         comparta el enlace la tarjeta salga sin imagen. -->
+    <meta property="og:image" content="https://lqc.revolution505.com/assets/lqc-trophy-logo.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="1024" />
+    <meta property="og:image:alt" content="Logo de la League Querétaro Championship" />
     <meta property="og:site_name" content="LQC Querétaro" />
     
     <!-- Twitter Cards -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://lqc.mx/" />
+    <meta name="twitter:url" content="https://lqc.revolution505.com/" />
     <meta name="twitter:title" content="LQC | League Querétaro Championship" />
     <meta name="twitter:description" content="Torneo competitivo LoL en Querétaro - Inscripciones abiertas" />
-    <meta name="twitter:image" content="https://lqc.mx/assets/og-image.jpg" />
+    <meta name="twitter:image" content="https://lqc.revolution505.com/assets/lqc-trophy-logo.jpg" />
+    <meta name="twitter:image:alt" content="Logo de la League Querétaro Championship" />
     
     <!-- Preconexión y DNS prefetch para rendimiento -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -71,7 +74,7 @@
       "@type": "Organization",
       "name": "League Querétaro Championship",
       "url": "https://lqc.revolution505.com",
-      "logo": "https://lqc.revolution505.com/assets/2 LQC.png",
+      "logo": "https://lqc.revolution505.com/assets/2%20LQC.png",
       "description": "Torneo competitivo oficial de League of Legends en Querétaro, México.",
       "sameAs": [
         "https://twitch.tv/lqroc",
