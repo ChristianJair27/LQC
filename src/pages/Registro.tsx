@@ -1009,10 +1009,10 @@ export default function Registro() {
                           </span>{' '}
                           sobre el tratamiento de tus datos. Para hacerlo, escribe a{' '}
                           <a
-                            href="mailto:lqcqro@gmail.com"
+                            href="mailto:contactolqc@revolution505.com"
                             className="after:hidden text-lqc-accent font-medium underline underline-offset-4 decoration-lqc-accent/40 hover:decoration-lqc-accent"
                           >
-                            lqcqro@gmail.com
+                            contactolqc@revolution505.com
                           </a>
                           .
                         </span>

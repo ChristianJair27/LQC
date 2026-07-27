@@ -139,8 +139,8 @@ export default function Footer() {
               </a>
 
               <a
-                href="mailto:contacto@revolution505.com"
-                aria-label="Escribir a contacto@revolution505.com"
+                href="mailto:contactolqc@revolution505.com"
+                aria-label="Escribir a contactolqc@revolution505.com"
                 className={CLASE_ICONO}
               >
                 <Mail className="w-5 h-5" />

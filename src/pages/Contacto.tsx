@@ -18,7 +18,7 @@ export default function Contacto() {
     {
       icon: Mail,
       title: "Correo Electrónico",
-      value: "contacto@revolution505.com",
+      value: "contactolqc@revolution505.com",
       description: "Respuesta en 24-48 horas",
       action: "Enviar correo"
     },
