@@ -8,9 +8,17 @@ componentes: sus páginas no leen ninguna base.
 Dos cosas tocan Supabase:
 - El **formulario público de `/registro`** hace un **INSERT anónimo** en la tabla
   `inscripciones`. No lee nada y no necesita sesión.
-- El **panel de administración (`/admin`)**, detrás de login, **lee** esa tabla con
-  un **SELECT autenticado** (agrupa las inscripciones por equipo). Tiene sesión de
-  usuario; los admins se crean a mano en Supabase, no hay alta pública.
+- El **panel de administración (`/admin`)**, detrás de login, **lee y escribe** esa
+  tabla con **SELECT y UPDATE autenticados** (agrupa las inscripciones por equipo).
+  Tiene sesión de usuario; los admins se crean a mano en Supabase, no hay alta
+  pública. Las escrituras son siempre UPDATE por `id` sobre todas las filas del
+  equipo: pago (`pagado`, `pagado_en`), notas (`notas`) y archivado
+  (`archivado_en`). **Nunca DELETE**: no hay política de DELETE, así que un borrado
+  fallaría en silencio —devolvería 0 filas *sin* error— y archivar es justamente la
+  alternativa (`archivado_en` null = activo, con fecha = archivado). El archivado
+  depende además de que el SELECT siga devolviendo las filas archivadas: el panel
+  detecta el éxito parcial comparando lo que responde el `.select()` posterior al
+  UPDATE.
 
 (El sitio además pide fuentes a Google Fonts desde `index.html`, pero eso no manda
 datos de nadie.)
