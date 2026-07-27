@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Twitch, Mail, Trophy, MapPin } from 'lucide-react'
+import { Twitch, Facebook, MessageSquare, Mail, Trophy, MapPin } from 'lucide-react'
 
 /* Clases compartidas por los enlaces de las listas (Navegación y Recursos). Viven en
    constantes porque el mismo enlace se pinta como <Link> o como <a> según a dónde vaya, y
@@ -8,6 +8,11 @@ const CLASE_ENLACE =
   'text-sm text-gray-500 hover:text-white transition-colors flex items-center gap-2 group'
 const CLASE_PUNTO =
   'w-1 h-1 rounded-full bg-gray-700 group-hover:bg-blue-400 transition-colors'
+
+/* Botonera de iconos de "Conectar". En constante porque ahora son cuatro enlaces con la
+   misma caja; el de Twitch además le suma `group` para su punto pulsante. */
+const CLASE_ICONO =
+  'p-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-700 transition-all duration-300 rounded-lg'
 
 /* Al pasar de <a href> a <Link>, la navegación deja de recargar el documento y el navegador
    ya no lleva la página nueva al tope: React Router en modo declarativo (<BrowserRouter> +
@@ -119,27 +124,52 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Redes sociales y contacto */}
-          {/* Solo quedan los canales que existen de verdad: Twitch y el correo. Los iconos de
-              Twitter e Instagram apuntaban a '#' con target="_blank", así que abrían una
-              pestaña nueva con esta misma página: prometían una cuenta que no hay. Cuando
-              existan, se reponen con su URL real, target="_blank" y rel="noopener noreferrer". */}
+          {/* Redes sociales y contacto. Solo canales que EXISTEN: acá vivían iconos de Twitter
+              e Instagram apuntando a '#', que abrían una pestaña nueva con esta misma página y
+              prometían cuentas que no hay. Si aparece un canal nuevo se repone con su URL real,
+              nunca con '#'.
+              Los iconos son mudos —no tienen texto visible— así que cada uno necesita su
+              `aria-label`; sin él un lector de pantalla cae al href y lee la URL cruda. Los que
+              abren pestaña nueva lo avisan en el propio nombre accesible, igual que
+              Registro.tsx. Las URLs de Facebook y Discord son las mismas que ese archivo. */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-white uppercase tracking-wider">Conectar</h4>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <a
                 href="https://twitch.tv/lqroc"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-700 transition-all duration-300 rounded-lg group"
+                aria-label="LQC en Twitch (abre en pestaña nueva)"
+                className={`${CLASE_ICONO} group`}
               >
                 <Twitch className="w-5 h-5" />
                 <div className="absolute -top-2 -right-2 w-2 h-2 rounded-full bg-red-500 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </a>
 
               <a
+                href="https://www.facebook.com/lolqrochampionship/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LQC en Facebook (abre en pestaña nueva)"
+                className={CLASE_ICONO}
+              >
+                <Facebook className="w-5 h-5" />
+              </a>
+
+              <a
+                href="https://discord.gg/eS6zkvfkp"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LQC en Discord (abre en pestaña nueva)"
+                className={CLASE_ICONO}
+              >
+                <MessageSquare className="w-5 h-5" />
+              </a>
+
+              <a
                 href="mailto:contacto@revolution505.com"
-                className="p-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-700 transition-all duration-300 rounded-lg"
+                aria-label="Escribir a contacto@revolution505.com"
+                className={CLASE_ICONO}
               >
                 <Mail className="w-5 h-5" />
               </a>
