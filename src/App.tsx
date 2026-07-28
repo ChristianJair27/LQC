@@ -14,6 +14,7 @@ const Galeria = lazy(() => import('./pages/Galeria'))
 const Acerca = lazy(() => import('./pages/Acerca'))
 const Contacto = lazy(() => import('./pages/Contacto'))
 const Registro = lazy(() => import('./pages/Registro'))
+const Reglamento = lazy(() => import('./pages/Reglamento'))
 
 // Panel de administración (acceso solo por URL directa, fuera del nav público)
 const Login = lazy(() => import('./pages/admin/Login'))
@@ -44,6 +45,20 @@ export default function App() {
               <Route path="/acerca" element={<Acerca />} />
               <Route path="/contacto" element={<Contacto />} />
               <Route path="/registro" element={<Registro />} />
+
+              {/* /reglamento NO está en `navItems` de Header.tsx, a diferencia del resto de
+                  las públicas. Se entra desde el pie (bloque "Recursos"). Es una excepción
+                  DELIBERADA a la regla de AGENTS.md de mantener ruta y menú en sincronía, y
+                  está anotada también allá para que no se lea como un olvido.
+                  (No es el mismo caso que /admin: aquello está fuera de LayoutPublico y sin
+                  ningún enlace en el sitio. Esta es pública y enlazada; lo que no es, es
+                  navegación principal.)
+                  El motivo de fondo es que sumarla no sale gratis: Header.tsx documenta que
+                  con 6 ítems el menú ya se quedó sin ancho en la franja md (768–1023px) y hubo
+                  que compactarlo, y «Reglamento» es la etiqueta más larga de todas. O sea, una
+                  línea en `navItems` MÁS una revisión del layout a 768px. Si se decide que
+                  vale la pena, es eso lo que hay que hacer. */}
+              <Route path="/reglamento" element={<Reglamento />} />
 
               {/* Ruta 404 básica (opcional pero recomendado). Va dentro del layout
                   público para conservar header/footer en la página no encontrada. */}

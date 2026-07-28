@@ -42,14 +42,6 @@ const NAVEGACION = [
   { label: 'Contacto', to: '/contacto' }
 ]
 
-/* Archivo estático servido desde public/. El año va en el nombre porque el reglamento cambia
-   por temporada: cuando exista el de 2027 se sube AL LADO y se cambia esta constante.
-   OJO, es la condición de la que depende todo lo anterior: el PDF de 2026 NO se borra. Si se
-   reemplaza, cualquier enlace ya compartido pasa a devolver 404, que es justo lo que el
-   nombre versionado viene a evitar. El costo de dejarlos es ~340 KB por temporada, para
-   siempre, en la historia de git. */
-const RUTA_REGLAMENTO = '/reglamento-lqc-2026.pdf'
-
 /* BLOQUE "RECURSOS": vuelve, pero solo con destinos que EXISTEN.
    Se había ido entero (f18aa5b) porque cuatro de sus cinco ítems —Reglamento, Calendario,
    Estadísticas y FAQ— apuntaban a '#'. Ahora el reglamento es un PDF real en public/, así que
@@ -57,15 +49,14 @@ const RUTA_REGLAMENTO = '/reglamento-lqc-2026.pdf'
    regla no cambió —un enlace a '#' no es un placeholder, es una promesa rota que el usuario
    descubre recién al hacer clic— y vuelven de a una, cuando cada página exista.
 
-   «Inscripciones» se MUDÓ acá desde Navegación (donde se llamaba «Registro»); no está
-   duplicado. El quinto ítem de la sección original era exactamente esa duplicación, y era la
-   otra mitad del argumento para borrarla: un enlace que repetía el destino de la columna
-   vecina con otro nombre. El PDF justifica que la sección vuelva a existir, no justifica que
-   vuelva el duplicado, así que se repone una cosa y no la otra.
-   Lo que sí cuesta esta decisión, dicho para que no sorprenda: /registro ahora se llama
-   «Inscripciones» en el pie y «Registro» en el header. Es un nombre distinto para la misma
-   página, y como el header es sticky los dos se ven a la vez. Se resuelve unificando el
-   nombre en los dos lados; queda anotado y sin hacer porque es una decisión de copy. */
+   «Registro» se MUDÓ acá desde Navegación; no está duplicado. El quinto ítem de la sección
+   original era exactamente esa duplicación, y era la otra mitad del argumento para borrarla:
+   un enlace que repetía el destino de la columna vecina con otro nombre. El PDF justifica que
+   la sección vuelva a existir, no justifica que vuelva el duplicado, así que se repone una
+   cosa y no la otra.
+   Se llama «Registro» y no «Inscripciones» —como se llamó un rato— para decirle igual que el
+   header a la misma página. El header es sticky, así que los dos nombres se veían a la vez y
+   parecían dos destinos distintos. */
 
 export default function Footer() {
   return (
@@ -129,36 +120,21 @@ export default function Footer() {
             <h4 className="text-sm font-medium text-white uppercase tracking-wider">Recursos</h4>
             <ul className="space-y-3">
               <li>
-                {/* <a href> y NO <Link>: el reglamento es un archivo estático de public/, no
-                    una ruta de React Router. Un <Link> lo trataría como navegación interna,
-                    el router no encontraría esa ruta y terminaría en la pantalla de 404 en
-                    vez de abrir el PDF. Por eso tampoco lleva `irAlTope`: no hay cambio de
-                    página que scrollear.
-                    Abre en pestaña nueva para no sacar a nadie del sitio, y `noopener
-                    noreferrer` va siempre con `target="_blank"`.
-                    El aria-label dice las dos cosas que el texto «Reglamento» no dice: que
-                    es un PDF y que abre en otra pestaña. Comparte con los iconos de
-                    "Conectar" la convención de avisar la pestaña nueva en el nombre
-                    accesible, pero no la razón de existir: los iconos son mudos y ahí el
-                    aria-label REEMPLAZA texto que no hay, mientras que acá lo AMPLÍA. Por eso
-                    arranca con la palabra visible «Reglamento» —si no, el control por voz
-                    dejaría de encontrarlo (WCAG 2.5.3, "Label in Name")—. */}
-                <a
-                  href={RUTA_REGLAMENTO}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Reglamento de la LQC en PDF (abre en pestaña nueva)"
-                  className={CLASE_ENLACE}
-                >
+                {/* Apunta a /reglamento, la página con el visor, y NO al PDF directo como
+                    hacía antes. Al ser ruta interna vuelve a ser <Link> + irAlTope, igual que
+                    Navegación: ya no hay pestaña nueva que avisar ni archivo que anunciar, así
+                    que tampoco necesita aria-label —el texto visible ya es el nombre completo
+                    del destino—. Esas dos cosas ahora las dice la página, que es donde el
+                    usuario decide si abrir o descargar. */}
+                <Link to="/reglamento" onClick={irAlTope} className={CLASE_ENLACE}>
                   <div className={CLASE_PUNTO}></div>
                   Reglamento
-                </a>
+                </Link>
               </li>
               <li>
-                {/* Este sí es ruta interna: <Link> + irAlTope, igual que Navegación. */}
                 <Link to="/registro" onClick={irAlTope} className={CLASE_ENLACE}>
                   <div className={CLASE_PUNTO}></div>
-                  Inscripciones
+                  Registro
                 </Link>
               </li>
             </ul>

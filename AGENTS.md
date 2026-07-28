@@ -127,6 +127,12 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
    en `src/App.tsx` **y** el arreglo `navItems` en `src/components/layout/Header.tsx`.
    Olvidar el segundo es el error más fácil de cometer acá. El nav tiene hoy
    **6 ítems** (Inicio, Torneos, Galería, Acerca, Contacto, Registro).
+   **Excepción vigente: `/reglamento`.** Es pública y vive en `LayoutPublico`, pero **no**
+   está en `navItems`: se entra desde el bloque "Recursos" del pie. No es un olvido — con
+   6 ítems el menú ya se quedó sin ancho en la franja `md` (768–1023px) y hubo que
+   compactarlo, y «Reglamento» es la etiqueta más larga. Sumarla es una línea en `navItems`
+   **más** una revisión del layout a 768px. Está anotado también en `App.tsx`, al lado de
+   la ruta.
 3. **No inventar contenido** (fechas, resultados, nombres de torneos, patrocinadores).
    Si falta un dato, marcarlo como pendiente y preguntar.
 4. Rama de trabajo: `main`. Remoto: `github.com/ChristianJair27/LQC`.
