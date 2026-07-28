@@ -1137,6 +1137,9 @@ function TarjetaArchivado({
      región aria-live del padre. */
   const [error, setError] = useState(false)
   const botonRestaurarRef = useRef<HTMLButtonElement>(null)
+  /* Enlaza el aviso de abajo con el botón: el texto va DESPUÉS de él en el DOM, así que sin
+     esto Tab lo saltea y el aviso llega tarde —o nunca— justo a quien no lo ve venir. */
+  const avisoId = useId()
 
   const montado = useRef(true)
   useEffect(() => {
@@ -1178,9 +1181,8 @@ function TarjetaArchivado({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate font-sans font-semibold text-gray-300">{nombre}</p>
-          {/* `text-gray-400` y no el `gray-500` de los metadatos secundarios del panel: acá
-              la fecha de archivado es la única información de la tarjeta y con gray-500 se
-              queda en ~3.9:1, por debajo del mínimo. */}
+          {/* `text-gray-400` y no el `gray-500` de los metadatos secundarios del panel: sobre
+              el fondo de esta tarjeta gray-500 se queda en ~3.9:1, por debajo del mínimo. */}
           <p className="mt-1 flex flex-wrap items-center gap-x-2 font-mono text-[11px] text-gray-400">
             <span>
               {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
@@ -1197,6 +1199,7 @@ function TarjetaArchivado({
           onClick={restaurar}
           disabled={estado === 'restaurando'}
           aria-busy={estado === 'restaurando'}
+          aria-describedby={avisoId}
           className={`${BTN_SECUNDARIO} shrink-0`}
         >
           {estado === 'restaurando' ? (
@@ -1212,6 +1215,15 @@ function TarjetaArchivado({
           )}
         </button>
       </div>
+      {/* Mismo criterio que la zona de archivado: el efecto que sale del panel se dice ANTES
+          de pulsar. Restaurar sigue siendo un clic sin confirmación (ver arriba), pero vuelve
+          a inscribir al equipo en ATAK.GG y eso no se adivina desde la palabra «Restaurar».
+          La frase es el espejo exacto de la de archivar ("saca al equipo del listado, del CSV
+          y del torneo"): misma tripleta, verbo invertido. Dice "listado ACTIVO" y no "listado"
+          a secas porque desde acá el usuario está parado en otro listado, el de archivados. */}
+      <p id={avisoId} className="mt-3 text-xs leading-snug text-gray-400">
+        Restaurar devuelve el equipo al listado activo, al CSV y al torneo en ATAK.GG.
+      </p>
       {error && (
         <p role="alert" className="mt-3 text-xs leading-snug text-rose-300">
           No pudimos restaurar el equipo. Inténtalo de nuevo.
