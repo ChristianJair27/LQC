@@ -4,9 +4,11 @@
 /* La documentación y la memoria de los agentes están versionadas, pero son
    prosa que menciona nombres de clases. Sin esto, Tailwind las detecta como uso
    real y las inyecta en el CSS de producción (ver "Trampas conocidas" en
-   AGENTS.md). Cubre .claude/ (agentes + memoria) y los .md de la raíz. */
+   AGENTS.md). Cubre .claude/ (agentes + memoria) y CUALQUIER .md del repo, no
+   solo los de la raíz: `../*.md` no cubría docs/, así que esa prosa quedaba
+   expuesta. */
 @source not "../.claude";
-@source not "../*.md";
+@source not "../**/*.md";
 
 /* Tema personalizado en azul oscuro/negro */
 @theme {

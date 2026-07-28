@@ -156,10 +156,12 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   `--color-lqc-500: #0066ff;`, uno por línea — **nunca** con sintaxis de objeto
   anidada entre llaves. Esa forma no es CSS válido: no compila, no genera
   utilidades y la paleta queda inerte mientras el build parece funcionar.
-- **Tailwind 4 escanea todo el repo**, incluida `.claude/agent-memory/`. Los
-  nombres de clase escritos **en prosa** (notas, documentación) se detectan como
-  uso real y se cuelan al CSS de producción. Por eso `src/index.css` tiene
-  `@source not "../.claude";` y `@source not "../*.md";` — **mantenelos**.
+- **Tailwind 4 escanea todo el repo**, incluidas `.claude/agent-memory/` y
+  `docs/`. Los nombres de clase escritos **en prosa** (notas, documentación) se
+  detectan como uso real y se cuelan al CSS de producción. Por eso
+  `src/index.css` tiene `@source not "../.claude";` y
+  `@source not "../**/*.md";` — **mantenelos**. Ojo con el glob: `../*.md` solo
+  cubre los `.md` de la raíz; `../**/*.md` cubre la raíz **y** las subcarpetas.
 - **La regla base `a { color: #66a3ff }`** de `index.css` pisa el color de
   cualquier enlace. Todo `<a>` que funcione como CTA necesita `text-white`
   explícito o el contraste falla (llega a bajar a ~1.9:1). Los `<button>` no
