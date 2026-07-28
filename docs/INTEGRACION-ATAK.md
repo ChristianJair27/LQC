@@ -53,7 +53,7 @@ security definer
 set search_path = public, extensions
 as $$
 declare
-  base text := 'http://<CONTENEDOR_ATAK>:4000/api/integrations/lqc';
+  base text := 'http://atak-backend:4000/api/integrations/lqc';
 begin
   perform net.http_post(
     url     := base || ruta,
@@ -109,8 +109,7 @@ create trigger atak_inscripcion_archivado
 ## Por qué `http://` por red interna y no el dominio público
 
 La URL apunta al **contenedor de ATAK por la red interna de Docker**
-(`http://<CONTENEDOR_ATAK>:4000`), no al dominio público por HTTPS. No es
-descuido:
+(`http://atak-backend:4000`), no al dominio público por HTTPS. No es descuido:
 
 Al salir al dominio público desde el mismo servidor, el **hairpin NAT** del
 router devuelve un **certificado autofirmado**, y `pg_net` **no puede saltarse la
@@ -126,29 +125,36 @@ validar y el problema desaparece.
 
 ---
 
-## ⚠️ El nombre del contenedor caduca en cada deploy
+## Por qué el hostname es `atak-backend` — RESUELTO
 
-**Este es el modo de falla más importante y el más difícil de notar.**
+**Ya no hay nada que hacer después de cada deploy.** El backend de ATAK tiene un
+**alias de red fijo, `atak-backend`, en la red `coolify`**, así que la URL de
+`atak_enviar` no depende del deploy. Esta sección queda porque explica **por qué
+la URL es la que es**, y por qué no hay que "simplificarla" volviendo al nombre
+del contenedor.
 
-El nombre del contenedor de ATAK lleva un **sufijo de timestamp que Coolify
-regenera en cada deploy**. Cuando cambia, la URL de `atak_enviar` apunta a un
-host que ya no existe y el webhook falla con:
+**Lo que pasaba antes.** El nombre del contenedor de ATAK lleva un **sufijo de
+timestamp que Coolify regenera en cada deploy del backend**. La URL apuntaba a
+ese nombre, así que cada deploy la dejaba apuntando a un host que ya no existía y
+el webhook fallaba con:
 
 ```
 Couldn't resolve host name
 ```
 
-Y acá está el problema: **los registros dejan de llegar a ATAK EN SILENCIO.** El
-`INSERT` local sigue funcionando perfecto, el jugador ve su confirmación en
-`/registro`, la fila aparece en el panel — y en ATAK.GG no hay nadie. Nada en el
-sitio lo delata.
+Y ahí estaba lo peor: **los registros dejaban de llegar a ATAK EN SILENCIO.** El
+`INSERT` local seguía funcionando perfecto, el jugador veía su confirmación en
+`/registro`, la fila aparecía en el panel — y en ATAK.GG no había nadie. Nada en
+el sitio lo delataba. Tumbó la integración más de una vez, y de ahí salió el
+[incidente registrado](#incidente-registrado) de más abajo.
 
-**Después de cada deploy de ATAK hay que verificar la integración** (ver abajo) y,
-si el nombre cambió, actualizar `base` en `public.atak_enviar`.
+**Cómo se resolvió.** Con el alias de red: el nombre `atak-backend` lo fija la
+configuración de red, no el deploy, así que sobrevive a los redespliegues.
 
-**Pendiente:** configurar un **alias de red estable** para el contenedor, de modo
-que la URL deje de depender del nombre generado. Mientras eso no exista, esta
-verificación manual es obligatoria.
+**Lo que sigue importando:** si alguien saca el alias, mueve el backend fuera de
+la red `coolify` o "limpia" la URL para que apunte al nombre real del contenedor,
+vuelve **exactamente** este fallo, con el mismo silencio. El alias es parte de la
+integración, no un detalle de infraestructura.
 
 ---
 
@@ -165,13 +171,51 @@ order by created desc;
 Cómo leerlo:
 
 - **`status_code` nulo** → la llamada **no llegó**. Mirá `error_msg`: si dice
-  `Couldn't resolve host name` es el nombre del contenedor caducado; si dice
-  `SSL connect error` es que la URL quedó apuntando al dominio público.
+  `Couldn't resolve host name`, el alias `atak-backend` no está resolviendo —el
+  backend está caído, quedó fuera de la red `coolify`, o le sacaron el alias—; si
+  dice `SSL connect error` es que la URL quedó apuntando al dominio público.
 - **`status_code` 2xx** → llegó. `content` trae la respuesta de ATAK.
 - **`status_code` 409** → llegó y ATAK lo rechazó (ver el límite de 7 jugadores).
 
 Las filas son asíncronas: pueden tardar unos segundos en aparecer después de la
 escritura.
+
+---
+
+## Incidente registrado
+
+**Un equipo archivado en el panel que siguió inscrito en el torneo.** Caso real,
+ya corregido. Se deja escrito porque es la forma exacta que toma esta falla
+cuando ocurre.
+
+**Qué pasó.** Se archivó un equipo desde `/admin` mientras el hostname viejo ya
+no resolvía. El trigger sí disparó —la escritura local fue normal—, pero `pg_net`
+falló con `Couldn't resolve host name` y el `POST /unregister` **nunca llegó a
+ATAK**.
+
+**La consecuencia.** El equipo quedó **archivado en Supabase pero todavía
+inscrito en el torneo de ATAK.GG**. El panel mostraba una cosa y el bracket otra.
+**Sin un solo aviso en la interfaz**: para el admin, archivar había funcionado.
+
+**Cómo se detectó.** Consultando `net._http_response` (ver arriba): la fila de esa
+escritura tenía `status_code` nulo y el `error_msg` de resolución de nombre.
+
+**Cómo se corrigió.** Llamando a la función a mano, con el equipo afectado:
+
+```sql
+select public.atak_enviar('/unregister', jsonb_build_object('equipo', '<nombre>'));
+```
+
+Respondió `team_deleted`, y las dos bases volvieron a coincidir.
+
+**La lección, que sigue vigente con el alias puesto:** las llamadas son
+**fire-and-forget**. `pg_net` no devuelve el resultado al trigger, así que si el
+destino no responde **el panel no se entera** y las dos bases divergen **en
+silencio**. El alias de red eliminó *una* causa —la más frecuente—, no la clase
+entera: un backend caído, un 409 por el límite de jugadores o un error de red
+producen el mismo desenlace mudo. **Revisar `net._http_response` es la única
+forma de detectarlo.** Vale la pena mirarlo después de archivar o restaurar algo
+que importe.
 
 ---
 
