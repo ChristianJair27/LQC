@@ -20,6 +20,18 @@ Dos cosas tocan Supabase:
   detecta el éxito parcial comparando lo que responde el `.select()` posterior al
   UPDATE.
 
+**Escribir en `inscripciones` dispara efectos FUERA de este repo.** Hay triggers de
+PostgreSQL en Supabase que sincronizan con **ATAK.GG** vía `pg_net`: un INSERT da de
+alta el registro allá, y archivar/restaurar (`archivado_en`) da de baja o vuelve a
+inscribir al equipo en el torneo. **No hay una sola línea de eso en el repo** —ni
+webhook, ni edge function, ni carpeta `supabase/`—, así que grepear el código y no
+encontrar nada **no** prueba que la integración no exista: ya llevó a un agente a
+concluir exactamente eso. Antes de afirmar nada sobre ATAK.GG, leé
+**[docs/INTEGRACION-ATAK.md](./docs/INTEGRACION-ATAK.md)**, que documenta los
+triggers, el modo de falla silencioso más importante (el nombre del contenedor
+caduca en cada deploy y los registros dejan de llegar sin que el sitio lo note) y
+cómo diagnosticarlo con `net._http_response`.
+
 (El sitio además pide fuentes a Google Fonts desde `index.html`, pero eso no manda
 datos de nadie.)
 
