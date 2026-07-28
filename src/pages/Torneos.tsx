@@ -3,9 +3,6 @@ import { useState } from 'react'
 
 export default function Torneos() {
   const [activeSeason, setActiveSeason] = useState("Otoño 2025")
-  const [activeTab, setActiveTab] = useState("brackets")
-  const [activeBracket, setActiveBracket] = useState<string>("groups")
-  const [activeStanding, setActiveStanding] = useState<string>("groups-standings")
 
   const tournaments = [
     {
@@ -60,58 +57,6 @@ export default function Torneos() {
 
   const currentTournament = tournaments.find(t => t.season === activeSeason) || tournaments[0]
 
-  const tournamentEmbeds = [
-    {
-      id: "teams",
-      title: "Equipos Participantes",
-      description: "Lista completa de equipos que compitieron",
-      src: "https://battlefy.com/embeds/teams/6852287c98498e0084e4cff1",
-      height: "680px"
-    },
-    {
-      id: "groups",
-      title: "FASE DE GRUPOS - Bracket",
-      description: "Enfrentamientos y resultados de la fase regular",
-      src: "https://battlefy.com/embeds/6852287c98498e0084e4cff1/stage/68ae011e24d77d05705932ee",
-      height: "720px"
-    },
-    {
-      id: "playins",
-      title: "Play Ins - Bracket",
-      description: "Ronda clasificatoria hacia playoffs",
-      src: "https://battlefy.com/embeds/6852287c98498e0084e4cff1/stage/68e259ecb9681c0021c34aec",
-      height: "720px"
-    },
-    {
-      id: "top8",
-      title: "Top 8 - Eliminación Directa",
-      description: "Fase final - bracket decisivo",
-      src: "https://battlefy.com/embeds/6852287c98498e0084e4cff1/stage/6900080ca7e3f1002186119f",
-      height: "800px"
-    }
-  ]
-
-  const standingsEmbeds = [
-    {
-      id: "groups-standings",
-      title: "FASE DE GRUPOS - Clasificación",
-      src: "https://battlefy.com/embeds/6852287c98498e0084e4cff1/stage/68ae011e24d77d05705932ee/standings",
-      height: "680px"
-    },
-    {
-      id: "playins-standings",
-      title: "Play Ins - Clasificación",
-      src: "https://battlefy.com/embeds/6852287c98498e0084e4cff1/stage/68e259ecb9681c0021c34aec/standings",
-      height: "680px"
-    },
-    {
-      id: "top8-standings",
-      title: "Top 8 - Clasificación",
-      src: "https://battlefy.com/embeds/6852287c98498e0084e4cff1/stage/6900080ca7e3f1002186119f/standings",
-      height: "680px"
-    }
-  ]
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
       {/* Fondo decorativo sutil - igual que Home */}
@@ -152,7 +97,7 @@ export default function Torneos() {
               </h1>
 
               <p className="text-xl text-gray-300 max-w-3xl mt-6 leading-relaxed">
-                Revive brackets, clasificaciones y momentos históricos de todas las temporadas del League Querétaro Championship.
+                Revive campeones, resultados y momentos históricos de todas las temporadas del League Querétaro Championship.
               </p>
 
               <div className="inline-flex items-center gap-4 mt-8">
@@ -261,137 +206,18 @@ export default function Torneos() {
           </div>
         </section>
 
-        {/* Tabs */}
-        <section className="py-12 bg-black/20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex justify-center border-b border-white/5">
-              <button
-                onClick={() => setActiveTab("brackets")}
-                className={`
-                  px-10 py-4 text-lg font-medium transition-all duration-300 relative
-                  ${activeTab === "brackets"
-                    ? 'text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
-                    : 'text-gray-400 hover:text-gray-200'
-                  }
-                `}
-              >
-                Brackets
-              </button>
-              <button
-                onClick={() => setActiveTab("standings")}
-                className={`
-                  px-10 py-4 text-lg font-medium transition-all duration-300 relative
-                  ${activeTab === "standings"
-                    ? 'text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-500'
-                    : 'text-gray-400 hover:text-gray-200'
-                  }
-                `}
-              >
-                Clasificaciones
-              </button>
-              <button
-                className="px-10 py-4 text-lg font-medium text-gray-500 cursor-not-allowed"
-                disabled
-              >
-                Estadísticas
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Contenido dinámico - Brackets o Standings */}
-        <section className="py-20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            {activeTab === "brackets" ? (
-              <div className="space-y-12">
-                <div className="flex flex-wrap justify-center gap-4">
-                  {tournamentEmbeds.map((embed) => (
-                    <button
-                      key={embed.id}
-                      onClick={() => setActiveBracket(embed.id)}
-                      className={`
-                        px-6 py-3 text-sm font-medium rounded-full transition-all duration-300 backdrop-blur-sm border
-                        ${activeBracket === embed.id
-                          ? 'bg-blue-900/40 border-blue-600 text-white shadow-lg shadow-blue-900/30'
-                          : 'bg-black/30 border-white/10 text-gray-300 hover:border-blue-500/50 hover:text-white'
-                        }
-                      `}
-                    >
-                      {embed.title.replace(" - Bracket", "").replace(" - Eliminación Directa", "")}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-2xl font-light mb-2">
-                      {tournamentEmbeds.find(e => e.id === activeBracket)?.title}
-                    </h3>
-                    <p className="text-gray-400">
-                      {tournamentEmbeds.find(e => e.id === activeBracket)?.description}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/50 backdrop-blur-md border border-white/5">
-                    <iframe
-                      key={activeBracket}
-                      src={tournamentEmbeds.find(e => e.id === activeBracket)?.src}
-                      title={tournamentEmbeds.find(e => e.id === activeBracket)?.title}
-                      width="100%"
-                      height="100%"
-                      className="min-h-[700px] md:min-h-[800px] lg:min-h-[900px]"
-                      scrolling="yes"
-                      frameBorder="0"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-12">
-                <div className="flex flex-wrap justify-center gap-4">
-                  {standingsEmbeds.map((embed) => (
-                    <button
-                      key={embed.id}
-                      onClick={() => setActiveStanding(embed.id)}
-                      className={`
-                        px-6 py-3 text-sm font-medium rounded-full transition-all duration-300 backdrop-blur-sm border
-                        ${activeStanding === embed.id
-                          ? 'bg-blue-900/40 border-blue-600 text-white shadow-lg shadow-blue-900/30'
-                          : 'bg-black/30 border-white/10 text-gray-300 hover:border-blue-500/50 hover:text-white'
-                        }
-                      `}
-                    >
-                      {embed.title.replace(" - Clasificación", "")}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-6">
-                  <h3 className="text-2xl font-light mb-2">
-                    {standingsEmbeds.find(e => e.id === activeStanding)?.title}
-                  </h3>
-
-                  <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/50 backdrop-blur-md border border-white/5">
-                    <iframe
-                      key={activeStanding}
-                      src={standingsEmbeds.find(e => e.id === activeStanding)?.src}
-                      title={standingsEmbeds.find(e => e.id === activeStanding)?.title}
-                      width="100%"
-                      height="100%"
-                      className="min-h-[700px] md:min-h-[800px] lg:min-h-[900px]"
-                      scrolling="yes"
-                      frameBorder="0"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+        {/* ACÁ NO HAY PESTAÑAS "Brackets / Clasificaciones / Estadísticas". Eran una barra de
+            tabs sobre iframes de Battlefy, y se fueron las dos cosas: sin embeds, la barra no
+            tenía nada que mostrar (y «Estadísticas» ya estaba `disabled` desde antes, o sea
+            que de las tres pestañas ninguna llevaba a contenido vivo).
+            Con ellas se fueron los arrays de embeds y los estados activeTab / activeBracket /
+            activeStanding, que existían solo para elegir qué iframe pintar.
+            Lo de arriba y lo de abajo NO dependía de eso y sigue igual: el selector de
+            temporada, `currentTournament`, las tarjetas de stats, el podio y este historial
+            salen del array `tournaments`, que es local (el CTA de más abajo está hardcodeado
+            en el JSX, ni siquiera pasa por ahí).
+            Cuando ATAK exponga brackets y clasificaciones, la barra vuelve con contenido
+            detrás — no antes. */}
 
         {/* Historial resumido */}
         <section className="py-20 bg-black/20">
