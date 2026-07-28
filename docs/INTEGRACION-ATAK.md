@@ -1,8 +1,13 @@
 # Integración con ATAK.GG
 
-**Esta integración YA FUNCIONA en producción, pero no vive en este repo.** Está
-implementada como **triggers de PostgreSQL dentro de Supabase**, así que es
-invisible para cualquiera que solo lea el código del sitio.
+**La sincronización con ATAK YA FUNCIONA en producción, pero no vive en este
+repo.** Está implementada como **triggers de PostgreSQL dentro de Supabase**, así
+que es invisible para cualquiera que solo lea el código del sitio.
+
+Cuidado con generalizar eso: el sitio habla con ATAK por **dos vías distintas**.
+Los triggers (esta sección y las que siguen) no están en el repo. La **validación
+del Riot ID** contra la API pública sí está, en `src/lib/atak.ts`, y se documenta
+[más abajo](#api-pública-validación-de-riot-id-esto-sí-vive-en-el-repo).
 
 Eso ya causó un error de diagnóstico: un agente grepeó el repo entero buscando
 `atak`, `webhook`, `functions.invoke` y una carpeta `supabase/`, no encontró nada
@@ -243,6 +248,55 @@ el panel. O sea: **las dos bases divergen** y el sitio no muestra ninguna señal
 
 Hay que **detectarlo a mano** revisando `net._http_response` en busca de 409, o
 comparando el conteo de jugadores del panel contra el de ATAK.
+
+---
+
+## API pública: validación de Riot ID (esto SÍ vive en el repo)
+
+Aparte de los triggers, ATAK expone un endpoint **público** que el sitio llama
+directo desde el navegador. Es la única parte de la integración que sí está en el
+código: **[`src/lib/atak.ts`](../src/lib/atak.ts)**, y la usa el campo Riot ID de
+`/registro` al perder el foco.
+
+```
+GET https://atakback.revolution505.com/api/public/v1/validate-riot-id?riotId=<encodeURIComponent>
+```
+
+| Respuesta | Significa |
+| --- | --- |
+| `{ ok:true, data:{ valid:true, gameName, tagLine } }` | el Riot ID existe |
+| `{ ok:true, data:{ valid:false, reason:"not_found" } }` | no existe |
+| `{ ok:true, data:{ valid:false, reason:"format" } }` | formato inválido |
+| `{ ok:true, data:{ valid:null, reason:"unavailable" } }` | Riot caído |
+
+**No lleva `x-lqc-secret`**: es público y sin credenciales, al revés que
+`atak_enviar`. Nada de lo que se mande por acá es secreto — viaja en el bundle.
+
+**Regla que no se negocia: esta validación nunca bloquea un registro.** Solo
+`not_found` frena el envío. Todo lo demás —`format`, `unavailable`, error de red,
+timeout, CORS, un `reason` desconocido, un JSON con otra forma— se trata como "no se pudo
+comprobar" y el registro sigue. Perder una inscripción de $500 porque una API de
+terceros estaba caída es peor que aceptar un Riot ID inválido, que además se
+corrige a mano desde el panel.
+
+**Estado al 2026-07-27, verificado con `curl`:**
+
+- La ruta **todavía no está desplegada**: devuelve **404**. El backend sí está
+  vivo (`/api/health` responde 200). O sea que hoy la validación está inerte —el
+  formulario funciona igual, que es justamente el punto del diseño— y se activa
+  sola cuando la ruta exista.
+- **CORS incompleto.** El 404 de esa ruta manda `Access-Control-Allow-Origin: *`,
+  pero `/api/health` —la única ruta que hoy responde 200— **no manda ningún
+  header CORS**. La cobertura es inconsistente por ruta, así que **queda sin
+  comprobar si la respuesta 200 real va a traer el header**. Si no lo trae, el
+  navegador bloquea la respuesta y la validación queda muda para siempre, además
+  de imprimir un error de CORS en consola que el código no puede atrapar.
+  **Antes de dar la función por viva, comprobar el header en el 200, no en el 404:**
+
+```bash
+curl -s -D - -o /dev/null -H "Origin: https://lqc.revolution505.com" \
+  "https://atakback.revolution505.com/api/public/v1/validate-riot-id?riotId=Jugador%23MX1"
+```
 
 ---
 

@@ -23,10 +23,12 @@ Dos cosas tocan Supabase:
 **Escribir en `inscripciones` dispara efectos FUERA de este repo.** Hay triggers de
 PostgreSQL en Supabase que sincronizan con **ATAK.GG** vía `pg_net`: un INSERT da de
 alta el registro allá, y archivar/restaurar (`archivado_en`) da de baja o vuelve a
-inscribir al equipo en el torneo. **No hay una sola línea de eso en el repo** —ni
-webhook, ni edge function, ni carpeta `supabase/`—, así que grepear el código y no
-encontrar nada **no** prueba que la integración no exista: ya llevó a un agente a
-concluir exactamente eso. Antes de afirmar nada sobre ATAK.GG, leé
+inscribir al equipo en el torneo. **De esos triggers no hay una sola línea en el
+repo** —ni webhook, ni edge function, ni carpeta `supabase/`—, así que grepear el
+código y no encontrar nada **no** prueba que la integración no exista: ya llevó a
+un agente a concluir exactamente eso. (Ojo: `src/lib/atak.ts` **sí** es código de
+ATAK, pero es otra cosa —la validación del Riot ID contra la API pública— y no
+tiene nada que ver con la sincronización por triggers.) Antes de afirmar nada sobre ATAK.GG, leé
 **[docs/INTEGRACION-ATAK.md](./docs/INTEGRACION-ATAK.md)**, que documenta los
 triggers, el riesgo vigente (las llamadas son **fire-and-forget**: `pg_net` no le
 devuelve el resultado al trigger, así que si la llamada falla o ATAK la rechaza
@@ -68,6 +70,7 @@ src/
     Footer.tsx
   lib/
     supabase.ts            cliente de Supabase (perezoso; devuelve null sin credenciales)
+    atak.ts                API pública de ATAK.GG: valida un Riot ID; nunca lanza ni bloquea
   pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro
     admin/                 panel protegido: Login · RutaProtegida · Panel · ListaInscripciones
 public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico

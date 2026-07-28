@@ -7,6 +7,8 @@ import {
   Loader2
 } from 'lucide-react'
 import { obtenerSupabase } from '../lib/supabase'
+import { validarRiotId } from '../lib/atak'
+import type { ResultadoRiotId } from '../lib/atak'
 
 /* ------------------------------------------------------------------ */
 /*  Estado del formulario                                              */
@@ -85,6 +87,24 @@ const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 /* Riot ID completo: nombre (3–16 caracteres, cualquiera menos '#') + '#' + tag (2–5
    alfanuméricos). Se valida sobre el valor con trim(); las mayúsculas se conservan. */
 const REGEX_RIOT_ID = /^[^#]{3,16}#[A-Za-z0-9]{2,5}$/
+
+/* Estado de la comprobación del Riot ID contra ATAK.GG. 'inactivo' es también
+   el estado al que vuelve cualquier fallo de la validación: si no se pudo
+   comprobar, el campo no dice nada y el registro sigue su curso. */
+type EstadoRiotId = 'inactivo' | 'validando' | 'valido' | 'no_encontrado'
+
+/* El veredicto viaja atado al valor exacto sobre el que se pidió. Quien lo lee
+   compara contra el Riot ID que hay ahora en el campo y descarta el que no
+   corresponda, así un veredicto no puede quedar pegado a un valor que la persona
+   ya cambió. Es lo que hace segura la lectura sin depender de que todos los
+   caminos que escriben el campo se acuerden de limpiar el estado. */
+type ValidacionRiotId = { valor: string; estado: EstadoRiotId }
+
+/* Lo usan dos caminos —el error derivado del campo y la validación del envío—,
+   por eso es constante. Nombra las dos causas reales (el tag y las mayúsculas):
+   "no existe" a secas no le dice a nadie qué corregir. */
+const MENSAJE_RIOT_ID_NO_EXISTE =
+  'No encontramos ese Riot ID. Revisa las mayúsculas y el tag que va después del # (por ejemplo, Jugador#MX1).'
 
 /* Solo dígitos y separadores de formato. Cualquier letra u otro símbolo se
    rechaza: sin esto, "abc0123456789" pasaría porque de la cadena igual se
@@ -175,8 +195,9 @@ const ORDEN_CAMPOS: CampoError[] = [
 /*  inputs en cada render y no perder el foco al escribir)              */
 /* ------------------------------------------------------------------ */
 
+/* Sin padding derecho: lo pone CampoTexto según haya o no adorno a la derecha. */
 const CLASE_INPUT_BASE =
-  'w-full pl-12 pr-4 py-3.5 bg-black/40 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-1 transition-all'
+  'w-full pl-12 py-3.5 bg-black/40 backdrop-blur-sm border rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-1 transition-all'
 const CLASE_INPUT_OK = 'border-white/10 focus:border-blue-500 focus:ring-blue-500/30'
 const CLASE_INPUT_ERROR = 'border-rose-500/60 focus:border-rose-400 focus:ring-rose-500/30'
 
@@ -206,12 +227,18 @@ type CampoTextoProps = {
   /* id(s) que describen el input vía aria-describedby (p. ej. una ayuda de formato).
      Opcional: los demás campos no lo pasan y se renderizan igual que antes. */
   describedById?: string
+  /* Al salir del campo. Lo usa el Riot ID para comprobarlo contra ATAK.GG. */
+  onBlur?: () => void
+  /* Adorno a la derecha del input (un estado de validación, por ejemplo). Va
+     `aria-hidden`: es señal visual y lo que se anuncia lo dice quien lo pasa,
+     por su propia región aria-live. */
+  sufijo?: React.ReactNode
 }
 
 function CampoTexto({
   id, label, icono: Icono, valor, onChange, error,
   tipo = 'text', placeholder, autoComplete, min, max,
-  claseContenedor = '', claseInput = '', describedById
+  claseContenedor = '', claseInput = '', describedById, onBlur, sufijo
 }: CampoTextoProps) {
   const idError = `${id}-error`
   return (
@@ -227,6 +254,7 @@ function CampoTexto({
           type={tipo}
           value={valor}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           placeholder={placeholder}
           autoComplete={autoComplete}
           min={min}
@@ -236,8 +264,16 @@ function CampoTexto({
           aria-describedby={
             [describedById, error ? idError : null].filter(Boolean).join(' ') || undefined
           }
-          className={`${CLASE_INPUT_BASE} ${error ? CLASE_INPUT_ERROR : CLASE_INPUT_OK} ${claseInput}`}
+          className={`${CLASE_INPUT_BASE} ${sufijo ? 'pr-12' : 'pr-4'} ${error ? CLASE_INPUT_ERROR : CLASE_INPUT_OK} ${claseInput}`}
         />
+        {sufijo && (
+          <span
+            className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none"
+            aria-hidden="true"
+          >
+            {sufijo}
+          </span>
+        )}
       </div>
       {error && <MensajeError id={idError} texto={error} />}
     </div>
@@ -336,6 +372,37 @@ export default function Registro() {
   const tarjetaExitoRef = useRef<HTMLDivElement>(null)
   const enviadoPrevio = useRef(enviado)
 
+  /* --- Comprobación del Riot ID contra ATAK.GG (ver src/lib/atak.ts) --- */
+
+  const [validacionRiotId, setValidacionRiotId] = useState<ValidacionRiotId>({
+    valor: '',
+    estado: 'inactivo'
+  })
+  /* El resultado ocurre al salir del campo, con el foco ya en otro lado: sin esto
+     no habría forma de enterarse sin ver la pantalla. */
+  const [anuncioRiotId, setAnuncioRiotId] = useState('')
+
+  /* Última comprobación con veredicto firme, para no repetir la llamada si la
+     persona vuelve a entrar y salir del campo sin cambiar el valor.
+     Los 'indeterminado' NO se guardan a propósito: si ATAK o Riot estaban caídos,
+     el siguiente blur es una oportunidad legítima de reintentar. El costo es que
+     entrar y salir del campo con el servicio caído repite la petición, acotado
+     por el timeout de 5 s y por ser un gesto manual. */
+  const riotIdComprobado = useRef<{ valor: string; resultado: ResultadoRiotId } | null>(null)
+
+  /* Contador de peticiones: una respuesta cuyo id ya no es el último llegó tarde
+     —la persona editó el campo o volvió a salir— y se descarta. Sin esto, una
+     respuesta lenta sobre un valor viejo pisa el veredicto del valor nuevo. */
+  const peticionRiotId = useRef(0)
+
+  /* Estado efectivo del campo: el veredicto guardado solo vale si sigue siendo
+     sobre el Riot ID que hay escrito ahora. Cualquier otra cosa —una edición sin
+     salir del campo, una respuesta vieja— se lee como 'inactivo', que es el
+     estado que no dice ni bloquea nada. */
+  const gamertagTrim = form.gamertag.trim()
+  const estadoRiotId: EstadoRiotId =
+    validacionRiotId.valor === gamertagTrim ? validacionRiotId.estado : 'inactivo'
+
   /* Cada vez que se alterna formulario ⇄ éxito, el nodo que tenía el foco se
      desmonta y el foco cae en <body>: el usuario de teclado queda al principio
      del documento y el scroll, donde estaba. Va en un efecto y no en los
@@ -388,6 +455,90 @@ export default function Registro() {
       if (valor !== 'Otros') delete siguiente[campoOtro]
       return siguiente
     })
+  }
+
+  /* El Riot ID tiene su propio onChange: además de lo que hace setCampo, toda
+     edición invalida el veredicto anterior —era sobre otro valor— y descarta la
+     respuesta de una validación en vuelo. */
+  const setGamertag = (valor: string) => {
+    setCampo('gamertag', valor)
+    /* Descarta la respuesta de una validación en vuelo: era sobre otro valor.
+       Que el veredicto no se pinte donde no va ya lo garantiza `estadoRiotId`;
+       esto además evita que una respuesta tardía pise a una más nueva. */
+    peticionRiotId.current++
+    /* Y se limpia el veredicto guardado. Hace falta aunque el estado esté atado
+       al valor: si la persona edita y vuelve a teclear el MISMO texto que se
+       estaba comprobando, el valor coincide de nuevo pero la petición de aquel
+       momento ya quedó descartada por el contador y su respuesta nunca se va a
+       aplicar — sin esto, el indicador de "Validando…" giraba para siempre.
+       No se pierde nada: al salir del campo, el caché repinta el veredicto sin
+       volver a llamar. */
+    setValidacionRiotId({ valor: '', estado: 'inactivo' })
+    setAnuncioRiotId('')
+  }
+
+  /* Traduce el veredicto a lo que ve y oye la persona, siempre atado al valor que
+     se comprobó. Es el único lugar donde 'indeterminado' se vuelve silencio: ni
+     tilde, ni error, ni anuncio. Es la regla más importante de todo esto —una
+     validación que no se pudo hacer nunca frena una inscripción— y por eso vive
+     en una sola rama y no repartida.
+
+     Ojo con lo que NO hace: no escribe en `errores`. Ese objeto significa "lo que
+     encontró el último envío" y es lo que enciende el banner role="alert" de
+     abajo del formulario. Escribirlo desde acá levantaba ese banner —"No pudimos
+     enviar el registro"— al salir del campo, sin que nadie hubiera enviado nada,
+     y encima lo anunciaba de forma assertive pisando a la región de al lado. El
+     error del campo se deriva en el JSX; el envío sí lo suma a `errores`. */
+  const aplicarVeredictoRiotId = (valor: string, resultado: ResultadoRiotId) => {
+    if (resultado === 'existe') {
+      setValidacionRiotId({ valor, estado: 'valido' })
+      setAnuncioRiotId('Riot ID verificado.')
+      return
+    }
+    if (resultado === 'no_existe') {
+      setValidacionRiotId({ valor, estado: 'no_encontrado' })
+      setAnuncioRiotId(MENSAJE_RIOT_ID_NO_EXISTE)
+      return
+    }
+    setValidacionRiotId({ valor, estado: 'inactivo' })
+    setAnuncioRiotId('')
+  }
+
+  /* Al salir del campo, no en cada tecla: es una petición de red por comprobación. */
+  /* La comprobación es ORIENTATIVA, no una barrera: con Enter dentro del campo el
+     formulario se envía sin que haya blur, así que nunca corre. Es coherente con
+     no bloquear nunca por la validación, pero significa que no todo lo que entra
+     a `inscripciones` pasó por acá. No asumir lo contrario. */
+  const comprobarRiotId = () => {
+    const valor = form.gamertag.trim()
+
+    /* El formato local manda y corre primero. Si ya está mal, su error es más
+       accionable que cualquier respuesta remota y no se gasta una petición
+       preguntándole a Riot por algo que ni siquiera es un Riot ID. */
+    if (!valor || !REGEX_RIOT_ID.test(valor)) return
+
+    /* Mismo valor ya comprobado: se repinta el veredicto guardado, sin llamada. */
+    const previo = riotIdComprobado.current
+    if (previo?.valor === valor) {
+      aplicarVeredictoRiotId(valor, previo.resultado)
+      return
+    }
+
+    const idPeticion = ++peticionRiotId.current
+    setValidacionRiotId({ valor, estado: 'validando' })
+    setAnuncioRiotId('')
+
+    /* Sin await ni try/catch: validarRiotId() no lanza por contrato y esto no
+       debe bloquear nada de lo que la persona siga haciendo en el formulario. */
+    void (async () => {
+      const resultado = await validarRiotId(valor)
+      /* Respuesta superada por otra más nueva (edición o segundo blur): se tira. */
+      if (idPeticion !== peticionRiotId.current) return
+      if (resultado !== 'indeterminado') {
+        riotIdComprobado.current = { valor, resultado }
+      }
+      aplicarVeredictoRiotId(valor, resultado)
+    })()
   }
 
   const validar = (): FormErrors => {
@@ -461,6 +612,18 @@ export default function Registro() {
     if (enviando) return
 
     const nuevosErrores = validar()
+
+    /* El veredicto remoto se suma acá y no dentro de validar(), que es síncrona
+       y no sabe de red. Solo se agrega si el formato ya pasó: ante los dos
+       problemas, el de formato es el más accionable.
+       Lo que NO frena el envío, a propósito: una comprobación en vuelo
+       ('validando') —no se espera a que termine— y una que no se pudo hacer
+       ('inactivo'). Solo el 'no_encontrado' confirmado bloquea, y se puede
+       corregir y reintentar porque editar el campo limpia el error. */
+    if (estadoRiotId === 'no_encontrado' && !nuevosErrores.gamertag) {
+      nuevosErrores.gamertag = MENSAJE_RIOT_ID_NO_EXISTE
+    }
+
     setErrores(nuevosErrores)
     setErrorEnvio(false)
 
@@ -550,6 +713,14 @@ export default function Registro() {
     setAceptaPrivacidad(false)
     setErrorEnvio(false)
     setEnviado(false)
+    /* El estado del Riot ID también se limpia, y el contador se incrementa para
+       que una comprobación del formulario anterior que llegue tarde no pinte su
+       veredicto sobre el formulario nuevo y vacío. El caché (`riotIdComprobado`)
+       sobrevive a propósito: si el siguiente jugador repite un Riot ID ya
+       comprobado, se reusa el veredicto en vez de volver a preguntar. */
+    peticionRiotId.current++
+    setValidacionRiotId({ valor: '', estado: 'inactivo' })
+    setAnuncioRiotId('')
   }
 
   const hayErrores = Object.keys(errores).length > 0
@@ -690,11 +861,33 @@ export default function Registro() {
                           label="Riot ID"
                           icono={Gamepad2}
                           valor={form.gamertag}
-                          onChange={(v) => setCampo('gamertag', v)}
-                          error={errores.gamertag}
+                          onChange={setGamertag}
+                          /* El error del envío tiene prioridad; si no hay, se
+                             deriva del veredicto remoto. Derivado y no guardado
+                             en `errores` a propósito: ese objeto enciende el
+                             banner de "No pudimos enviar el registro", que no
+                             corresponde cuando nadie envió nada todavía. */
+                          error={
+                            errores.gamertag ??
+                            (estadoRiotId === 'no_encontrado'
+                              ? MENSAJE_RIOT_ID_NO_EXISTE
+                              : undefined)
+                          }
                           placeholder="Jugador#MX1"
                           autoComplete="nickname"
                           describedById="gamertag-ayuda"
+                          onBlur={comprobarRiotId}
+                          /* Estados de la comprobación contra ATAK.GG. El
+                             'no_encontrado' no pone ícono acá: ya se ve como
+                             error de campo (borde rojo + mensaje con su propio
+                             ícono abajo) y un segundo símbolo sería ruido. */
+                          sufijo={
+                            estadoRiotId === 'validando' ? (
+                              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                            ) : estadoRiotId === 'valido' ? (
+                              <Check className="w-5 h-5 text-green-400" />
+                            ) : null
+                          }
                         />
                         {/* Ayuda de formato del Riot ID, asociada al input por
                             aria-describedby (describedById). En su propio contenedor para
@@ -704,6 +897,16 @@ export default function Registro() {
                           Jugador#MX1). Lo encuentras en el cliente de League, en tu perfil
                           de Riot; el tag es lo que va después del #.
                         </p>
+                        {/* Región viva del resultado de la comprobación: ocurre al salir
+                            del campo, cuando el foco ya está en otro lado, así que ni la
+                            tilde (aria-hidden) ni el mensaje de error (asociado por
+                            aria-describedby, que se lee al entrar al campo) se anuncian
+                            solos. Mismo patrón que el panel: siempre montada, sr-only y
+                            role="status", que ya implica aria-live="polite" —no
+                            interrumpe— y se deja explícito por claridad. */}
+                        <span role="status" aria-live="polite" className="sr-only">
+                          {anuncioRiotId}
+                        </span>
                       </div>
                       <CampoTexto
                         id="nombre"
