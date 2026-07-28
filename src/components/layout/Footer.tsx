@@ -29,32 +29,60 @@ const CLASE_ICONO =
    propósito; queda anotado. */
 const irAlTope = () => window.scrollTo({ top: 0 })
 
-/* Navegación: mismos 6 destinos que `navItems` de Header.tsx. Si se agrega o renombra una
-   página hay que tocar los dos lugares (ver AGENTS.md, "Reglas de trabajo"). */
+/* Navegación: los mismos destinos que `navItems` de Header.tsx MENOS /registro, que se mudó
+   al bloque "Recursos" de acá abajo (ver el comentario de ahí para el porqué). Son 5 de los
+   6; el que falta no desapareció del pie, cambió de columna.
+   Si se agrega o renombra una página hay que tocar los dos lugares (ver AGENTS.md, "Reglas
+   de trabajo"). */
 const NAVEGACION = [
   { label: 'Inicio', to: '/' },
   { label: 'Torneos', to: '/torneos' },
   { label: 'Galería', to: '/galeria' },
   { label: 'Acerca', to: '/acerca' },
-  { label: 'Contacto', to: '/contacto' },
-  { label: 'Registro', to: '/registro' }
+  { label: 'Contacto', to: '/contacto' }
 ]
 
-/* NO HAY BLOQUE "RECURSOS". Tenía cinco ítems y cuatro —Reglamento, Calendario,
-   Estadísticas y FAQ— apuntaban a '#': prometían páginas que no existen. El quinto,
-   «Inscripciones», iba a /registro, o sea al mismo destino que «Registro» de acá arriba: una
-   sección de un solo enlace, duplicando con otro nombre al de la columna de al lado.
-   Cuando alguna de esas cuatro páginas exista de verdad, se repone la sección con su ruta
-   real y su <Link> — NUNCA con '#'. Un enlace a '#' no es un placeholder: es una promesa
-   rota que el usuario descubre recién al hacer clic. */
+/* Archivo estático servido desde public/. El año va en el nombre porque el reglamento cambia
+   por temporada: cuando exista el de 2027 se sube AL LADO y se cambia esta constante.
+   OJO, es la condición de la que depende todo lo anterior: el PDF de 2026 NO se borra. Si se
+   reemplaza, cualquier enlace ya compartido pasa a devolver 404, que es justo lo que el
+   nombre versionado viene a evitar. El costo de dejarlos es ~340 KB por temporada, para
+   siempre, en la historia de git. */
+const RUTA_REGLAMENTO = '/reglamento-lqc-2026.pdf'
+
+/* BLOQUE "RECURSOS": vuelve, pero solo con destinos que EXISTEN.
+   Se había ido entero (f18aa5b) porque cuatro de sus cinco ítems —Reglamento, Calendario,
+   Estadísticas y FAQ— apuntaban a '#'. Ahora el reglamento es un PDF real en public/, así que
+   la sección tiene una razón de ser propia. Calendario, Estadísticas y FAQ SIGUEN AFUERA: la
+   regla no cambió —un enlace a '#' no es un placeholder, es una promesa rota que el usuario
+   descubre recién al hacer clic— y vuelven de a una, cuando cada página exista.
+
+   «Inscripciones» se MUDÓ acá desde Navegación (donde se llamaba «Registro»); no está
+   duplicado. El quinto ítem de la sección original era exactamente esa duplicación, y era la
+   otra mitad del argumento para borrarla: un enlace que repetía el destino de la columna
+   vecina con otro nombre. El PDF justifica que la sección vuelva a existir, no justifica que
+   vuelva el duplicado, así que se repone una cosa y no la otra.
+   Lo que sí cuesta esta decisión, dicho para que no sorprenda: /registro ahora se llama
+   «Inscripciones» en el pie y «Registro» en el header. Es un nombre distinto para la misma
+   página, y como el header es sticky los dos se ven a la vez. Se resuelve unificando el
+   nombre en los dos lados; queda anotado y sin hacer porque es una decisión de copy. */
 
 export default function Footer() {
   return (
     <footer className="bg-black border-t border-gray-900">
       <div className="container mx-auto px-4 py-12">
-        {/* Tres columnas, no cuatro: al irse el bloque "Recursos" quedaba una columna
-            fantasma y las tres restantes apretadas contra el borde izquierdo. */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Cuatro columnas otra vez, al volver "Recursos" — pero con un escalón intermedio
+            que la versión de 4 columnas anterior a f18aa5b no tenía (el estado inmediatamente
+            anterior a este cambio era de 3 columnas, sin "Recursos").
+            Aquella saltaba de 1 a 4 en `md` (768px), y ahí cada columna mide 160px:
+            (768 − 32 de px-4 − 3 huecos de 32) / 4. La botonera de "Conectar" mide 188px
+            —4 botones de 38px (icono w-5 de 20 + p-2 de 16 + borde de 2) y 3 huecos de 12—,
+            así que no entraba y se partía en dos filas.
+            Con `md:grid-cols-2 lg:grid-cols-4` la tablet va a 2×2 (352px por columna) y las
+            4 en línea entran recién en `lg` (1024px), donde dan 224px: 36px de margen sobre
+            los 188px de la botonera, que es el elemento más ancho que no se puede envolver.
+            Anchos calculados desde el CSS compilado, no medidos en un navegador. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Logo y descripción */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -93,6 +121,46 @@ export default function Footer() {
                   </Link>
                 </li>
               ))}
+            </ul>
+          </div>
+
+          {/* Recursos */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-white uppercase tracking-wider">Recursos</h4>
+            <ul className="space-y-3">
+              <li>
+                {/* <a href> y NO <Link>: el reglamento es un archivo estático de public/, no
+                    una ruta de React Router. Un <Link> lo trataría como navegación interna,
+                    el router no encontraría esa ruta y terminaría en la pantalla de 404 en
+                    vez de abrir el PDF. Por eso tampoco lleva `irAlTope`: no hay cambio de
+                    página que scrollear.
+                    Abre en pestaña nueva para no sacar a nadie del sitio, y `noopener
+                    noreferrer` va siempre con `target="_blank"`.
+                    El aria-label dice las dos cosas que el texto «Reglamento» no dice: que
+                    es un PDF y que abre en otra pestaña. Comparte con los iconos de
+                    "Conectar" la convención de avisar la pestaña nueva en el nombre
+                    accesible, pero no la razón de existir: los iconos son mudos y ahí el
+                    aria-label REEMPLAZA texto que no hay, mientras que acá lo AMPLÍA. Por eso
+                    arranca con la palabra visible «Reglamento» —si no, el control por voz
+                    dejaría de encontrarlo (WCAG 2.5.3, "Label in Name")—. */}
+                <a
+                  href={RUTA_REGLAMENTO}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Reglamento de la LQC en PDF (abre en pestaña nueva)"
+                  className={CLASE_ENLACE}
+                >
+                  <div className={CLASE_PUNTO}></div>
+                  Reglamento
+                </a>
+              </li>
+              <li>
+                {/* Este sí es ruta interna: <Link> + irAlTope, igual que Navegación. */}
+                <Link to="/registro" onClick={irAlTope} className={CLASE_ENLACE}>
+                  <div className={CLASE_PUNTO}></div>
+                  Inscripciones
+                </Link>
+              </li>
             </ul>
           </div>
 
