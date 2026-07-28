@@ -28,9 +28,11 @@ webhook, ni edge function, ni carpeta `supabase/`—, así que grepear el códig
 encontrar nada **no** prueba que la integración no exista: ya llevó a un agente a
 concluir exactamente eso. Antes de afirmar nada sobre ATAK.GG, leé
 **[docs/INTEGRACION-ATAK.md](./docs/INTEGRACION-ATAK.md)**, que documenta los
-triggers, el modo de falla silencioso más importante (el nombre del contenedor
-caduca en cada deploy y los registros dejan de llegar sin que el sitio lo note) y
-cómo diagnosticarlo con `net._http_response`.
+triggers, el riesgo vigente (las llamadas son **fire-and-forget**: `pg_net` no le
+devuelve el resultado al trigger, así que si la llamada falla o ATAK la rechaza
+—un 409 por el límite de 7 jugadores— la escritura local sale bien igual y las
+dos bases divergen sin un solo aviso) y cómo diagnosticarlo con
+`net._http_response`.
 
 (El sitio además pide fuentes a Google Fonts desde `index.html`, pero eso no manda
 datos de nadie.)
