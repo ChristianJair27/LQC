@@ -214,49 +214,22 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Brackets - nueva sección */}
-        <section className="py-20 bg-black/20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-12">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Brackets - Fase Regular</h2>
-            </div>
-            
-            <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/50 backdrop-blur-md border border-white/5 min-h-[600px]">
-              <iframe
-                src="https://battlefy.com/embeds/694306c449965900f6362ff6/stage/698a2254cd5d9a0030a25efb"
-                title="Battlefy Tournament - Fase regular - Pareo Suizo"
-                width="100%"
-                height="100%"
-                scrolling="yes"
-                frameBorder="0"
-                className="min-h-[600px] md:min-h-[700px] lg:min-h-[800px]"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Standings - nueva sección */}
-        <section className="py-20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-12">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Clasificación / Standings</h2>
-            </div>
-            
-            <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/50 backdrop-blur-md border border-white/5 min-h-[600px]">
-              <iframe
-                src="https://battlefy.com/embeds/694306c449965900f6362ff6/stage/698a2254cd5d9a0030a25efb/standings"
-                title="Battlefy Tournament - Fase regular - Pareo Suizo - Standings"
-                width="100%"
-                height="100%"
-                scrolling="yes"
-                frameBorder="0"
-                className="min-h-[600px] md:min-h-[700px] lg:min-h-[800px]"
-              />
-            </div>
-          </div>
-        </section>
+        {/* ACÁ NO HAY BRACKETS, STANDINGS NI "EQUIPOS INSCRITOS". Eran tres secciones con
+            iframes de Battlefy y se fueron enteras —encabezado, caja y iframe—, no solo el
+            iframe: un <h2> sobre un contenedor vacío es peor que no tener la sección.
+            (Ubicación original, por si alguna se repone: Brackets y Standings iban justo acá;
+            «Equipos Inscritos» NO, iba después de Patrocinadores.)
+            Dos razones para que no vuelvan como estaban:
+            1. La liga se muda a ATAK.GG. Battlefy deja de ser la fuente.
+            2. Apuntaban a torneos YA TERMINADOS y los presentaban como si fueran lo actual;
+               mientras no haya torneo en curso no hay nada que mostrar ahí.
+            «Equipos Inscritos» además arrastraba un párrafo que prometía "Conoce a los
+            equipos… Actualizado en tiempo real": borrar solo el iframe dejaba ese texto
+            mintiendo en pantalla.
+            Vuelven cuando haya torneo en curso Y ATAK exponga brackets, clasificaciones y
+            equipos: hoy su única API pública documentada es la validación de Riot ID (ver
+            docs/INTEGRACION-ATAK.md), así que todavía no hay de dónde sacar los datos.
+            Con datos primero, no con el encabezado puesto de antemano. */}
 
         {/* Patrocinadores - versión más limpia */}
         <section className="py-20 bg-black/20">
@@ -322,33 +295,6 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        
-
-        <section className="py-20 bg-black/20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-12">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Equipos Inscritos</h2>
-            </div>
-            
-            <p className="text-gray-300 mb-8 max-w-3xl">
-              Conoce a los equipos que competirán por el título en la temporada Primavera 2026. Actualizado en tiempo real.
-            </p>
-
-            <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/50 backdrop-blur-md border border-white/5">
-              <iframe
-                src="https://battlefy.com/embeds/teams/694306c449965900f6362ff6"
-                title="Equipos participantes - LQC Primavera 2026"
-                width="100%"
-                height="720"
-                scrolling="yes"
-                frameBorder="0"
-                className="bg-gray-950/50"
-              />
             </div>
           </div>
         </section>
