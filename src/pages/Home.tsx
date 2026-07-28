@@ -1,6 +1,43 @@
-import { Twitch, Calendar, ChevronRight, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Twitch, Calendar, ChevronRight, ChevronLeft, ChevronRight as ChevronRightIcon, UserPlus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
+/* Mismo parche que Footer.tsx: React Router en modo declarativo no resetea el scroll y el
+   proyecto no tiene <ScrollRestoration>, así que un <Link> pulsado con la página abajo
+   aterriza en mitad del destino. Importa sobre todo para el CTA de más abajo, que se pulsa
+   con la portada ya scrolleada. Va duplicado —es una línea— en vez de extraído a un módulo:
+   si aparece un tercer lugar que lo necesite, ahí sí conviene el helper compartido. */
+const irAlTope = () => window.scrollTo({ top: 0 })
+
+/* Canon del CTA primario (AGENTS.md, "Canon del CTA primario"). Al ser un <a>/<Link> y no un
+   <button> necesita dos cosas que la capa base de index.css no le da: `text-white` explícito
+   —si no, `a { color: #66a3ff }` le pisa el texto y el contraste sobre azul se cae— y el
+   anillo de foco, que index.css solo aplica a <button>. `after:hidden` mata la barra de
+   gradiente de `a::after`, pensada para enlaces de texto, que en un botón queda colgando. */
+/* `outline-hidden` y no `outline-none`: en Tailwind 4 `outline-none` compila a
+   `outline-style: none` a secas, y como el anillo de foco es un `box-shadow` —que el modo de
+   alto contraste forzado de Windows no pinta— el foco desaparecería del todo ahí.
+   `outline-hidden` deja un outline transparente que ese modo sí convierte en visible. */
+const CLASE_CTA_PRIMARIO =
+  'after:hidden inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl ' +
+  'bg-gradient-to-r from-lqc-700 to-lqc-500 hover:from-lqc-600 hover:to-lqc-400 ' +
+  'font-medium text-white transition-all duration-300 shadow-lg shadow-blue-900/30 ' +
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+
+/* Secundario. Ojo con `bg-none`: acá NO hace nada. El gradiente de la capa base que AGENTS.md
+   manda desactivar en los secundarios vive en `button { background: var(--gradient-primary) }`
+   (index.css:152) y esto es un <a>, al que la base solo le toca `color` y el `::after`
+   (index.css:124-149). Queda puesto porque la constante es compartida y salva el día que
+   alguien se la pegue a un <button>, que es el caso que el documento describe.
+   Lo que sí hace falta en un <a> es `text-gray-200`, que pisa `a { color: #66a3ff }`. */
+const CLASE_CTA_SECUNDARIO =
+  'after:hidden inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl ' +
+  'bg-none bg-black/40 border border-blue-800/40 text-gray-200 ' +
+  'hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white ' +
+  'font-medium transition-all duration-300 ' +
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
 const sponsors = [
   { id: 1, name: 'Yuri Japonesa', logo: '/sponsors/YuriJaponesa.png', url: 'https://example.com' },
@@ -97,6 +134,33 @@ export default function Home() {
                   Primavera 2026
                 </span>
               </div>
+
+              {/* CTA principal de la portada. Antes el único enlace de acción de toda la
+                  página mandaba a Twitch, o sea afuera del sitio: quien llegaba por la
+                  campaña de inscripciones no tenía ni un camino a /registro.
+                  <Link> y no <a href>: en una SPA el <a> fuerza una recarga completa del
+                  documento aunque el destino sea correcto. */}
+              {/* Agrupados con su propio gap: como hermanos sueltos heredaban el `gap-6` del
+                  contenedor y la línea de apoyo quedaba flotando lejos del botón. */}
+              {/* «Inscripciones abiertas» NO sale del repo —no hay nada acá que registre el
+                  estado de la convocatoria—: es el mensaje de la campaña, confirmado por quien
+                  administra el proyecto al pedir este cambio (2026-07-28). Se anota porque es
+                  la única frase de la portada que un grep no puede corroborar, y porque el
+                  formulario no tiene forma de cerrarse solo: el día que las inscripciones
+                  cierren, esta línea hay que borrarla a mano. No agregar fechas, cupos ni
+                  premios al lado, que eso sí sigue sin confirmarse. */}
+              <div className="flex flex-col items-center gap-3">
+                <Link
+                  to="/registro"
+                  onClick={irAlTope}
+                  className={CLASE_CTA_PRIMARIO}
+                >
+                  <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  Registrarme
+                  <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                </Link>
+                <p className="text-sm text-gray-400">Inscripciones abiertas</p>
+              </div>
             </div>
           </div>
         </section>
@@ -192,21 +256,22 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Próximo + stats + botón */}
-                <div className="space-y-8">
-                 
-
-                  
-
+                {/* Ir al canal. Pasó de primario a SECUNDARIO: llevaba el gradiente del canon
+                    —el que marca la acción principal de una pantalla— siendo el único CTA de
+                    la portada, así que la acción más destacada del sitio mandaba a Twitch en
+                    vez de al registro. Sigue acá y sigue siendo útil; lo que cambia es la
+                    jerarquía. */}
+                <div>
                   <a
                     href={`https://www.twitch.tv/${twitchChannel}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-3 w-full py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 hover:from-lqc-600 hover:to-lqc-400 rounded-xl font-medium text-white transition-all duration-300 shadow-lg shadow-blue-900/30"
+                    aria-label="Ir al canal de Twitch de LQC (abre en pestaña nueva)"
+                    className={`${CLASE_CTA_SECUNDARIO} w-full`}
                   >
-                    <Twitch className="w-5 h-5" />
+                    <Twitch className="w-5 h-5 shrink-0" aria-hidden="true" />
                     Ir al canal de Twitch
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
                   </a>
                 </div>
               </div>
@@ -231,8 +296,39 @@ export default function Home() {
             docs/INTEGRACION-ATAK.md), así que todavía no hay de dónde sacar los datos.
             Con datos primero, no con el encabezado puesto de antemano. */}
 
-        {/* Patrocinadores - versión más limpia */}
+        {/* Segundo camino al registro. Existe por el móvil: arriba está el hero, pero entre
+            medio quedó la sección de Transmisión, que es la más alta de la página (video 16:9
+            + chat de 256–320px + la barra lateral del horario). Para cuando alguien llega acá
+            scrolleando ya pasaron dos o tres pantallas y el CTA del hero hace rato que no se
+            ve. Sin esto, el único camino al registro obliga a volver arriba.
+            Va ANTES de Patrocinadores a propósito: es la acción que la portada quiere.
+            Sobre el ritmo de fondos: esta sección se lleva el `bg-black/20` que tenía
+            Patrocinadores, que pasa a ir sin fondo. Si las dos lo llevaran quedarían pegadas
+            en una sola banda tintada —el mismo defecto que se corrigió al sacar los embeds—, y
+            si esta fuera sin fondo serían tres seguidas sin tintar. Así queda alternado:
+            Hero (sin fondo) → Transmisión (sin fondo) → este CTA (tintado) → Patrocinadores
+            (sin fondo). Y de paso el tinte ayuda a que el bloque se despegue.
+            El texto no promete fechas, cupos ni premios: nada de eso está confirmado. Lo que
+            dice del registro por jugador sí lo está (ver Registro.tsx y la FAQ de Contacto). */}
         <section className="py-20 bg-black/20">
+          <div className="container mx-auto px-6 max-w-4xl text-center">
+            {/* Tarjeta oscura de CTA, con el gradiente que AGENTS.md marca como canon. */}
+            <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-10 md:p-12 shadow-2xl shadow-black/50">
+              <h2 className="text-3xl font-light mb-4">¿Vas a competir?</h2>
+              <p className="text-lg text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
+                El registro es por jugador: cada integrante del equipo llena sus propios datos.
+              </p>
+              <Link to="/registro" onClick={irAlTope} className={CLASE_CTA_PRIMARIO}>
+                <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
+                Registrarme
+                <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Patrocinadores - versión más limpia */}
+        <section className="py-20">
           <div className="container mx-auto px-6 max-w-6xl">
             <div className="flex items-center gap-4 mb-12">
               <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
