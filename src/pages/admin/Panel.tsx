@@ -94,7 +94,8 @@ export default function Panel() {
             Desde aquí vas a administrar los registros de la liga.
           </p>
 
-          {/* Listado real de inscripciones, agrupado por equipo (Fase 2). */}
+          {/* Listado de equipos con su roster. Ya NO agrupa nada en el cliente: lee
+              `equipos` con sus `jugadores` embebidos por el join. */}
           <ListaInscripciones />
         </div>
       </main>

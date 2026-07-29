@@ -17,89 +17,114 @@ import { obtenerSupabase } from '../../lib/supabase'
 /*  Datos                                                              */
 /* ------------------------------------------------------------------ */
 
-/* Una fila de la tabla `inscripciones` = un jugador. Los nombres de columna son
-   los reales del esquema; un typo acá cae en el estado de error genérico. */
-type Inscripcion = {
+/* MODELO NUEVO: el equipo es una FILA REAL en `public.equipos` con sus jugadores
+   colgando por `equipo_id`. Antes el equipo era un string repetido en cada fila de
+   `inscripciones` y este archivo tenía que reconstruirlo agrupando en el cliente.
+
+   Lo que se fue con esa maquinaria, y por qué ya no hace falta:
+   - `normalizarEquipo` / `agruparPorEquipo`: el equipo tiene id, no un nombre que
+     haya que normalizar para adivinar quién va con quién.
+   - El estado `'parcial'` del archivado y toda su detección de éxito parcial: era
+     un artefacto de que archivar fueran N updates que podían fallar a medias. Con
+     una fila por equipo el UPDATE es atómico — sale bien o no sale.
+   - Las escrituras por `.in(id, ids)`: ahora son `.eq('id', equipo.id)`.
+
+   Los jugadores NO se editan desde el panel: la RLS solo da UPDATE sobre `equipos`. */
+
+type Rol = 'titular' | 'suplente'
+
+/* Una fila de `public.jugadores`. `orden` es la posición dentro del roster y es lo
+   que determinó el rol al registrarse; se conserva para poder mostrar el roster
+   exactamente como lo mandó el capitán. */
+type Jugador = {
   id: string | number
-  equipo: string
+  orden: number
   gamertag: string
   nombre: string
   fecha_nacimiento: string
   celular: string
-  escolaridad: string
-  municipio: string
-  localidad: string
   correo: string
+  municipio: string
+  escolaridad: string
   genero: string
+  rol: Rol
+  creado_en: string
+}
+
+/* Una fila de `public.equipos` con sus jugadores embebidos por el join.
+   `archivado_en`: null = activo, con fecha = archivado. Archivar NUNCA borra: es un
+   UPDATE de esta columna, y un trigger propaga la baja (o el alta, al restaurar) a
+   ATAK.GG. No hay política de DELETE. */
+type Equipo = {
+  id: string
+  nombre: string
   capitan_nombre: string
   capitan_celular: string
   pagado: boolean | null
   pagado_en: string | null
   notas: string | null
-  creado_en: string
-  /* null = inscripción activa; con fecha = archivada. Archivar NUNCA borra la fila:
-     es un UPDATE de esta columna. No hay política de DELETE en la tabla. */
   archivado_en: string | null
+  creado_en: string
+  jugadores: Jugador[]
 }
 
 /* Nombres de columna aislados en constantes: si el esquema los renombra, se cambian
-   acá (y en las claves del tipo) sin tocar la lógica. `id` es el único nombre que no
-   vino literal en el contrato ("los ids de las filas"): se asume la PK por defecto de
-   Supabase; si difiere, es un cambio de una sola línea. Las escrituras (pago y notas)
-   filtran SIEMPRE por `id` con `.in()`, nunca por el texto del equipo, que se normaliza
-   para agrupar y no es clave. */
+   acá (y en las claves del tipo) sin tocar la lógica. Las escrituras filtran SIEMPRE
+   por `id`, que ahora es la PK del equipo y no un puñado de ids de jugadores. */
 const COL_ID = 'id' as const
 const COL_PAGADO = 'pagado' as const
 const COL_PAGADO_EN = 'pagado_en' as const
 const COL_NOTAS = 'notas' as const
 const COL_ARCHIVADO_EN = 'archivado_en' as const
 
-/* Techo de las escrituras (marcar pago / guardar notas): pasado ese tiempo la query se
+/* Roster mínimo para competir. El formulario de /registro ya no deja mandar menos,
+   pero un equipo puede quedar corto por una edición posterior en la base, así que el
+   panel lo comprueba igual en vez de confiar en que el origen sea correcto. */
+/* OJO: el mismo número vive en `src/pages/Registro.tsx` (MIN_JUGADORES), que es quien lo
+   hace cumplir al registrar. Las páginas son autocontenidas por diseño, así que no se
+   comparte la constante — pero si cambia el mínimo hay que tocar los dos lugares. */
+const MIN_JUGADORES = 5
+
+/* Techo de las escrituras (pago, notas, archivado): pasado ese tiempo la query se
    aborta y cae en el mensaje genérico, en vez de dejar la tarjeta trabada en
    "Guardando…". Mismo criterio que el envío de /registro. */
 const TIEMPO_LIMITE_MS = 15_000
 
-/* Orden de columnas del contrato de datos, más las de Fase 3 (id, pagado_en, notas). Las
-   columnas fecha_nacimiento, escolaridad, municipio, localidad y genero no se pintan en el
-   panel, pero se traen para poder exportarlas al CSV (Fase 4) SIN una segunda consulta: la
-   exportación arma el archivo con lo que ya está en memoria. */
+/* El join: equipos con sus jugadores. Las columnas de jugador que el panel no pinta
+   —fecha_nacimiento, escolaridad, municipio, genero— se traen igual para poder
+   exportarlas al CSV SIN una segunda consulta. `nombre_norm` no se pide: es la clave
+   de unicidad de la base y el panel no la usa para nada. */
 const SELECT =
-  `${COL_ID}, equipo, gamertag, nombre, fecha_nacimiento, celular, escolaridad, municipio, localidad, correo, genero, capitan_nombre, capitan_celular, ${COL_PAGADO}, ${COL_PAGADO_EN}, ${COL_NOTAS}, creado_en, ${COL_ARCHIVADO_EN}`
+  `${COL_ID}, nombre, capitan_nombre, capitan_celular, ${COL_PAGADO}, ${COL_PAGADO_EN}, ${COL_NOTAS}, creado_en, ${COL_ARCHIVADO_EN}, ` +
+  'jugadores (id, orden, gamertag, nombre, fecha_nacimiento, celular, correo, municipio, escolaridad, genero, rol, creado_en)'
 
 /* ------------------------------------------------------------------ */
-/*  Agrupación por equipo (función pura, fácil de auditar)             */
+/*  Derivados (funciones puras, fáciles de auditar)                    */
 /* ------------------------------------------------------------------ */
 
-/* Estado de archivado del equipo. 'parcial' NO es un estado que se pida: es el que queda
-   si un UPDATE de archivado toca solo algunas filas del grupo (éxito parcial). Se modela
-   explícitamente para que ese equipo siga VISIBLE en el listado activo y se pueda
-   reintentar, en vez de desaparecer de las dos vistas. */
-type EstadoArchivo = 'activo' | 'parcial' | 'archivado'
-
-type EquipoAgrupado = {
-  clave: string // clave normalizada, única por grupo (sirve de key de React)
-  nombre: string // nombre a mostrar = el original de la fila más antigua
-  capitanNombre: string
-  capitanCelular: string
-  jugadores: Inscripcion[] // ordenados por registro, más reciente primero
-  pagado: boolean // true solo si TODAS las filas están pagadas
-  ids: (string | number)[] // todos los ids del grupo — clave de las escrituras
-  pagadoEn: string | null // fecha de pago (de la fila más antigua); null si pendiente
-  notas: string // notas del equipo (de la fila más antigua); '' si la columna es null
-  ultimaActividad: number // mayor creado_en del grupo (ms) — para ordenar equipos
-  estadoArchivo: EstadoArchivo
-  archivadoEn: string | null // fecha de archivado; solo si el equipo está archivado ENTERO
-  jugadoresActivos: number // filas del grupo con archivado_en null — base de los contadores
+/* `pagado` llega como boolean|null: null cuenta como no pagado. Un helper y no un
+   `=== true` suelto en cada uso para que la regla viva en un solo lugar. */
+function estaPagado(equipo: Equipo): boolean {
+  return equipo[COL_PAGADO] === true
 }
 
-/* Nombre visible del equipo. Un `equipo` vacío se muestra —y se escribe, en la confirmación
-   de archivado— como "Sin nombre": si se exigiera teclear la cadena vacía, la confirmación
-   quedaría satisfecha sin escribir nada. */
-function nombreMostrado(equipo: EquipoAgrupado): string {
-  /* Normalizado igual que la comparación de la confirmación: un `equipo` de puros espacios se
-     vería vacío en el HTML y, sin esto, daría un nombre a teclear que se satisface sin
-     escribir nada. Hoy /registro no deja pasar ese valor, pero el listado ya se blinda contra
-     filas raras y esto no cuesta nada. */
+function estaArchivado(equipo: Equipo): boolean {
+  return equipo[COL_ARCHIVADO_EN] != null
+}
+
+/* Un roster corto no puede competir. Se marca en el panel en vez de filtrarlo: el
+   organizador necesita verlo justamente para ir a buscar a ese equipo. */
+function rosterIncompleto(equipo: Equipo): boolean {
+  return equipo.jugadores.length < MIN_JUGADORES
+}
+
+/* Nombre visible del equipo. Un `nombre` vacío se muestra —y se escribe, en la
+   confirmación de archivado— como "Sin nombre": si se exigiera teclear la cadena
+   vacía, la confirmación quedaría satisfecha sin escribir nada. */
+function nombreMostrado(equipo: Equipo): string {
+  /* Normalizado igual que la comparación de la confirmación: un `nombre` de puros
+     espacios se vería vacío en el HTML y, sin esto, daría un nombre a teclear que se
+     satisface sin escribir nada. */
   return normalizarEspacios(equipo.nombre ?? '') || 'Sin nombre'
 }
 
@@ -108,122 +133,24 @@ function normalizarEspacios(texto: string): string {
   return texto.trim().replace(/\s+/g, ' ')
 }
 
-/* "Los Panditas" y "los panditas " deben caer en el mismo grupo. */
-function normalizarEquipo(equipo: string): string {
-  return normalizarEspacios(equipo).toLowerCase()
-}
-
-/* creado_en → milisegundos. Se compara por tiempo real, no lexicográficamente,
-   por si el timestamp llega con distinto offset. Un valor inválido cae a 0. */
-function tiempo(creadoEn: string): number {
-  const t = new Date(creadoEn).getTime()
+/* creado_en / archivado_en → milisegundos. Se compara por tiempo real, no
+   lexicográficamente, por si el timestamp llega con distinto offset. Inválido → 0. */
+function tiempo(iso: string): number {
+  const t = new Date(iso).getTime()
   return Number.isNaN(t) ? 0 : t
 }
 
-/* Estado de archivado del grupo, derivado SIEMPRE de las filas (nunca de una bandera
-   aparte que pueda desincronizarse): 'activo' si ninguna tiene archivado_en, 'archivado'
-   si TODAS lo tienen, 'parcial' si quedó a medias. La fecha que se muestra es la más
-   reciente del grupo y solo se expone cuando el equipo está archivado entero: en 'parcial'
-   sería engañosa. */
-function estadoDeArchivo(jugadores: Inscripcion[]): {
-  estadoArchivo: EstadoArchivo
-  archivadoEn: string | null
-  jugadoresActivos: number
-} {
-  const archivados = jugadores.filter((j) => j[COL_ARCHIVADO_EN] != null)
-  const jugadoresActivos = jugadores.length - archivados.length
-  if (archivados.length === 0) {
-    return { estadoArchivo: 'activo', archivadoEn: null, jugadoresActivos }
-  }
-  if (jugadoresActivos > 0) {
-    return { estadoArchivo: 'parcial', archivadoEn: null, jugadoresActivos }
-  }
-  const archivadoEn = archivados.reduce<string>((max, j) => {
-    const valor = String(j[COL_ARCHIVADO_EN])
-    return tiempo(valor) > tiempo(max) ? valor : max
-  }, String(archivados[0][COL_ARCHIVADO_EN]))
-  return { estadoArchivo: 'archivado', archivadoEn, jugadoresActivos }
-}
-
-/* Rehace un grupo después de un UPDATE de archivado: aplica `valor` SOLO a las filas cuyos
-   ids confirmó la base (`data` del `.select()` posterior al update) y recalcula el estado
-   desde las filas. Así el éxito parcial queda reflejado tal cual es, sin inventar que el
-   equipo entero cambió. Los ids se comparan como texto: la PK puede llegar como número o
-   como cadena y `Set.has` no coacciona tipos. */
-function conArchivado(
-  equipo: EquipoAgrupado,
-  idsTocados: Set<string>,
-  valor: string | null
-): EquipoAgrupado {
-  const jugadores = equipo.jugadores.map((j) =>
-    idsTocados.has(String(j[COL_ID])) ? { ...j, [COL_ARCHIVADO_EN]: valor } : j
-  )
-  return { ...equipo, jugadores, ...estadoDeArchivo(jugadores) }
-}
-
-/* Resultado de una escritura de archivado/restauración. Enum + cuántas filas confirmó la
-   base, que es lo que permite distinguir el éxito parcial del total. Nunca viaja el error
-   de Supabase: las tarjetas solo pintan mensajes genéricos. */
-type ResultadoArchivo = {
-  resultado: 'ok' | 'parcial' | 'error'
-  tocados: number
-}
-
-/* La query llega DESC (lo más reciente primero), así que la fila más antigua es
-   la ÚLTIMA ocurrencia del grupo: la buscamos por el mínimo `creado_en` en vez
-   de tomar la primera que aparece. Esa fila fija el nombre a mostrar y el capitán
-   (determinístico si variaran entre filas). */
-function agruparPorEquipo(filas: Inscripcion[]): EquipoAgrupado[] {
-  const grupos = new Map<string, Inscripcion[]>()
-  for (const fila of filas) {
-    /* String(... ?? '') blinda contra una fila con `equipo` nulo: sin el guard,
-       `normalizarEquipo(null)` lanzaría y tumbaría todo el listado por una fila. */
-    const clave = normalizarEquipo(String(fila.equipo ?? ''))
-    const grupo = grupos.get(clave)
-    if (grupo) grupo.push(fila)
-    else grupos.set(clave, [fila])
-  }
-
-  const equipos: EquipoAgrupado[] = []
-  for (const [clave, grupo] of grupos) {
-    const masAntigua = grupo.reduce((a, b) =>
-      tiempo(b.creado_en) < tiempo(a.creado_en) ? b : a
-    )
-    const ultimaActividad = grupo.reduce(
-      (max, f) => Math.max(max, tiempo(f.creado_en)),
-      0
-    )
-    /* El pago es un solo depósito por equipo: el equipo está "Confirmado" solo si
-       NO le queda ninguna fila sin saldar. `null`/`false` cuentan como no pagado.
-       En Fase 3, el botón de marcar pagado debe setear TODAS las filas del grupo. */
-    const pagado = grupo.every((f) => f[COL_PAGADO] === true)
-    const jugadores = [...grupo].sort(
-      (a, b) => tiempo(b.creado_en) - tiempo(a.creado_en)
-    )
-    /* Todos los ids del grupo: son la clave de las escrituras (`.in(COL_ID, ids)`),
-       nunca el texto normalizado del equipo. */
-    const ids = grupo.map((f) => f[COL_ID])
-
-    equipos.push({
-      clave,
-      nombre: masAntigua.equipo,
-      capitanNombre: masAntigua.capitan_nombre,
-      capitanCelular: masAntigua.capitan_celular,
-      jugadores,
-      pagado,
-      ids,
-      /* pagadoEn y notas salen de la fila más antigua, mismo criterio que el nombre y el
-         capitán (determinístico si variaran entre filas). `null` → '' en notas. */
-      pagadoEn: masAntigua.pagado_en,
-      notas: masAntigua.notas ?? '',
-      ultimaActividad,
-      ...estadoDeArchivo(jugadores)
-    })
-  }
-
-  /* Equipo con actividad más nueva arriba, coherente con "lo más reciente arriba". */
-  equipos.sort((a, b) => b.ultimaActividad - a.ultimaActividad)
-  return equipos
+/* Normaliza lo que devuelve PostgREST. Solo dos cosas, ninguna es agrupar:
+   - `jugadores` puede venir null si el equipo no tiene ninguno (left join), y el
+     resto del archivo asume un array.
+   - el orden del roster se reafirma en el cliente. La query ya lo pide por `orden`,
+     pero de ese orden dependen el rol que se muestra y el CSV, así que no se deja
+     a merced de que nadie toque el `referencedTable` de la consulta. */
+function normalizarEquipos(filas: Equipo[]): Equipo[] {
+  return filas.map((equipo) => ({
+    ...equipo,
+    jugadores: [...(equipo.jugadores ?? [])].sort((a, b) => a.orden - b.orden)
+  }))
 }
 
 /* ------------------------------------------------------------------ */
@@ -260,16 +187,18 @@ function fmtFechaHora(iso: string): string {
 /* ------------------------------------------------------------------ */
 
 /* Encabezados en español, en el orden exacto del contrato de exportación. Una fila del
-   CSV = un jugador; los campos de equipo se repiten en cada jugador del grupo. */
+   CSV = un jugador; los campos de equipo se repiten en cada jugador.
+   Respecto del modelo viejo: entra `Rol` (que antes no existía) y sale `Localidad`
+   (que el formulario nuevo ya no pide y la tabla no tiene). Siguen siendo 16. */
 const COLUMNAS_CSV = [
   'Equipo',
   'Gamertag',
   'Nombre',
+  'Rol',
   'Fecha de Nacimiento',
   'Celular',
   'Escolaridad',
   'Municipio',
-  'Localidad',
   'Correo',
   'Género',
   'Capitán',
@@ -309,10 +238,10 @@ function fmtFechaLocalDiaCSV(valor: string | null | undefined): string {
 }
 
 /* Escape RFC 4180 + saneo anti-inyección de fórmulas.
-   - Anti-inyección: los datos vienen del formulario PÚBLICO /registro (INSERT anónimo), o
-     sea entrada NO confiable. Una celda que arranque con `=`, `+`, `-`, `@` (o TAB/CR) la
-     interpreta Excel/Sheets como fórmula al abrir el archivo (p. ej. `=HYPERLINK(...)`),
-     justo cuando el que abre es un admin. Se le antepone un apóstrofo: Excel lo esconde y
+   - Anti-inyección: los datos vienen del formulario PÚBLICO /registro, o sea entrada NO
+     confiable. Una celda que arranque con `=`, `+`, `-`, `@` (o TAB/CR) la interpreta
+     Excel/Sheets como fórmula al abrir el archivo (p. ej. `=HYPERLINK(...)`), justo
+     cuando el que abre es un admin. Se le antepone un apóstrofo: Excel lo esconde y
      trata el resto como texto. Va ANTES del quoting para no romperlo.
    - RFC 4180: si el valor trae coma, comilla o salto de línea, se encierra entre comillas
      dobles y cada comilla interna se duplica. Notas es texto libre: el campo con más
@@ -324,36 +253,41 @@ function celdaCSV(valor: string | number | null | undefined): string {
   return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto
 }
 
-/* Arma el CSV completo (con BOM) a partir de los equipos agrupados: una fila por jugador.
-   Los campos de equipo (nombre, capitán, pago, notas) se repiten en cada jugador del
-   grupo, coherente con lo que ve el panel —el pago y las notas son por equipo—. El BOM
-   UTF-8 (U+FEFF) al inicio hace que Excel muestre bien los acentos (á, é, ñ) en vez de
-   caracteres corruptos; las filas se separan con CRLF (RFC 4180).
+/* Arma el CSV completo (con BOM) a partir de los equipos: una fila por jugador. Los
+   campos de equipo (nombre, capitán, pago, notas) se repiten en cada jugador, coherente
+   con lo que ve el panel —el pago y las notas son por equipo—. El BOM UTF-8 (U+FEFF) al
+   inicio hace que Excel muestre bien los acentos; las filas se separan con CRLF (RFC 4180).
 
-   ARCHIVADOS FUERA: el CSV es la foto de la liga viva. Se filtra por fila (no solo por
-   equipo) para que un equipo en estado 'parcial' exporte únicamente sus inscripciones
-   activas; el llamador ya pasa nada más los equipos no archivados. */
-function construirCSV(equipos: EquipoAgrupado[]): string {
+   ARCHIVADOS FUERA: el CSV es la foto de la liga viva, y el llamador ya pasa nada más los
+   equipos activos. Ya no hace falta filtrar TAMBIÉN por fila como en el modelo viejo: ahí
+   un equipo podía quedar archivado a medias y había que excluir sus filas archivadas una
+   por una. Ahora el archivado es del equipo entero, así que si el equipo está en la lista,
+   están todos sus jugadores. */
+function construirCSV(equipos: Equipo[]): string {
   const filas: string[] = [COLUMNAS_CSV.map(celdaCSV).join(',')]
   for (const equipo of equipos) {
-    for (const j of equipo.jugadores.filter((fila) => fila[COL_ARCHIVADO_EN] == null)) {
+    const nombre = nombreMostrado(equipo)
+    const pagado = estaPagado(equipo) ? 'Sí' : 'No'
+    const fechaPago = fmtFechaLocalDiaCSV(equipo[COL_PAGADO_EN])
+    const notas = equipo[COL_NOTAS] ?? ''
+    for (const j of equipo.jugadores) {
       filas.push(
         [
-          equipo.nombre,
+          nombre,
           j.gamertag,
           j.nombre,
+          j.rol === 'titular' ? 'Titular' : 'Suplente',
           fmtFechaSoloDiaCSV(j.fecha_nacimiento),
           j.celular,
           j.escolaridad,
           j.municipio,
-          j.localidad,
           j.correo,
           j.genero,
-          equipo.capitanNombre,
-          equipo.capitanCelular,
-          equipo.pagado ? 'Sí' : 'No',
-          fmtFechaLocalDiaCSV(equipo.pagadoEn),
-          equipo.notas,
+          equipo.capitan_nombre,
+          equipo.capitan_celular,
+          pagado,
+          fechaPago,
+          notas,
           fmtFechaLocalDiaCSV(j.creado_en)
         ]
           .map(celdaCSV)
@@ -506,6 +440,37 @@ function BadgePago({ pagado }: { pagado: boolean }) {
   )
 }
 
+/* Rol del jugador. Titular en azul apagado (es lo esperable, no una alarma) y suplente
+   en gris: la diferencia tiene que leerse de un vistazo sin gritar. `rose` sigue
+   reservado a errores y a lo que no puede competir. */
+function BadgeRol({ rol }: { rol: Rol }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+        rol === 'titular'
+          ? 'border-blue-700/50 bg-blue-950/40 text-blue-300'
+          : 'border-white/10 bg-white/5 text-gray-400'
+      }`}
+    >
+      {rol === 'titular' ? 'Titular' : 'Suplente'}
+    </span>
+  )
+}
+
+/* Aviso de roster corto. Es información operativa —hay que ir a buscar a ese equipo—,
+   así que se marca donde se ve el equipo y no se filtra de la lista. */
+function BadgeRosterIncompleto({ cantidad }: { cantidad: number }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-rose-700/50 bg-rose-950/30 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-rose-300">
+      <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+      {/* Sin esto se oye "3 jugadores, 3 de 5": el número se repite y el badge llega sin
+          sustantivo. Es el único indicador de que el equipo no puede competir. */}
+      <span className="sr-only">Roster incompleto: </span>
+      {cantidad} de {MIN_JUGADORES}
+    </span>
+  )
+}
+
 function CampoJugador({
   label,
   valor,
@@ -533,7 +498,7 @@ function CampoJugador({
   )
 }
 
-/* Tarjeta de equipo colapsable + acciones de Fase 3 (marcar pago, notas).
+/* Tarjeta de equipo colapsable + acciones (marcar pago, notas, archivar).
 
    Estructura del encabezado — GOTCHA: no se puede anidar <button> dentro de <button>
    (HTML inválido). El disparador del colapso y el botón de pago son HERMANOS dentro de
@@ -542,12 +507,11 @@ function CampoJugador({
    disparador es solo de frase (`<span>` + iconos), nunca bloques. Las notas y su botón
    viven en el panel expandido, que es un <div> hermano fuera del disparador.
 
-   Pago (por equipo): confirmación inline on-brand (no window.confirm, no modal), que
-   dice a cuántos jugadores afecta. Actualización PESIMISTA: se aplica solo tras el éxito;
-   el UPDATE toca TODAS las filas del grupo por id (`onMarcarPago` → `.in(COL_ID, ids)`).
-   Al éxito, el padre muta `equipos` de forma inmutable y el badge, la fecha y el número
-   "Confirmados" del resumen se recalculan solos, sin refetch (que perdería la expansión).
-   En error/timeout no se cambia nada y se muestra un texto genérico.
+   Pago (por equipo): confirmación inline on-brand (no window.confirm, no modal).
+   Actualización PESIMISTA: se aplica solo tras el éxito. Al éxito, el padre muta
+   `equipos` de forma inmutable y el badge, la fecha y el número "Confirmados" del
+   resumen se recalculan solos, sin refetch (que perdería la expansión). En error/timeout
+   no se cambia nada y se muestra un texto genérico.
 
    Notas (por equipo): textarea en el panel expandido, guardado explícito con botón
    (nunca al teclear), con estados sin-cambios/sin-guardar/guardando/guardado/error.
@@ -555,7 +519,11 @@ function CampoJugador({
    Archivado (por equipo): vive en una zona aparte al FINAL del panel expandido, fuera del
    flujo de las acciones normales, y exige escribir el nombre exacto del equipo. No usa
    window.confirm ni un diálogo de sí/no: un clic distraído no puede archivar. El UPDATE
-   pone archivado_en = ahora en TODAS las filas del grupo; jamás se borra una fila.
+   pone archivado_en = ahora en LA fila del equipo; jamás se borra nada.
+
+   Lo que ya NO está, porque el modelo lo volvió imposible: el estado 'parcial' y su
+   botón "Restaurar las archivadas". Un equipo archivado a medias solo existía cuando
+   archivar eran N updates independientes.
 
    Los controles de escritura de la tarjeta se deshabilitan mientras una operación vuela
    (`ocupado`). Un flag `montado` evita setState si la tarjeta se desmonta a mitad. */
@@ -563,39 +531,31 @@ function TarjetaEquipo({
   equipo,
   onMarcarPago,
   onGuardarNotas,
-  onArchivar,
-  onRestaurar
+  onArchivar
 }: {
-  equipo: EquipoAgrupado
-  onMarcarPago: (equipo: EquipoAgrupado, pagar: boolean) => Promise<boolean>
-  onGuardarNotas: (equipo: EquipoAgrupado, notas: string) => Promise<boolean>
-  onArchivar: (equipo: EquipoAgrupado) => Promise<ResultadoArchivo>
-  /* Solo se usa para sacar al equipo del estado 'parcial'; un equipo activo no tiene nada
-     que restaurar. */
-  onRestaurar: (equipo: EquipoAgrupado) => Promise<ResultadoArchivo>
+  equipo: Equipo
+  onMarcarPago: (equipo: Equipo, pagar: boolean) => Promise<boolean>
+  onGuardarNotas: (equipo: Equipo, notas: string) => Promise<boolean>
+  onArchivar: (equipo: Equipo) => Promise<boolean>
 }) {
+  const notasGuardadas = equipo[COL_NOTAS] ?? ''
+
   const [expandido, setExpandido] = useState(false)
   const [estadoPago, setEstadoPago] = useState<'idle' | 'confirmando' | 'guardando'>('idle')
   const [errorPago, setErrorPago] = useState(false)
-  const [notasTexto, setNotasTexto] = useState(equipo.notas)
+  const [notasTexto, setNotasTexto] = useState(notasGuardadas)
   const [estadoNotas, setEstadoNotas] = useState<'idle' | 'guardando' | 'guardado' | 'error'>(
     'idle'
   )
   /* `modoArchivar` es el estado LOCAL del control (qué está mostrando la zona de archivado),
-     distinto de `equipo.estadoArchivo`, que es el estado del equipo en la base. Nombres
-     separados a propósito: conviven en este mismo componente. */
+     distinto de si el equipo está archivado en la base. */
   const [modoArchivar, setModoArchivar] = useState<'idle' | 'confirmando' | 'archivando'>(
     'idle'
   )
-  /* Texto tecleado en la confirmación y último fallo del archivado. `fallo` guarda el
-     resultado (error o parcial) para poder decir CUÁNTAS filas se archivaron. */
+  /* Texto tecleado en la confirmación y si el último intento de archivar falló. Ya no hace
+     falta guardar CUÁNTAS filas se tocaron: el archivado es de una sola fila. */
+  const [errorArchivar, setErrorArchivar] = useState(false)
   const [textoConfirma, setTextoConfirma] = useState('')
-  const [fallo, setFallo] = useState<ResultadoArchivo | null>(null)
-  /* Restaurar lo ya archivado de un equipo 'parcial'. Estado propio y no `modoArchivar`,
-     porque este botón vive en la vista 'idle' de la zona: reusar aquel estado abriría la
-     confirmación de archivado en medio de una restauración. */
-  const [restaurando, setRestaurando] = useState(false)
-  const [errorRestaurar, setErrorRestaurar] = useState(false)
 
   const panelId = useId()
   const notasId = useId()
@@ -604,7 +564,6 @@ function TarjetaEquipo({
   const botonPagoRef = useRef<HTMLButtonElement>(null)
   const botonArchivarRef = useRef<HTMLButtonElement>(null)
   const botonConfirmarArchivoRef = useRef<HTMLButtonElement>(null)
-  const botonRestaurarParcialRef = useRef<HTMLButtonElement>(null)
   const campoConfirmaRef = useRef<HTMLInputElement>(null)
 
   /* Flag para no llamar setState si la tarjeta se desmonta con una escritura en vuelo.
@@ -654,30 +613,17 @@ function TarjetaEquipo({
     }
   }, [modoArchivar])
 
-  /* Mismo problema, otro control: "Restaurar las archivadas" se deshabilita mientras escribe
-     y el navegador le suelta el foco. Al terminar hay dos desenlaces: si el equipo dejó de
-     ser 'parcial' el botón ya no existe y el foco va a "Archivar equipo", que ocupa su lugar
-     en la misma banda; si sigue existiendo (parcial o error) vuelve a él. El `??` distingue
-     los dos casos solo, sin mirar el estado. */
-  const restaurandoPrevio = useRef(restaurando)
-  useEffect(() => {
-    const previo = restaurandoPrevio.current
-    restaurandoPrevio.current = restaurando
-    if (previo && !restaurando) {
-      ;(botonRestaurarParcialRef.current ?? botonArchivarRef.current)?.focus()
-    }
-  }, [restaurando])
-
   const cantidad = equipo.jugadores.length
+  const incompleto = rosterIncompleto(equipo)
+  const pagado = estaPagado(equipo)
   /* Una escritura de esta tarjeta (pago, notas o archivado) bloquea sus propios controles. */
   const ocupado =
     estadoPago === 'guardando' ||
     estadoNotas === 'guardando' ||
-    modoArchivar === 'archivando' ||
-    restaurando
+    modoArchivar === 'archivando'
   /* Toggle: si está pagado, la acción es desmarcar; si no, marcar. */
-  const pagar = !equipo.pagado
-  const notasCambiadas = notasTexto !== equipo.notas
+  const pagar = !pagado
+  const notasCambiadas = notasTexto !== notasGuardadas
   /* Coincidencia con el nombre del equipo distinguiendo MAYÚSCULAS (eso es a propósito: es
      lo que obliga a mirar el nombre y escribirlo), pero normalizando los espacios de los dos
      lados. El HTML colapsa los espacios al pintar, así que un equipo guardado como
@@ -685,11 +631,6 @@ function TarjetaEquipo({
      imposible de archivar, con el botón muerto y sin explicación. */
   const nombre = nombreMostrado(equipo)
   const confirmaCoincide = normalizarEspacios(textoConfirma) === normalizarEspacios(nombre)
-  /* Cuántas filas del grupo ya están archivadas y cuántas cambiarían de estado al confirmar.
-     En un equipo 'parcial' NO son lo mismo que `cantidad`, y la confirmación tiene que decir
-     el número que se está confirmando, no el tamaño del grupo. */
-  const yaArchivadas = cantidad - equipo.jugadoresActivos
-  const porArchivar = equipo.jugadoresActivos
 
   const confirmarPago = async () => {
     if (ocupado) return
@@ -721,39 +662,22 @@ function TarjetaEquipo({
   const cerrarConfirmacionArchivado = () => {
     if (ocupado) return
     setTextoConfirma('')
-    setFallo(null)
-    setErrorRestaurar(false)
+    setErrorArchivar(false)
     setModoArchivar('idle')
   }
 
   /* Al éxito no se toca el estado local: el padre saca al equipo del listado activo y esta
-     tarjeta se desmonta. Al fallar —error o éxito parcial— la confirmación queda ABIERTA con
-     el nombre ya escrito, para poder reintentar sin volver a teclearlo; el mensaje concreto
-     lo pinta el bloque de confirmación a partir de `fallo`. */
+     tarjeta se desmonta. Al fallar, la confirmación queda ABIERTA con el nombre ya escrito,
+     para poder reintentar sin volver a teclearlo. */
   const confirmarArchivado = async () => {
     if (ocupado || !confirmaCoincide) return
-    setFallo(null)
+    setErrorArchivar(false)
     setModoArchivar('archivando')
-    const resultado = await onArchivar(equipo)
+    const ok = await onArchivar(equipo)
     if (!montado.current) return
-    if (resultado.resultado === 'ok') return
+    if (ok) return
     setModoArchivar('confirmando')
-    setFallo(resultado)
-  }
-
-  /* Devuelve a activo lo que quedó archivado de un equipo 'parcial'. Esta tarjeta NO se
-     desmonta (el equipo ya estaba en el listado activo y ahí se queda), así que el resultado
-     bueno se ve solo: desaparecen la etiqueta "archivado parcial" y las marcas por fila. El
-     'parcial' —restauró algunas y quedan otras— lo anuncia la región del padre; acá solo se
-     pinta el error, que es lo que no deja rastro visible. */
-  const restaurarParcial = async () => {
-    if (ocupado) return
-    setErrorRestaurar(false)
-    setRestaurando(true)
-    const resultado = await onRestaurar(equipo)
-    if (!montado.current) return
-    setRestaurando(false)
-    setErrorRestaurar(resultado.resultado === 'error')
+    setErrorArchivar(true)
   }
 
   return (
@@ -778,36 +702,24 @@ function TarjetaEquipo({
           className="group flex min-w-0 flex-1 items-center gap-3 border-0 bg-none px-4 py-4 text-left font-sans font-normal tracking-normal transition-colors hover:bg-white/[0.03] hover:[transform:none] hover:shadow-none md:gap-4 md:px-6 md:py-5"
         >
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="flex min-w-0 items-baseline gap-2 md:gap-3">
+            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 md:gap-x-3">
               <span className="truncate text-base font-semibold text-white md:text-lg">
                 {nombre}
               </span>
-              {/* Un archivado a medias no puede quedar invisible ni ambiguo: si el
-                  encabezado dijera "5 jugadores" mientras el contador Jugadores suma 3, el
-                  panel se contradice y el CSV exporta de menos sin explicación. En 'parcial'
-                  se muestran los dos números y la etiqueta que lo nombra. */}
-              {equipo.estadoArchivo === 'parcial' ? (
-                <>
-                  <span className="shrink-0 font-mono text-xs text-gray-400">
-                    {equipo.jugadoresActivos} de {cantidad} activos
-                  </span>
-                  <span className="shrink-0 font-mono text-xs text-rose-300">
-                    archivado parcial
-                  </span>
-                </>
-              ) : (
-                <span className="shrink-0 font-mono text-xs text-gray-400">
-                  {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
-                </span>
-              )}
+              <span className="shrink-0 font-mono text-xs text-gray-400">
+                {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
+              </span>
+              {/* Roster corto: el equipo no puede competir y hay que verlo sin desplegar
+                  la tarjeta, que es donde el organizador está escaneando la lista. */}
+              {incompleto && <BadgeRosterIncompleto cantidad={cantidad} />}
             </span>
             <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
               <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400">
                 Capitán
               </span>
-              <span className="text-gray-300">{equipo.capitanNombre || '—'}</span>
+              <span className="text-gray-300">{equipo.capitan_nombre || '—'}</span>
               <span className="font-mono text-gray-400">
-                {equipo.capitanCelular || '—'}
+                {equipo.capitan_celular || '—'}
               </span>
             </span>
           </span>
@@ -816,10 +728,10 @@ function TarjetaEquipo({
             {/* Badge + fecha de pago apilados: la fecha (`pagado_en`) solo cuando está
                 pagado. `<span>` con flex sigue siendo contenido de frase válido. */}
             <span className="flex flex-col items-end gap-1">
-              <BadgePago pagado={equipo.pagado} />
-              {equipo.pagado && equipo.pagadoEn && (
+              <BadgePago pagado={pagado} />
+              {pagado && equipo[COL_PAGADO_EN] && (
                 <span className="whitespace-nowrap font-mono text-[10px] leading-none text-gray-500">
-                  {fmtFechaHora(equipo.pagadoEn)}
+                  {fmtFechaHora(equipo[COL_PAGADO_EN] as string)}
                 </span>
               )}
             </span>
@@ -847,8 +759,7 @@ function TarjetaEquipo({
             <div className="flex flex-col gap-2">
               <p className="max-w-[15rem] text-xs leading-snug text-gray-300">
                 {pagar ? 'Marcar como pagado' : 'Marcar como pendiente'} al equipo «{nombre}
-                ». Afecta a {cantidad}{' '}
-                {cantidad === 1 ? 'jugador' : 'jugadores'}.
+                ». El pago es uno por equipo.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -877,9 +788,9 @@ function TarjetaEquipo({
                 setEstadoPago('confirmando')
               }}
               disabled={ocupado}
-              className={equipo.pagado ? BTN_SECUNDARIO : BTN_PRIMARIO}
+              className={pagado ? BTN_SECUNDARIO : BTN_PRIMARIO}
             >
-              {equipo.pagado ? 'Quitar pago' : 'Marcar pagado'}
+              {pagado ? 'Quitar pago' : 'Marcar pagado'}
             </button>
           )}
           {errorPago && (
@@ -894,18 +805,39 @@ function TarjetaEquipo({
           `aria-controls` existe también colapsado (un aria-controls a un id ausente es
           ARIA inválido). */}
       <div id={panelId} hidden={!expandido} className="border-t border-white/10">
+        {incompleto && (
+          <p className="border-b border-rose-900/30 bg-rose-950/10 px-4 py-3 text-xs leading-snug text-rose-200 md:px-6">
+            Este equipo tiene {cantidad}{' '}
+            {cantidad === 1 ? 'jugador' : 'jugadores'} y el mínimo para competir es{' '}
+            {MIN_JUGADORES}. Los jugadores no se editan desde el panel: hay que
+            contactar al capitán para completar el roster.
+          </p>
+        )}
+
+        {/* Un equipo sin jugadores es posible en el modelo relacional (la fila del equipo
+            existe por su cuenta). Sin esta línea el panel expandido mostraría una lista
+            vacía y parecería que no cargó. */}
+        {cantidad === 0 && (
+          <p className="px-4 py-5 text-sm text-gray-400 md:px-6">
+            Este equipo no tiene jugadores registrados.
+          </p>
+        )}
+
         <ul className="divide-y divide-white/5">
-          {equipo.jugadores.map((j, i) => (
-            <li key={`${equipo.clave}-${i}`} className="px-4 py-4 md:px-6 md:py-5">
-              <p className="flex flex-wrap items-baseline gap-x-2 break-words font-sans font-semibold text-white">
+          {equipo.jugadores.map((j) => (
+            <li key={j.id} className="px-4 py-4 md:px-6 md:py-5">
+              <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 break-words font-sans font-semibold text-white">
+                {/* La posición se muestra porque es lo que decidió el rol al registrarse:
+                    sin ella, "suplente" parece una etiqueta arbitraria. */}
+                {/* `gray-400` y no `gray-500`: sobre esta superficie el 500 se queda en
+                    ~3.9:1 (lo documenta la tarjeta de archivados más abajo) y a 11px el
+                    mínimo es 4.5:1. Este número no es decorativo — es lo que explica el
+                    rol—, así que tiene que leerse. */}
+                <span className="font-mono text-[11px] font-normal text-gray-400">
+                  {j.orden}
+                </span>
                 {j.gamertag || '—'}
-                {/* En un equipo 'parcial' hay que poder ver QUÉ filas quedaron archivadas:
-                    son justo las que el CSV no exporta. */}
-                {j[COL_ARCHIVADO_EN] != null && (
-                  <span className="font-mono text-[11px] font-normal uppercase tracking-wider text-rose-300">
-                    archivada
-                  </span>
-                )}
+                <BadgeRol rol={j.rol} />
               </p>
               <dl className="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                 <CampoJugador label="Nombre" valor={j.nombre} />
@@ -962,69 +894,30 @@ function TarjetaEquipo({
         {/* Zona de archivado. Va al FINAL del panel expandido y a propósito no comparte
             banda con "Marcar pagado" ni con "Guardar notas": archivar saca al equipo del
             listado, del CSV y del torneo en ATAK.GG, así que no debe quedar a un clic
-            de distraído ni leerse como una acción más. El fondo rose apenas teñido y el botón fantasma la marcan como
-            destructiva sin robarle protagonismo al CTA azul del encabezado. */}
+            de distraído ni leerse como una acción más. El fondo rose apenas teñido y el
+            botón fantasma la marcan como destructiva sin robarle protagonismo al CTA azul
+            del encabezado. */}
         <div className="border-t border-rose-900/30 bg-rose-950/10 px-4 py-4 md:px-6 md:py-5">
           {modoArchivar === 'idle' ? (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="max-w-md text-xs leading-snug text-gray-400">
-                {equipo.estadoArchivo === 'parcial'
-                  ? yaArchivadas === 1
-                    ? `Este equipo quedó archivado a medias: 1 de ${cantidad} inscripciones está archivada y no se exporta. Termina de archivarlo o restaura la que quedó.`
-                    : `Este equipo quedó archivado a medias: ${yaArchivadas} de ${cantidad} inscripciones están archivadas y no se exportan. Termina de archivarlo o restaura las que quedaron.`
-                  : 'Archivar saca al equipo del listado, del CSV y del torneo en ATAK.GG. No borra nada: puedes restaurarlo desde «Ver archivados».'}
+                Archivar saca al equipo del listado, del CSV y del torneo en ATAK.GG. No
+                borra nada: puedes restaurarlo desde «Ver archivados».
               </p>
-              <div className="flex flex-wrap gap-2">
-                {/* Salida del estado 'parcial': sin esto, un archivado a medias solo se puede
-                    deshacer archivando todo y restaurando después. Restaurar no retira nada,
-                    así que va como acción secundaria y sin confirmación escrita. */}
-                {equipo.estadoArchivo === 'parcial' && (
-                  <button
-                    ref={botonRestaurarParcialRef}
-                    type="button"
-                    onClick={restaurarParcial}
-                    disabled={ocupado}
-                    aria-busy={restaurando}
-                    className={BTN_SECUNDARIO}
-                  >
-                    {restaurando ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Restaurando…
-                      </>
-                    ) : (
-                      <>
-                        <ArchiveRestore className="h-4 w-4" />
-                        Restaurar las archivadas
-                      </>
-                    )}
-                  </button>
-                )}
-                <button
-                  ref={botonArchivarRef}
-                  type="button"
-                  onClick={() => {
-                    setTextoConfirma('')
-                    setFallo(null)
-                    /* También el de restaurar: si no, un error viejo de "Restaurar las
-                       archivadas" reaparece intacto al cancelar la confirmación. */
-                    setErrorRestaurar(false)
-                    setModoArchivar('confirmando')
-                  }}
-                  disabled={ocupado}
-                  className={BTN_DESTRUCTIVO}
-                >
-                  <Archive className="h-4 w-4" />
-                  {equipo.estadoArchivo === 'parcial'
-                    ? 'Terminar de archivar'
-                    : 'Archivar equipo'}
-                </button>
-              </div>
-              {errorRestaurar && (
-                <p role="alert" className="w-full text-xs leading-snug text-rose-300">
-                  No pudimos restaurar las inscripciones. Inténtalo de nuevo.
-                </p>
-              )}
+              <button
+                ref={botonArchivarRef}
+                type="button"
+                onClick={() => {
+                  setTextoConfirma('')
+                  setErrorArchivar(false)
+                  setModoArchivar('confirmando')
+                }}
+                disabled={ocupado}
+                className={BTN_DESTRUCTIVO}
+              >
+                <Archive className="h-4 w-4" />
+                Archivar equipo
+              </button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1032,14 +925,10 @@ function TarjetaEquipo({
                 Archivar «{nombre}»
               </p>
               <p className="text-sm leading-relaxed text-gray-300">
-                Se {porArchivar === 1 ? 'archivará' : 'archivarán'} {porArchivar}{' '}
-                {porArchivar === 1 ? 'jugador' : 'jugadores'}
-                {yaArchivadas > 0 && ` (${yaArchivadas} ya lo ${
-                  yaArchivadas === 1 ? 'está' : 'están'
-                }, así que el equipo queda archivado entero: ${cantidad})`}
-                . Las inscripciones no se borran: el equipo sale del listado, del CSV y del
-                torneo, y puedes restaurarlo cuando quieras desde «Ver archivados» — al
-                restaurarlo vuelve a quedar inscrito.
+                Se archivará el equipo completo con sus {cantidad}{' '}
+                {cantidad === 1 ? 'jugador' : 'jugadores'}. No se borra nada: el equipo
+                sale del listado, del CSV y del torneo, y puedes restaurarlo cuando
+                quieras desde «Ver archivados» — al restaurarlo vuelve a quedar inscrito.
               </p>
               {/* El recuadro de alerta CIERRA con la consecuencia, no con la tranquilización:
                   si terminara en "se puede deshacer", el peso de la advertencia se diluye y
@@ -1100,15 +989,11 @@ function TarjetaEquipo({
                   Cancelar
                 </button>
               </div>
-              {/* El éxito parcial se dice con números y deja la confirmación abierta: el
-                  nombre ya escrito sigue ahí, así que reintentar es un solo clic. */}
-              {fallo && (
+              {/* La confirmación queda abierta con el nombre ya escrito, así que
+                  reintentar es un solo clic. */}
+              {errorArchivar && (
                 <p role="alert" className="text-xs leading-snug text-rose-300">
-                  {fallo.resultado === 'parcial'
-                    ? `Solo se ${fallo.tocados === 1 ? 'archivó' : 'archivaron'} ${
-                        fallo.tocados
-                      } de ${cantidad} jugadores. Vuelve a intentarlo para archivar el resto.`
-                    : 'No pudimos archivar el equipo. Inténtalo de nuevo.'}
+                  No pudimos archivar el equipo. Inténtalo de nuevo.
                 </p>
               )}
             </div>
@@ -1127,14 +1012,13 @@ function TarjetaArchivado({
   equipo,
   onRestaurar
 }: {
-  equipo: EquipoAgrupado
-  onRestaurar: (equipo: EquipoAgrupado) => Promise<ResultadoArchivo>
+  equipo: Equipo
+  onRestaurar: (equipo: Equipo) => Promise<boolean>
 }) {
   const [estado, setEstado] = useState<'idle' | 'restaurando'>('idle')
-  /* Basta un booleano: el único desenlace que deja esta tarjeta montada es el error. Tanto
-     'ok' como 'parcial' sacan al equipo de la lista de archivados —a activos en los dos
-     casos—, así que la tarjeta ya no existe para mostrar nada; esos dos los anuncia la
-     región aria-live del padre. */
+  /* Basta un booleano: el único desenlace que deja esta tarjeta montada es el error. Al
+     restaurar, el equipo sale de la lista de archivados y la tarjeta ya no existe para
+     mostrar nada; ese caso lo anuncia la región aria-live del padre. */
   const [error, setError] = useState(false)
   const botonRestaurarRef = useRef<HTMLButtonElement>(null)
   /* Enlaza el aviso de abajo con el botón: el texto va DESPUÉS de él en el DOM, así que sin
@@ -1167,13 +1051,13 @@ function TarjetaArchivado({
     if (estado === 'restaurando') return
     setError(false)
     setEstado('restaurando')
-    const resultado = await onRestaurar(equipo)
+    const ok = await onRestaurar(equipo)
     if (!montado.current) return
-    /* Con 'ok' o 'parcial' el equipo sale de la lista de archivados y esta tarjeta se
-       desmonta en el mismo render, así que estos setState son inocuos: solo importan en el
-       camino de error, que es el único que la deja viva. */
+    /* Al éxito el equipo sale de la lista de archivados y esta tarjeta se desmonta en el
+       mismo render, así que estos setState son inocuos: solo importan en el camino de
+       error, que es el único que la deja viva. */
     setEstado('idle')
-    setError(resultado.resultado === 'error')
+    setError(!ok)
   }
 
   return (
@@ -1189,7 +1073,8 @@ function TarjetaArchivado({
             </span>
             <span aria-hidden="true">·</span>
             <span>
-              Archivado el {equipo.archivadoEn ? fmtFechaHora(equipo.archivadoEn) : '—'}
+              Archivado el{' '}
+              {equipo[COL_ARCHIVADO_EN] ? fmtFechaHora(equipo[COL_ARCHIVADO_EN] as string) : '—'}
             </span>
           </p>
         </div>
@@ -1233,28 +1118,38 @@ function TarjetaArchivado({
   )
 }
 
-/* Resumen: tres números grandes en azul + etiqueta mono. La marca entra en el
-   número; los datos se leen como herramienta, no como póster. */
+/* Resumen: números grandes en azul + etiqueta mono. La marca entra en el número; los
+   datos se leen como herramienta, no como póster.
+   "Incompletos" solo aparece cuando hay alguno: una celda fija en 0 ocupa el mismo
+   espacio que las que sí informan y entrena a ignorarla. */
 function Resumen({
   equipos,
   totalJugadores
 }: {
-  equipos: EquipoAgrupado[]
+  equipos: Equipo[]
   totalJugadores: number
 }) {
+  const incompletos = equipos.filter(rosterIncompleto).length
   const celdas = [
-    { etiqueta: 'Equipos', valor: equipos.length },
-    { etiqueta: 'Jugadores', valor: totalJugadores },
-    { etiqueta: 'Confirmados', valor: equipos.filter((e) => e.pagado).length }
+    { etiqueta: 'Equipos', valor: equipos.length, alerta: false },
+    { etiqueta: 'Jugadores', valor: totalJugadores, alerta: false },
+    { etiqueta: 'Confirmados', valor: equipos.filter(estaPagado).length, alerta: false },
+    ...(incompletos > 0
+      ? [{ etiqueta: 'Incompletos', valor: incompletos, alerta: true }]
+      : [])
   ]
   return (
-    <div className="grid grid-cols-3 gap-3 md:gap-4">
+    <div className={`grid gap-3 md:gap-4 ${celdas.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
       {celdas.map((c) => (
         <div
           key={c.etiqueta}
           className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5"
         >
-          <p className="font-sans text-3xl font-semibold leading-none text-blue-400 md:text-4xl">
+          <p
+            className={`font-sans text-3xl font-semibold leading-none md:text-4xl ${
+              c.alerta ? 'text-rose-300' : 'text-blue-400'
+            }`}
+          >
             {c.valor}
           </p>
           <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-gray-400 md:text-xs">
@@ -1271,7 +1166,7 @@ function Resumen({
 function Esqueleto() {
   return (
     <div role="status" className="space-y-6 md:space-y-8">
-      <span className="sr-only">Cargando inscripciones…</span>
+      <span className="sr-only">Cargando equipos…</span>
       <div className="grid grid-cols-3 gap-3 md:gap-4" aria-hidden="true">
         {[0, 1, 2].map((i) => (
           <div
@@ -1314,7 +1209,7 @@ function ErrorCarga() {
       <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-300" />
       <div>
         <p className="font-sans text-sm text-rose-200 md:text-base">
-          No pudimos cargar las inscripciones.
+          No pudimos cargar los equipos.
         </p>
         <p className="mt-1 font-sans text-sm text-rose-300/80">
           Recarga la página e inténtalo de nuevo en unos minutos.
@@ -1326,17 +1221,17 @@ function ErrorCarga() {
 
 /* Vacío: no es un error, es un mensaje amable. Reusa la caja punteada del
    placeholder anterior. */
-function VacioInscripciones() {
+function VacioEquipos() {
   return (
     <div className="rounded-2xl border border-dashed border-white/15 bg-black/30 p-10 text-center md:p-14">
       <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-lqc-accent/20 bg-blue-950/40 shadow-lqc">
         <Inbox className="h-8 w-8 text-lqc-accent" />
       </div>
       <p className="font-sans text-lg text-white md:text-xl">
-        Todavía no hay inscripciones.
+        Todavía no hay equipos registrados.
       </p>
       <p className="mx-auto mt-2 max-w-md font-sans leading-relaxed text-gray-400">
-        Cuando alguien complete el registro, su equipo aparecerá aquí.
+        Cuando un capitán complete el registro, su equipo aparecerá aquí.
       </p>
     </div>
   )
@@ -1355,7 +1250,7 @@ export default function ListaInscripciones() {
   const [estado, setEstado] = useState<Estado>(() =>
     obtenerSupabase() ? 'cargando' : 'error'
   )
-  const [equipos, setEquipos] = useState<EquipoAgrupado[]>([])
+  const [equipos, setEquipos] = useState<Equipo[]>([])
   /* Anuncio para lectores de pantalla del resultado de exportar, archivar y restaurar: la
      única señal de que funcionaron es visual —la descarga del archivo, la tarjeta que
      cambia de lista— y eso no le dice nada a quien no ve la pantalla. Se lee por una región
@@ -1375,10 +1270,14 @@ export default function ListaInscripciones() {
 
     void (async () => {
       try {
+        /* Un solo viaje: equipos con sus jugadores embebidos. Antes eran N filas planas
+           que había que agrupar acá. El `referencedTable` ordena el roster dentro de
+           cada equipo; `normalizarEquipos` lo reafirma en el cliente. */
         const { data, error } = await supabase
-          .from('inscripciones')
+          .from('equipos')
           .select(SELECT)
           .order('creado_en', { ascending: false })
+          .order('orden', { referencedTable: 'jugadores', ascending: true })
 
         if (!montado) return
         /* No se guarda `error` en estado ni se loguea: solo se marca el enum. */
@@ -1389,7 +1288,7 @@ export default function ListaInscripciones() {
         /* `data` viene como `any`/tipo de error de PostgREST porque el cliente no
            tiene el esquema generado (ver DEUDA en Registro.tsx): se castea vía
            `unknown` al contrato de columnas de arriba. */
-        setEquipos(agruparPorEquipo(data as unknown as Inscripcion[]))
+        setEquipos(normalizarEquipos(data as unknown as Equipo[]))
         setEstado('listo')
       } catch {
         if (montado) setEstado('error')
@@ -1401,16 +1300,18 @@ export default function ListaInscripciones() {
     }
   }, [])
 
-  /* Escritura de pago (por equipo). Toca TODAS las filas del grupo por id — nunca por el
-     texto del equipo, que se normaliza para agrupar y no es clave. Actualización
-     pesimista: al éxito muta `equipos` de forma inmutable (map por clave), así el badge,
-     la fecha y el número "Confirmados" del resumen se recalculan sin refetch (que
-     perdería el estado de expansión). El error nunca se filtra: la función devuelve un
-     booleano, no el objeto de Supabase, y no se loguea. */
-  const marcarPago = async (
-    equipo: EquipoAgrupado,
-    pagar: boolean
-  ): Promise<boolean> => {
+  /* Aplica un cambio a un equipo del listado, de forma inmutable y por id. Las tres
+     escrituras hacen lo mismo, así que la operación vive en un solo lugar. */
+  const actualizarEquipo = (id: string, cambios: Partial<Equipo>) => {
+    setEquipos((prev) => prev.map((e) => (e.id === id ? { ...e, ...cambios } : e)))
+  }
+
+  /* Escritura de pago. Ahora toca UNA fila por id — antes había que tocar todas las del
+     grupo con `.in()`. Actualización pesimista: al éxito muta `equipos` de forma
+     inmutable, así el badge, la fecha y el número "Confirmados" del resumen se recalculan
+     sin refetch (que perdería el estado de expansión). El error nunca se filtra: la
+     función devuelve un booleano, no el objeto de Supabase, y no se loguea. */
+  const marcarPago = async (equipo: Equipo, pagar: boolean): Promise<boolean> => {
     const supabase = obtenerSupabase()
     if (!supabase) return false
     /* Timestamp del cliente: en un UPDATE no aplica el default de la DB. Skew menor,
@@ -1418,16 +1319,12 @@ export default function ListaInscripciones() {
     const pagadoEn = pagar ? new Date().toISOString() : null
     try {
       const { error } = await supabase
-        .from('inscripciones')
+        .from('equipos')
         .update({ [COL_PAGADO]: pagar, [COL_PAGADO_EN]: pagadoEn })
-        .in(COL_ID, equipo.ids)
+        .eq(COL_ID, equipo.id)
         .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_MS))
       if (error) return false
-      setEquipos((prev) =>
-        prev.map((e) =>
-          e.clave === equipo.clave ? { ...e, pagado: pagar, pagadoEn } : e
-        )
-      )
+      actualizarEquipo(equipo.id, { [COL_PAGADO]: pagar, [COL_PAGADO_EN]: pagadoEn })
       return true
     } catch {
       /* Timeout (abort) o red: mismo camino, sin logs ni exponer el error. */
@@ -1435,96 +1332,63 @@ export default function ListaInscripciones() {
     }
   }
 
-  /* Escritura de notas (por equipo). Mismo criterio: todas las filas del grupo por id.
-     Al éxito actualiza el `notas` guardado del grupo para que la tarjeta vuelva a
-     "sin cambios". */
-  const guardarNotas = async (
-    equipo: EquipoAgrupado,
-    notas: string
-  ): Promise<boolean> => {
+  /* Escritura de notas. Mismo criterio: una fila, por id. */
+  const guardarNotas = async (equipo: Equipo, notas: string): Promise<boolean> => {
     const supabase = obtenerSupabase()
     if (!supabase) return false
     try {
       const { error } = await supabase
-        .from('inscripciones')
+        .from('equipos')
         .update({ [COL_NOTAS]: notas })
-        .in(COL_ID, equipo.ids)
+        .eq(COL_ID, equipo.id)
         .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_MS))
       if (error) return false
-      setEquipos((prev) =>
-        prev.map((e) => (e.clave === equipo.clave ? { ...e, notas } : e))
-      )
+      actualizarEquipo(equipo.id, { [COL_NOTAS]: notas })
       return true
     } catch {
       return false
     }
   }
 
-  /* Escritura de archivado/restauración (por equipo). `valor` es la fecha (archivar) o null
+  /* Escritura de archivado/restauración. `valor` es la fecha (archivar) o null
      (restaurar); NUNCA un .delete(): la tabla no tiene política de DELETE y un borrado
-     fallaría en silencio, devolviendo 0 filas sin error. El `.select()` después del UPDATE
-     hace que PostgREST devuelva las filas que realmente cambiaron: comparar esa cuenta
-     contra los ids del grupo es la única forma de detectar el ÉXITO PARCIAL. Con 0 filas se
-     trata como error (es lo que se vería si la RLS bloqueara el UPDATE). El error real de
-     Supabase no se guarda ni se loguea: solo viaja el enum.
+     fallaría en silencio, devolviendo 0 filas sin error.
 
-     OJO SI SE TOCA LA RLS: todo esto depende de que la política de SELECT siga devolviendo
-     las filas archivadas. Si algún día se le agregara un `archivado_en IS NULL`, este
+     Sigue habiendo un `.select()` después del UPDATE, y NO es la detección de éxito
+     parcial que se borró —eso ya no puede pasar con una sola fila—. Es otra cosa:
+     comprobar que el UPDATE alcanzó una fila visible, o sea 0 filas = error. (No prueba
+     que el valor CAMBIARA: PostgREST devuelve la fila aunque se escriba lo mismo.) Sin
+     él, un UPDATE que no encuentra ninguna fila —id que ya no está, o una RLS que lo
+     bloquee— vuelve sin error y el panel reportaría éxito sobre algo que no ocurrió, con
+     el agravante de que el trigger de ATAK tampoco habría disparado.
+     Pago y notas no lo llevan a propósito: si fallan en silencio se
+     corrige volviendo a pulsar, mientras que un archivado fantasma deja las dos bases
+     divergiendo sin que nadie lo note.
+
+     OJO SI SE TOCA LA RLS: esto depende de que la política de SELECT siga devolviendo las
+     filas archivadas. Si algún día se le agregara un `archivado_en IS NULL`, este
      `.select()` volvería vacío y el código reportaría 'error' con el archivado ya hecho. */
-  const escribirArchivado = async (
-    equipo: EquipoAgrupado,
-    valor: string | null
-  ): Promise<ResultadoArchivo> => {
+  const escribirArchivado = async (equipo: Equipo, valor: string | null): Promise<boolean> => {
     const supabase = obtenerSupabase()
-    if (!supabase) return { resultado: 'error', tocados: 0 }
+    if (!supabase) return false
     try {
       const { data, error } = await supabase
-        .from('inscripciones')
+        .from('equipos')
         .update({ [COL_ARCHIVADO_EN]: valor })
-        .in(COL_ID, equipo.ids)
+        .eq(COL_ID, equipo.id)
         .select(COL_ID)
         .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_MS))
-      if (error || !data) return { resultado: 'error', tocados: 0 }
-      const filas = data as unknown as Record<string, string | number>[]
-      const idsTocados = new Set(filas.map((f) => String(f[COL_ID])))
-      if (idsTocados.size === 0) return { resultado: 'error', tocados: 0 }
-      /* 'ok' se decide por CÓMO QUEDÓ EL GRUPO, no por cuántas filas contestó la petición.
-         Si se comparara `idsTocados.size` contra `equipo.ids.length`, un reintento que
-         termina de archivar un equipo ya a medias saldría 'parcial' pese a haber quedado
-         archivado entero, y el resultado real se perdería sin avisar. */
-      const nuevo = conArchivado(equipo, idsTocados, valor)
-      /* El grupo se recalcula desde `prev`, no se pisa con `nuevo`: `nuevo` deriva del prop
-         capturado antes del await, así que sustituirlo tal cual descartaría cualquier otra
-         escritura del mismo equipo que hubiera aterrizado en el medio. `nuevo` se usa solo
-         para decidir el resultado, que es una foto de este UPDATE. Mismo criterio inmutable
-         que `marcarPago` y `guardarNotas`. */
-      setEquipos((prev) =>
-        prev.map((e) => (e.clave === equipo.clave ? conArchivado(e, idsTocados, valor) : e))
-      )
-      const completo =
-        valor === null ? nuevo.estadoArchivo === 'activo' : nuevo.estadoArchivo === 'archivado'
-      /* `tocados` cuenta las filas que CAMBIARON de estado, no las que respondió el UPDATE:
-         el `.in()` incluye siempre todos los ids del grupo, así que en un reintento sobre un
-         equipo a medias las ya archivadas volverían a contarse e inflarían el mensaje. */
-      const cambiadas = equipo.jugadores.filter(
-        (j) =>
-          idsTocados.has(String(j[COL_ID])) &&
-          (j[COL_ARCHIVADO_EN] == null) !== (valor == null)
-      ).length
-      return { resultado: completo ? 'ok' : 'parcial', tocados: cambiadas }
+      if (error || !data || data.length === 0) return false
+      actualizarEquipo(equipo.id, { [COL_ARCHIVADO_EN]: valor })
+      return true
     } catch {
-      /* Timeout (abort) o red: mismo camino, sin logs ni exponer el error. */
-      return { resultado: 'error', tocados: 0 }
+      return false
     }
   }
 
   /* Reparto de quién dice qué, según qué tarjeta sobrevive a la operación:
-     - archivar 'ok' → la tarjeta se desmonta: lo dice la región aria-live.
-     - archivar 'parcial' → el equipo queda 'parcial' y sigue en el listado activo, así que
-       la tarjeta se queda montada y lo dice ella con role="alert".
-     - restaurar 'ok' y 'parcial' → en los dos casos el equipo sale de la lista de archivados
-       y la tarjeta se desmonta: los dos los dice la región.
-     - 'error' → nadie se desmontó nunca: siempre lo dice la tarjeta.
+     - éxito → la tarjeta se desmonta (el equipo cambia de lista): lo dice la región aria-live.
+     - error → nadie se desmontó: lo dice la tarjeta con role="alert".
      Los conjuntos son disjuntos, así que ningún resultado se anuncia dos veces ni se pierde.
 
      Además, al desmontarse la tarjeta el foco caería a <body> (el botón que se acaba de usar
@@ -1539,65 +1403,65 @@ export default function ListaInscripciones() {
 
   /* Timestamp del cliente, igual que en `pagado_en`: en un UPDATE no aplica el default de
      la DB. El skew es menor y aceptable para una marca de archivado. */
-  const archivarEquipo = async (equipo: EquipoAgrupado): Promise<ResultadoArchivo> => {
-    const r = await escribirArchivado(equipo, new Date().toISOString())
-    if (r.resultado === 'ok') {
+  const archivarEquipo = async (equipo: Equipo): Promise<boolean> => {
+    const ok = await escribirArchivado(equipo, new Date().toISOString())
+    if (ok) {
+      const n = equipo.jugadores.length
       setAnuncio(
-        `Equipo ${nombreMostrado(equipo)} archivado. ${r.tocados} ${
-          r.tocados === 1 ? 'jugador archivado' : 'jugadores archivados'
+        `Equipo ${nombreMostrado(equipo)} archivado, con sus ${n} ${
+          n === 1 ? 'jugador' : 'jugadores'
         }.`
       )
       enfocarInterruptor()
     }
-    return r
+    return ok
   }
 
-  const restaurarEquipo = async (equipo: EquipoAgrupado): Promise<ResultadoArchivo> => {
-    /* Restaurar se llama desde dos lugares y solo uno pierde su tarjeta: desde la lista de
-       archivados el equipo se va (a activos, con 'ok' o con 'parcial') y hay que reubicar el
-       foco; desde un equipo 'parcial' del listado activo la tarjeta se queda donde está y
-       moverle el foco al usuario sería quitárselo de las manos. */
-    const veniaDeArchivados = equipo.estadoArchivo === 'archivado'
-    const r = await escribirArchivado(equipo, null)
-    if (r.resultado === 'ok') {
+  const restaurarEquipo = async (equipo: Equipo): Promise<boolean> => {
+    const ok = await escribirArchivado(equipo, null)
+    if (ok) {
       setAnuncio(`Equipo ${nombreMostrado(equipo)} restaurado.`)
-    } else if (r.resultado === 'parcial') {
-      setAnuncio(
-        `Se ${r.tocados === 1 ? 'restauró' : 'restauraron'} ${r.tocados} de ${
-          equipo.ids.length
-        } jugadores de ${nombreMostrado(equipo)}. El equipo quedó archivado a medias.`
-      )
+      enfocarInterruptor()
     }
-    if (veniaDeArchivados && r.resultado !== 'error') enfocarInterruptor()
-    return r
+    return ok
   }
 
   if (estado === 'cargando') return <Esqueleto />
   if (estado === 'error') return <ErrorCarga />
-  /* Vacío de verdad = ni una inscripción en la tabla. Que no queden equipos ACTIVOS es otra
+  /* Vacío de verdad = ni un equipo en la tabla. Que no queden equipos ACTIVOS es otra
      cosa (están todos archivados) y se resuelve más abajo con su propio mensaje. */
-  if (equipos.length === 0) return <VacioInscripciones />
+  if (equipos.length === 0) return <VacioEquipos />
 
-  /* Un equipo 'parcial' cuenta como activo: sigue teniendo inscripciones sin archivar y
-     debe quedar a la vista para poder terminar (o deshacer) el archivado. */
-  const activos = equipos.filter((e) => e.estadoArchivo !== 'archivado')
+  const activos = equipos.filter((e) => !estaArchivado(e))
   const archivados = equipos
-    .filter((e) => e.estadoArchivo === 'archivado')
-    .sort((a, b) => tiempo(String(b.archivadoEn)) - tiempo(String(a.archivadoEn)))
-  /* Contadores: solo lo activo. Los jugadores se cuentan por FILA sin archivar, no por
-     tamaño del grupo, para que un equipo 'parcial' no infle el número. */
-  const totalJugadores = activos.reduce((n, e) => n + e.jugadoresActivos, 0)
+    .filter(estaArchivado)
+    .sort((a, b) => tiempo(String(b[COL_ARCHIVADO_EN])) - tiempo(String(a[COL_ARCHIVADO_EN])))
+  /* Contadores: solo lo activo. Con el archivado por equipo, el total de jugadores es la
+     suma directa de los rosters — ya no hay que contar fila por fila para descontar las
+     archivadas de un equipo a medias. */
+  const totalJugadores = activos.reduce((n, e) => n + e.jugadores.length, 0)
 
-  /* Exporta las inscripciones a un CSV generado y descargado en el cliente, con lo que YA
-     está en memoria (sin una segunda consulta a Supabase). Exporta SOLO lo activo: los
-     equipos archivados quedan fuera, y de los 'parcial' salen únicamente sus filas sin
-     archivar (el filtro por fila vive en construirCSV). En ambos casos se fija el anuncio
-     aria-live, la única señal audible de que la acción ocurrió. */
+  /* Exporta a un CSV generado y descargado en el cliente, con lo que YA está en memoria
+     (sin una segunda consulta a Supabase). Exporta SOLO lo activo. En ambos casos se fija
+     el anuncio aria-live, la única señal audible de que la acción ocurrió. */
   const exportarCSV = () => {
-    if (totalJugadores === 0) {
-      setAnuncio('No hay inscripciones activas para exportar.')
+    /* Dos guardas y no una: con el modelo relacional un equipo puede existir con CERO
+       jugadores —es justo lo que marca el badge de roster incompleto—, así que
+       `totalJugadores === 0` ya no implica que no haya equipos. Con una sola guarda, un
+       panel lleno de equipos sin roster anunciaría "no hay equipos activos", que es falso.
+       En el modelo viejo las dos condiciones eran equivalentes: sin filas no había equipo. */
+    if (activos.length === 0) {
+      setAnuncio('No hay equipos activos para exportar.')
       return
     }
+    if (totalJugadores === 0) {
+      setAnuncio('Los equipos activos no tienen jugadores: no hay nada que exportar.')
+      return
+    }
+    /* El nombre del archivo NO cambia respecto del modelo viejo a propósito: es un
+       contrato con quien archiva los exports, y renombrarlo rompería en silencio
+       cualquier carpeta o convención ya armada. El contenido sí cambió (entra Rol,
+       sale Localidad). */
     descargarArchivo(construirCSV(activos), `inscripciones-lqc-${fechaHoyArchivo()}.csv`)
     setAnuncio('CSV descargado.')
   }
@@ -1643,13 +1507,12 @@ export default function ListaInscripciones() {
       ) : (
         <ul className="space-y-3 md:space-y-4">
           {activos.map((e) => (
-            <li key={e.clave}>
+            <li key={e.id}>
               <TarjetaEquipo
                 equipo={e}
                 onMarcarPago={marcarPago}
                 onGuardarNotas={guardarNotas}
                 onArchivar={archivarEquipo}
-                onRestaurar={restaurarEquipo}
               />
             </li>
           ))}
@@ -1671,7 +1534,7 @@ export default function ListaInscripciones() {
           ) : (
             <ul className="space-y-3 md:space-y-4">
               {archivados.map((e) => (
-                <li key={e.clave}>
+                <li key={e.id}>
                   <TarjetaArchivado equipo={e} onRestaurar={restaurarEquipo} />
                 </li>
               ))}

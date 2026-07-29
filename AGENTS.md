@@ -5,25 +5,52 @@ de **Revolution505** en Querétaro. Es un sitio **estático de presentación**: 
 galería, información de la liga y contacto. **No hay backend propio** y el contenido **público** del sitio vive en los
 componentes: sus páginas no leen ninguna base.
 
-Dos cosas tocan Supabase:
-- El **formulario público de `/registro`** hace un **INSERT anónimo** en la tabla
-  `inscripciones`. No lee nada y no necesita sesión.
-- El **panel de administración (`/admin`)**, detrás de login, **lee y escribe** esa
-  tabla con **SELECT y UPDATE autenticados** (agrupa las inscripciones por equipo).
-  Tiene sesión de usuario; los admins se crean a mano en Supabase, no hay alta
-  pública. Las escrituras son siempre UPDATE por `id` sobre todas las filas del
-  equipo: pago (`pagado`, `pagado_en`), notas (`notas`) y archivado
-  (`archivado_en`). **Nunca DELETE**: no hay política de DELETE, así que un borrado
-  fallaría en silencio —devolvería 0 filas *sin* error— y archivar es justamente la
-  alternativa (`archivado_en` null = activo, con fecha = archivado). El archivado
-  depende además de que el SELECT siga devolviendo las filas archivadas: el panel
-  detecta el éxito parcial comparando lo que responde el `.select()` posterior al
-  UPDATE.
+## Modelo de datos: el equipo es una entidad (migrado el 2026-07-29)
 
-**Escribir en `inscripciones` dispara efectos FUERA de este repo.** Hay triggers de
-PostgreSQL en Supabase que sincronizan con **ATAK.GG** vía `pg_net`: un INSERT da de
-alta el registro allá, y archivar/restaurar (`archivado_en`) da de baja o vuelve a
-inscribir al equipo en el torneo. **De esos triggers no hay una sola línea en el
+**La tabla `inscripciones` ya NO se usa.** Sigue existiendo en la base —no se borró—
+pero ni el registro ni el panel la tocan. El modelo pasó de *una fila = un jugador*,
+con el equipo como un **string repetido** en cada fila, a dos tablas:
+
+- **`public.equipos`** — `id` (uuid), `nombre`, `nombre_norm`, `capitan_nombre`,
+  `capitan_celular`, `pagado`, `pagado_en`, `notas`, `archivado_en`, `creado_en`.
+- **`public.jugadores`** — `id`, `equipo_id`, `orden`, `gamertag`, `nombre`,
+  `fecha_nacimiento`, `celular`, `correo`, `municipio`, `escolaridad`, `genero`,
+  `rol` (`'titular'|'suplente'`), `creado_en`. **`localidad` ya no existe.**
+
+Dos cosas tocan Supabase:
+
+- El **formulario público de `/registro`** ya no hace un INSERT: el **capitán registra
+  al equipo completo con su roster de 5 a 7 jugadores en un solo envío**, por la RPC
+  **`registrar_equipo(datos jsonb)`**. `datos` es
+  `{ equipo, capitan_nombre, capitan_celular, jugadores: [...] }` y **`rol` no se
+  manda**: la función asigna titular a los 5 primeros y suplente del 6º en adelante,
+  **por el orden del array**. Devuelve `{ ok:true }` o `{ ok:false, error }` con los
+  códigos `min_jugadores`, `max_jugadores`, `falta_equipo` y `equipo_duplicado`.
+  El cliente anónimo **solo puede llamar a la RPC**: no lee las tablas, así que no
+  intentes un `.select()` de vuelta.
+- El **panel de administración (`/admin`)**, detrás de login, lee las dos tablas con
+  **un solo SELECT con join** (`equipos` con sus `jugadores` ordenados por `orden`) y
+  **ya no agrupa nada en el cliente**. Tiene sesión de usuario; los admins se crean a
+  mano en Supabase, no hay alta pública. Escribe **solo en `equipos`**, siempre
+  `UPDATE ... .eq('id', equipo.id)`: pago (`pagado`, `pagado_en`), notas (`notas`) y
+  archivado (`archivado_en`). **Los jugadores no se editan desde el panel.**
+  **Nunca DELETE**: no hay política de DELETE, así que un borrado fallaría en
+  silencio —devolvería 0 filas *sin* error— y archivar es la alternativa
+  (`archivado_en` null = activo, con fecha = archivado). El archivado depende además
+  de que el SELECT siga devolviendo las filas archivadas.
+
+**Lo que desapareció con la migración, y no hay que reponer:** el estado `'parcial'`
+del archivado y su detección de éxito parcial. Existían porque archivar eran *N*
+updates que podían fallar a medias; con una fila por equipo el UPDATE es atómico y el
+resultado es ok o error. (El `.select()` posterior al UPDATE de archivado **sí** se
+conservó, pero con otro propósito: comprobar que alcanzó una fila visible, o sea
+0 filas = error.)
+
+**Escribir en las tablas del registro dispara efectos FUERA de este repo.** Hay triggers de
+PostgreSQL en Supabase que sincronizan con **ATAK.GG** vía `pg_net`: archivar o
+restaurar un equipo lo da de baja o lo vuelve a inscribir en el torneo. Con el modelo
+nuevo ese trigger cuelga de **`equipos.archivado_en`** (antes era
+`inscripciones.archivado_en`). **De esos triggers no hay una sola línea en el
 repo** —ni webhook, ni edge function, ni carpeta `supabase/`—, así que grepear el
 código y no encontrar nada **no** prueba que la integración no exista: ya llevó a
 un agente a concluir exactamente eso. (Ojo: `src/lib/atak.ts` **sí** es código de
@@ -39,12 +66,27 @@ dos bases divergen sin un solo aviso) y cómo diagnosticarlo con
 (El sitio además pide fuentes a Google Fonts desde `index.html`, pero eso no manda
 datos de nadie.)
 
-La RLS de `inscripciones`: **INSERT permitido para anónimos** (el registro público)
-y **SELECT solo para usuarios autenticados** (el panel) — **nunca SELECT anónimo**.
-Es lo acordado con quien administra el proyecto de Supabase. **No está en el repo,
-pero se verificó de punta a punta en producción el 2026-07-23** (un INSERT anónimo
-real llegó a la tabla). Si algún día un INSERT o un SELECT falla por permisos, ese
-es el primer lugar donde mirar, no el código.
+**SIN CONFIRMAR — el alta.** `docs/INTEGRACION-ATAK.md` documenta un `AFTER INSERT`
+sobre `inscripciones` que daba de alta cada registro en ATAK. Esa tabla ya no recibe
+registros, así que **queda sin verificar desde el repo si la RPC `registrar_equipo`
+notifica el alta a ATAK** (por trigger sobre `equipos`/`jugadores`, desde la propia
+función, o de ninguna manera). No lo asumas en ningún sentido: comprobalo contra la
+base antes de afirmarlo. Si no notificara, ningún equipo nuevo llegaría a ATAK **y
+nada en el sitio lo delataría**, que es exactamente la falla silenciosa que ya
+documenta el incidente registrado de ese archivo.
+
+La RLS con el modelo nuevo:
+
+- **`equipos` y `jugadores`**: el anónimo **no lee ni escribe** ninguna de las dos —su
+  única superficie es la RPC `registrar_equipo`, que corre con permisos propios—. El
+  usuario **autenticado** tiene **SELECT en las dos** y **UPDATE solo en `equipos`**
+  (por eso el panel no edita jugadores).
+- **`inscripciones`** (la tabla vieja, ya sin uso): INSERT anónimo y SELECT
+  autenticado. Se verificó de punta a punta en producción el 2026-07-23, cuando era la
+  tabla en uso.
+
+Nada de esto está en el repo. Si algún día una lectura o una escritura falla por
+permisos, ese es el primer lugar donde mirar, no el código.
 
 ## Stack
 

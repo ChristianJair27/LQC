@@ -20,6 +20,29 @@ fuente de verdad es la base.
 
 ---
 
+## ⚠️ Este documento describe el modelo VIEJO (`inscripciones`)
+
+**El 2026-07-29 el registro se migró a `public.equipos` + `public.jugadores`** (ver
+[AGENTS.md](../AGENTS.md), «Modelo de datos»). `inscripciones` sigue existiendo pero
+**ya no recibe registros**, así que **todo el SQL de este archivo apunta a una tabla
+que dejó de usarse**. Lo que se sabe del estado actual:
+
+- **Baja/alta (archivar/restaurar): migrado.** El trigger equivalente cuelga ahora de
+  **`equipos.archivado_en`**. El panel escribe esa columna con
+  `UPDATE ... .eq('id', equipo.id)`, una sola fila.
+- **Alta al registrarse: SIN CONFIRMAR.** El registro entra por la RPC
+  `registrar_equipo`, no por un INSERT del cliente. **No está verificado desde el repo
+  si esa función notifica el alta a ATAK.** Compruébalo contra la base —no lo asumas
+  en ningún sentido— antes de afirmar nada: si no notificara, ningún equipo nuevo
+  llegaría a ATAK y, por lo de más abajo, **nada lo delataría**.
+
+Todo lo demás de este archivo —el porqué del `http://` interno, el alias de red
+`atak-backend`, cómo diagnosticar con `net._http_response`, el límite de 7 jugadores
+y, sobre todo, que las llamadas son **fire-and-forget**— sigue vigente tal cual:
+describe el transporte, no el esquema.
+
+---
+
 ## Qué hace
 
 Dos triggers sobre `public.inscripciones` llaman a la API de ATAK.GG usando la
