@@ -274,33 +274,23 @@ export default function Torneos() {
               <h2 className="text-3xl font-light mb-6">Próxima Temporada</h2>
               {/* Decía «Invierno 2026», que no era la temporada siguiente sino ESTA misma con
                   otro nombre, según confirmaron los organizadores.
-                  El encabezado «Próxima» es correcto al 2026-07-28 porque la temporada todavía
-                  no arrancó, pero CADUCA SOLO: los organizadores dicen que la liga empieza el
-                  25/08/2026, así que a partir de esa fecha hay que cambiarlo a mano por
-                  «Temporada Actual». Nada en el código avisa cuando eso pase. */}
+                  El encabezado «Próxima» es correcto mientras la temporada no arranque, pero
+                  CADUCA SOLO: los organizadores dicen que la liga empieza el 25/08/2026, así
+                  que a partir de esa fecha hay que cambiarlo a mano por «Temporada Actual».
+                  Nada en el código avisa cuando eso pase. */}
               <p className="text-xl text-gray-300 mb-10">Otoño 2026 • ¡Prepárate!</p>
 
-              {/* Acá había un tercer dato, «Enero / Inicio», y se BORRÓ en vez de corregirse.
-                  Se sabe falso: la liga empieza el 25/08/2026 según los organizadores. Quedaba
-                  además contradiciendo al nombre de acá arriba —una temporada de otoño que
-                  arranca en enero—, así que renombrar y dejarlo era publicar el error más
-                  grande que antes. Borrar un dato falso no es inventar uno nuevo; poner
-                  «25 ago» sí habría sido meter una fecha, y este cambio era solo de nombre.
-                  El tile vuelve el día que los organizadores den una fecha para publicar.
-                  Los otros dos que SIGUEN acá, «20+ equipos» y «$50K+», están hardcodeados
-                  desde antes y nunca se verificaron. No se sabe que sean falsos, por eso no se
-                  tocaron; tampoco se sabe que sean ciertos. Confirmarlos aparte. */}
-              <div className="flex flex-wrap justify-center gap-12 mb-12">
-                <div>
-                  <div className="text-4xl font-light text-white">20+</div>
-                  <div className="text-sm text-gray-400">Equipos</div>
-                </div>
-                <div>
-                  <div className="text-4xl font-light text-white">$50K+</div>
-                  <div className="text-sm text-gray-400">Premios</div>
-                </div>
-              </div>
-
+              {/* En ESTA tarjeta ya no hay cifras (el historial de arriba sí tiene, y son de
+                  temporadas cerradas). Las tres que había acá se fueron por lo mismo: eran
+                  datos hardcodeados sin fuente, anunciando una temporada que no arrancó.
+                  «Enero / Inicio» se fue primero, y ese sí se sabía FALSO: la liga empieza el
+                  25/08/2026 según los organizadores, así que una temporada de otoño que
+                  arrancaba en enero se contradecía con su propio nombre.
+                  «$50K+ Premios» contradecía al reglamento publicado, que dice «Premiación:
+                  Por definir»: el sitio prometía un monto que el documento oficial no promete.
+                  «20+ Equipos» no se sabe falso, pero tampoco tiene de dónde salir.
+                  Se borró el contenedor entero y no solo los números: una caja de stats vacía
+                  es peor que no tenerla. Vuelve con cifras que tengan fuente, y anotándola. */}
               <div className="flex flex-wrap justify-center gap-6">
                 <button className="px-10 py-4 bg-black/50 border border-blue-800/40 text-gray-200 rounded-xl hover:bg-blue-900/30 transition-all duration-300">
                   Notificarme

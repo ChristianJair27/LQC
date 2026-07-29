@@ -1,11 +1,18 @@
-import { Trophy, Users, MapPin, Calendar, Award, Target, Globe, Heart, Star, ChevronRight } from 'lucide-react'
+/* `Award` se fue del import junto con la celda «$500K+ En Premios», que era su único uso. */
+import { Trophy, Users, MapPin, Calendar, Target, Globe, Heart, Star, ChevronRight } from 'lucide-react'
 
 
 export default function Acerca() { 
+  /* Acá había cuatro cifras y se fueron dos: «200+ Equipos» y «$500K+ En Premios».
+     Ninguna estaba verificada, y la de premios además CONTRADECÍA al reglamento
+     publicado, que para esta temporada dice «Premiación: Por definir» — o sea que el
+     sitio prometía medio millón mientras el documento oficial no promete nada.
+     Vuelven cuando haya un número que alguien pueda respaldar.
+     Las dos que quedan tampoco están verificadas contra una fuente: se conservan
+     porque no contradicen nada, no porque estén comprobadas. Si se confirman, vale
+     anotar de dónde salen; si se desmienten, se van igual que las otras. */
   const stats = [
     { value: "12+", label: "Temporadas", icon: Trophy },
-    { value: "200+", label: "Equipos", icon: Users },
-    { value: "$500K+", label: "En Premios", icon: Award },
     { value: "1000+", label: "Partidos", icon: Target },
   ]
 
@@ -88,7 +95,11 @@ export default function Acerca() {
         {/* Estadísticas */}
         <section className="py-20">
           <div className="container mx-auto px-6 max-w-6xl">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {/* Era `md:grid-cols-4` con cuatro celdas. Con dos, esa rejilla las dejaba
+                encogidas contra el borde izquierdo y media sección vacía a la derecha;
+                `max-w-2xl mx-auto` las centra y les devuelve un ancho razonable dentro
+                del contenedor de 6xl. */}
+            <div className="grid grid-cols-2 gap-8 max-w-2xl mx-auto">
               {stats.map((stat, index) => (
                 <div 
                   key={index} 
