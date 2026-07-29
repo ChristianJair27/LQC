@@ -759,7 +759,7 @@ export default function Registro() {
         <section className="py-32 md:py-40">
           <div className="container mx-auto px-6 max-w-4xl text-center">
             <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent mb-6">
-              LQC Split Primavera 2026
+              LQC Split Otoño 2026
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
               Formulario de registro por jugador
@@ -1189,7 +1189,7 @@ export default function Registro() {
                         <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
                         <span className="text-gray-300">
                           <span className="text-white font-medium">Finalidad:</span> organización,
-                          logística y comunicación del evento LQC Split Primavera 2026.
+                          logística y comunicación del evento LQC Split Otoño 2026.
                         </span>
                       </li>
                       <li className="flex items-start gap-3">

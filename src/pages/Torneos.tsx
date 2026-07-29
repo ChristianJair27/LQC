@@ -272,13 +272,25 @@ export default function Torneos() {
           <div className="container mx-auto px-6 max-w-4xl text-center">
             <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-12 shadow-2xl shadow-black/50">
               <h2 className="text-3xl font-light mb-6">Próxima Temporada</h2>
-              <p className="text-xl text-gray-300 mb-10">Invierno 2026 • ¡Prepárate!</p>
+              {/* Decía «Invierno 2026», que no era la temporada siguiente sino ESTA misma con
+                  otro nombre, según confirmaron los organizadores.
+                  El encabezado «Próxima» es correcto al 2026-07-28 porque la temporada todavía
+                  no arrancó, pero CADUCA SOLO: los organizadores dicen que la liga empieza el
+                  25/08/2026, así que a partir de esa fecha hay que cambiarlo a mano por
+                  «Temporada Actual». Nada en el código avisa cuando eso pase. */}
+              <p className="text-xl text-gray-300 mb-10">Otoño 2026 • ¡Prepárate!</p>
 
+              {/* Acá había un tercer dato, «Enero / Inicio», y se BORRÓ en vez de corregirse.
+                  Se sabe falso: la liga empieza el 25/08/2026 según los organizadores. Quedaba
+                  además contradiciendo al nombre de acá arriba —una temporada de otoño que
+                  arranca en enero—, así que renombrar y dejarlo era publicar el error más
+                  grande que antes. Borrar un dato falso no es inventar uno nuevo; poner
+                  «25 ago» sí habría sido meter una fecha, y este cambio era solo de nombre.
+                  El tile vuelve el día que los organizadores den una fecha para publicar.
+                  Los otros dos que SIGUEN acá, «20+ equipos» y «$50K+», están hardcodeados
+                  desde antes y nunca se verificaron. No se sabe que sean falsos, por eso no se
+                  tocaron; tampoco se sabe que sean ciertos. Confirmarlos aparte. */}
               <div className="flex flex-wrap justify-center gap-12 mb-12">
-                <div>
-                  <div className="text-4xl font-light text-white">Enero</div>
-                  <div className="text-sm text-gray-400">Inicio</div>
-                </div>
                 <div>
                   <div className="text-4xl font-light text-white">20+</div>
                   <div className="text-sm text-gray-400">Equipos</div>

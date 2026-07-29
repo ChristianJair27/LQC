@@ -131,7 +131,7 @@ export default function Home() {
               
               <div className="inline-flex items-center gap-4 mt-4">
                 <span className="px-5 py-2 text-base bg-blue-950/40 text-blue-300 backdrop-blur-sm border border-blue-800/30 rounded-full shadow-lg">
-                  Primavera 2026
+                  Otoño 2026
                 </span>
               </div>
 
@@ -375,7 +375,7 @@ export default function Home() {
                           </div>
                           <div className="text-center space-y-3">
                             <h3 className="text-2xl font-medium">{sponsor.name}</h3>
-                            <p className="text-gray-400">Patrocinador oficial LQC Primavera 2026</p>
+                            <p className="text-gray-400">Patrocinador oficial LQC Otoño 2026</p>
                           </div>
                           <a
                             href={sponsor.url}
