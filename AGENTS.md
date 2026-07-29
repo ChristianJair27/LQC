@@ -46,34 +46,40 @@ resultado es ok o error. (El `.select()` posterior al UPDATE de archivado **sí*
 conservó, pero con otro propósito: comprobar que alcanzó una fila visible, o sea
 0 filas = error.)
 
-**Escribir en las tablas del registro dispara efectos FUERA de este repo.** Hay triggers de
-PostgreSQL en Supabase que sincronizan con **ATAK.GG** vía `pg_net`: archivar o
-restaurar un equipo lo da de baja o lo vuelve a inscribir en el torneo. Con el modelo
-nuevo ese trigger cuelga de **`equipos.archivado_en`** (antes era
-`inscripciones.archivado_en`). **De esos triggers no hay una sola línea en el
-repo** —ni webhook, ni edge function, ni carpeta `supabase/`—, así que grepear el
-código y no encontrar nada **no** prueba que la integración no exista: ya llevó a
-un agente a concluir exactamente eso. (Ojo: `src/lib/atak.ts` **sí** es código de
-ATAK, pero es otra cosa —la validación del Riot ID contra la API pública— y no
-tiene nada que ver con la sincronización por triggers.) Antes de afirmar nada sobre ATAK.GG, leé
-**[docs/INTEGRACION-ATAK.md](./docs/INTEGRACION-ATAK.md)**, que documenta los
-triggers, el riesgo vigente (las llamadas son **fire-and-forget**: `pg_net` no le
-devuelve el resultado al trigger, así que si la llamada falla o ATAK la rechaza
-—un 409 por el límite de 7 jugadores— la escritura local sale bien igual y las
-dos bases divergen sin un solo aviso) y cómo diagnosticarlo con
-`net._http_response`.
+**Registrar o archivar un equipo dispara efectos FUERA de este repo.** Hay PL/pgSQL en
+Supabase que sincroniza con **ATAK.GG** vía `pg_net`, por **dos caminos y solo uno es
+un trigger** (verificado en producción el 2026-07-29):
+
+- **Alta: NO es un trigger.** La propia RPC `registrar_equipo` llama al final de su
+  transacción a `atak_enviar('/register-team', armar_roster_atak(id))`. Se hace así a
+  propósito: un `AFTER INSERT` sobre `equipos` correría **antes** de que se inserte el
+  roster y mandaría un equipo con cero jugadores.
+- **Baja y alta por archivado: sí es trigger.** `trg_atak_equipo`, `AFTER UPDATE OF
+  archivado_en ON public.equipos`, con `WHEN (old IS DISTINCT FROM new)` para que
+  marcar pago o guardar notas no disparen nada. Archivar llama a `/unregister`;
+  restaurar, a `/register-team`.
+
+`/register-team` es **atómico e idempotente** del lado de ATAK (lock de fila, y el
+roster enviado reemplaza al que hubiera), así que reenviarlo es la forma barata de
+reparar una llamada perdida.
+
+**De nada de esto hay una sola línea en el repo** —ni webhook, ni edge function, ni
+carpeta `supabase/`—, así que grepear el código y no encontrar nada **no** prueba que
+la integración no exista: ya llevó a un agente a concluir exactamente eso. (Ojo:
+`src/lib/atak.ts` **sí** es código de ATAK, pero es otra cosa —la validación del Riot
+ID contra la API pública— y no tiene nada que ver con esta sincronización.)
+Antes de afirmar nada sobre ATAK.GG, leé
+**[docs/INTEGRACION-ATAK.md](./docs/INTEGRACION-ATAK.md)**, que documenta los dos
+caminos con su SQL, el riesgo vigente (las llamadas son **fire-and-forget**: `pg_net`
+no devuelve el resultado a quien la hizo, así que si la llamada falla o ATAK la
+rechaza, la escritura local sale bien igual y las dos bases divergen sin un solo
+aviso) y cómo diagnosticarlo con `net._http_response`. Ese archivo conserva además,
+en una sección marcada como histórica, los triggers viejos sobre `inscripciones`:
+sirven para entender por qué las cosas son como son, pero **no corren para nada
+nuevo**.
 
 (El sitio además pide fuentes a Google Fonts desde `index.html`, pero eso no manda
 datos de nadie.)
-
-**SIN CONFIRMAR — el alta.** `docs/INTEGRACION-ATAK.md` documenta un `AFTER INSERT`
-sobre `inscripciones` que daba de alta cada registro en ATAK. Esa tabla ya no recibe
-registros, así que **queda sin verificar desde el repo si la RPC `registrar_equipo`
-notifica el alta a ATAK** (por trigger sobre `equipos`/`jugadores`, desde la propia
-función, o de ninguna manera). No lo asumas en ningún sentido: comprobalo contra la
-base antes de afirmarlo. Si no notificara, ningún equipo nuevo llegaría a ATAK **y
-nada en el sitio lo delataría**, que es exactamente la falla silenciosa que ya
-documenta el incidente registrado de ese archivo.
 
 La RLS con el modelo nuevo:
 

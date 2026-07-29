@@ -1,11 +1,13 @@
 # Integración con ATAK.GG
 
 **La sincronización con ATAK YA FUNCIONA en producción, pero no vive en este
-repo.** Está implementada como **triggers de PostgreSQL dentro de Supabase**, así
-que es invisible para cualquiera que solo lea el código del sitio.
+repo.** Está implementada **dentro de Supabase**, en PL/pgSQL: en parte como un
+**trigger** y en parte como una **llamada explícita desde la función de registro**
+(ver «Estado vigente»). En cualquier caso es invisible para quien solo lea el
+código del sitio.
 
 Cuidado con generalizar eso: el sitio habla con ATAK por **dos vías distintas**.
-Los triggers (esta sección y las que siguen) no están en el repo. La **validación
+Lo de Supabase (esta sección y las que siguen) no está en el repo. La **validación
 del Riot ID** contra la API pública sí está, en `src/lib/atak.ts`, y se documenta
 [más abajo](#api-pública-validación-de-riot-id-esto-sí-vive-en-el-repo).
 
@@ -20,41 +22,82 @@ fuente de verdad es la base.
 
 ---
 
-## ⚠️ Este documento describe el modelo VIEJO (`inscripciones`)
+## Estado vigente — modelo `equipos` + `jugadores`
 
-**El 2026-07-29 el registro se migró a `public.equipos` + `public.jugadores`** (ver
+**Todo lo de esta sección está verificado en producción el 2026-07-29**, el mismo día
+en que el registro se migró de
+`public.inscripciones` a `public.equipos` + `public.jugadores` (ver
 [AGENTS.md](../AGENTS.md), «Modelo de datos»). `inscripciones` sigue existiendo pero
-**ya no recibe registros**, así que **todo el SQL de este archivo apunta a una tabla
-que dejó de usarse**. Lo que se sabe del estado actual:
+**ya no recibe registros**, y la sincronización con ATAK se movió entera al modelo
+nuevo. Hay [una sección histórica](#histórico-los-triggers-sobre-inscripciones) al
+final con lo que había antes.
 
-- **Baja/alta (archivar/restaurar): migrado.** El trigger equivalente cuelga ahora de
-  **`equipos.archivado_en`**. El panel escribe esa columna con
-  `UPDATE ... .eq('id', equipo.id)`, una sola fila.
-- **Alta al registrarse: SIN CONFIRMAR.** El registro entra por la RPC
-  `registrar_equipo`, no por un INSERT del cliente. **No está verificado desde el repo
-  si esa función notifica el alta a ATAK.** Compruébalo contra la base —no lo asumas
-  en ningún sentido— antes de afirmar nada: si no notificara, ningún equipo nuevo
-  llegaría a ATAK y, por lo de más abajo, **nada lo delataría**.
+Son **dos caminos, y solo uno es un trigger**:
 
-Todo lo demás de este archivo —el porqué del `http://` interno, el alias de red
-`atak-backend`, cómo diagnosticar con `net._http_response`, el límite de 7 jugadores
-y, sobre todo, que las llamadas son **fire-and-forget**— sigue vigente tal cual:
-describe el transporte, no el esquema.
+| Qué | Cómo se dispara | Llamada |
+| --- | --- | --- |
+| **Alta** al registrarse | **NO es un trigger.** Lo llama `public.registrar_equipo` al final de su propia transacción | `POST /register-team` |
+| **Baja y alta por archivado** | Trigger `trg_atak_equipo`, `AFTER UPDATE OF archivado_en ON public.equipos` | `POST /unregister` al archivar, `POST /register-team` al restaurar |
+
+Las dos usan la extensión **`pg_net`** (HTTP asíncrono desde Postgres) a través de
+`public.atak_enviar`, igual que antes.
 
 ---
 
-## Qué hace
+## Alta: por qué NO es un trigger
 
-Dos triggers sobre `public.inscripciones` llaman a la API de ATAK.GG usando la
-extensión **`pg_net`** (HTTP asíncrono desde Postgres).
+Es la decisión menos obvia de toda la integración y conviene que quede escrita,
+porque «esto debería ser un trigger» es la primera reacción de cualquiera que lo
+lea.
 
-| Trigger | Cuándo | Llamada |
-| --- | --- | --- |
-| `AFTER INSERT` | alguien completa `/registro` | `POST /register` — alta del equipo o del jugador |
-| `AFTER UPDATE OF archivado_en` | el panel archiva o restaura | `POST /unregister` al archivar, `POST /register` al restaurar |
+**Un `AFTER INSERT` sobre `equipos` vería CERO jugadores.** `registrar_equipo`
+inserta primero la fila del equipo y **después** el roster, así que un trigger por
+fila sobre `equipos` correría en el medio, cuando todavía no hay ni un jugador que
+mandar: ATAK daría de alta un equipo vacío. Por eso el alta la dispara la **propia
+función**, al final, cuando la transacción ya tiene todo:
 
-El segundo trigger tiene una **cláusula `WHEN`** para que **marcar pago o guardar
-notas NO disparen nada**. Son dos filtros superpuestos:
+```sql
+-- dentro de public.registrar_equipo(datos jsonb), al final
+perform public.atak_enviar('/register-team', public.armar_roster_atak(id));
+```
+
+**Verificado el 2026-07-29:** respondió **200** con
+`{"ok":true,"action":"team_created","teamSize":5}`.
+
+---
+
+## `public.armar_roster_atak(p_equipo_id uuid)`
+
+Arma el payload que ATAK espera, a partir de un `equipo_id`:
+
+```
+{ equipo, capitan_nombre, capitan_celular, jugadores: [ ... ] }
+```
+
+con los jugadores **ordenados por `orden`** — el mismo orden que decidió quién es
+titular y quién suplente al registrarse.
+
+La usan **los dos** caminos que dan de alta: `registrar_equipo` y el desarchivado
+del trigger. Existe justamente para que no haya dos versiones del payload que se
+puedan desfasar.
+
+---
+
+## Trigger de archivado: `trg_atak_equipo`
+
+```sql
+after update of archivado_en on public.equipos
+for each row
+when (old.archivado_en is distinct from new.archivado_en)
+```
+
+- `archivado_en` **no nulo** → `POST /unregister` (baja del torneo).
+- `archivado_en` **nulo** → `POST /register-team` con el roster completo (alta otra vez).
+
+**Verificado el 2026-07-29:** archivar respondió **`team_deleted`**.
+
+La cláusula `WHEN` está para que **marcar pago o guardar notas NO disparen nada**.
+Son dos filtros superpuestos y vale la pena conservar los dos:
 
 1. `UPDATE OF archivado_en` — el trigger ni se considera si la sentencia no
    menciona esa columna. Las escrituras de pago (`pagado`, `pagado_en`) y de
@@ -62,16 +105,31 @@ notas NO disparen nada**. Son dos filtros superpuestos:
 2. `WHEN (old.archivado_en IS DISTINCT FROM new.archivado_en)` — aunque una
    sentencia futura sí la incluyera, si el valor no cambia no se llama a ATAK.
 
-Vale la pena conservar los dos: el primero solo mira las columnas *listadas* en
-el `UPDATE`, no si cambiaron. El segundo es el que garantiza que hubo un cambio
-real.
+El primero solo mira las columnas *listadas* en el `UPDATE`, no si cambiaron. El
+segundo es el que garantiza que hubo un cambio real.
+
+---
+
+## `/register-team` es idempotente
+
+**Del lado de ATAK el endpoint es atómico** (toma un lock de fila) y **el roster que
+se manda REEMPLAZA al que hubiera**. O sea: **reenviarlo es seguro**.
+
+Esto es lo que hace barata la recuperación cuando una llamada se pierde —que, por lo
+de más abajo, ocurre en silencio—: no hay que averiguar en qué estado quedó ATAK ni
+limpiar nada antes. Se vuelve a mandar el roster y las dos bases quedan iguales:
+
+```sql
+select public.atak_enviar('/register-team', public.armar_roster_atak('<equipo_id>'));
+```
 
 ---
 
 ## Función central: `public.atak_enviar`
 
-Centraliza la URL y el secreto en un solo lugar, para que los triggers no los
-repitan y rotar el secreto sea un cambio de una línea.
+Centraliza la URL y el secreto en un solo lugar, para que ni el trigger ni
+`registrar_equipo` los repitan y rotar el secreto sea un cambio de una línea. **No
+cambió con la migración**: es la única pieza que quedó igual.
 
 ```sql
 create or replace function public.atak_enviar(ruta text, cuerpo jsonb)
@@ -93,43 +151,6 @@ begin
   );
 end;
 $$;
-```
-
-```sql
--- Alta: cada fila nueva de /registro
-create or replace function public.atak_on_insert()
-returns trigger language plpgsql security definer as $$
-begin
-  perform public.atak_enviar('/register', to_jsonb(new));
-  return new;
-end;
-$$;
-
-create trigger atak_inscripcion_insert
-  after insert on public.inscripciones
-  for each row
-  execute function public.atak_on_insert();
-```
-
-```sql
--- Archivar / restaurar
-create or replace function public.atak_on_archivado()
-returns trigger language plpgsql security definer as $$
-begin
-  if new.archivado_en is not null then
-    perform public.atak_enviar('/unregister', to_jsonb(new));
-  else
-    perform public.atak_enviar('/register', to_jsonb(new));
-  end if;
-  return new;
-end;
-$$;
-
-create trigger atak_inscripcion_archivado
-  after update of archivado_en on public.inscripciones
-  for each row
-  when (old.archivado_en is distinct from new.archivado_en)
-  execute function public.atak_on_archivado();
 ```
 
 ---
@@ -213,8 +234,9 @@ escritura.
 ## Incidente registrado
 
 **Un equipo archivado en el panel que siguió inscrito en el torneo.** Caso real,
-ya corregido. Se deja escrito porque es la forma exacta que toma esta falla
-cuando ocurre.
+ya corregido. Ocurrió con el modelo viejo, pero **la falla no era del esquema sino
+del transporte**, así que se deja escrito tal cual: es la forma exacta que toma
+cuando ocurre, y con `equipos` puede volver a ocurrir igual.
 
 **Qué pasó.** Se archivó un equipo desde `/admin` mientras el hostname viejo ya
 no resolvía. El trigger sí disparó —la escritura local fue normal—, pero `pg_net`
@@ -228,13 +250,20 @@ inscrito en el torneo de ATAK.GG**. El panel mostraba una cosa y el bracket otra
 **Cómo se detectó.** Consultando `net._http_response` (ver arriba): la fila de esa
 escritura tenía `status_code` nulo y el `error_msg` de resolución de nombre.
 
-**Cómo se corrigió.** Llamando a la función a mano, con el equipo afectado:
+**Cómo se corrigió.** Llamando a la función a mano, con el equipo afectado (forma
+del **modelo viejo**, que identificaba al equipo por su nombre):
 
 ```sql
 select public.atak_enviar('/unregister', jsonb_build_object('equipo', '<nombre>'));
 ```
 
 Respondió `team_deleted`, y las dos bases volvieron a coincidir.
+
+**Hoy, para el caso inverso** —un alta que no llegó— la reparación es reenviar el
+roster, que es idempotente (ver [`/register-team` es
+idempotente](#register-team-es-idempotente)). Para una baja que no llegó, confirmá
+la forma del payload de `/unregister` contra la definición del trigger antes de
+llamarlo a mano: la de arriba es la del esquema que ya no está.
 
 **La lección, que sigue vigente con el alias puesto:** las llamadas son
 **fire-and-forget**. `pg_net` no devuelve el resultado al trigger, así que si el
@@ -249,28 +278,37 @@ que importe.
 
 ## Respuestas esperadas
 
-| Respuesta | Significa |
-| --- | --- |
-| `team_created` | se creó el equipo en ATAK |
-| `player_added` | se agregó un jugador a un equipo existente |
-| `player_updated` | el jugador ya estaba y se actualizaron sus datos |
-| `player_removed` | se quitó un jugador del equipo |
-| `team_deleted` | se eliminó el equipo (se archivó su última inscripción) |
-| `already_absent` | no había nada que quitar; la baja es idempotente |
+El cuerpo llega como `{"ok":true,"action":"…"}`, y en `/register-team` además con
+`teamSize`.
+
+| Respuesta | De | Significa |
+| --- | --- | --- |
+| `team_created` | `/register-team` | se creó el equipo en ATAK con su roster. **Confirmada el 2026-07-29** (`{"ok":true,"action":"team_created","teamSize":5}`) |
+| `team_deleted` | `/unregister` | se dio de baja el equipo del torneo. **Confirmada el 2026-07-29** |
+
+Las respuestas a nivel JUGADOR que documentaba este archivo —`player_added`,
+`player_updated`, `player_removed`— eran del endpoint `/register` del modelo viejo,
+que daba de alta **de a un jugador por vez** porque cada fila de `inscripciones` era
+una persona. Con `/register-team` la unidad es el equipo entero, así que no
+aparecen. `already_absent` (baja idempotente, no había nada que quitar) se
+documentaba para `/unregister` y no se volvió a comprobar con el modelo nuevo.
 
 ---
 
 ## Límite de 7 jugadores por equipo
 
-**Del lado de ATAK**, un equipo admite **como máximo 7 jugadores**. El octavo
-registro devuelve **409**.
+**Del lado de ATAK**, un equipo admite **como máximo 7 jugadores**.
 
-**Ese 409 NO bloquea el insert local.** La fila entra igual en
-`public.inscripciones`, el jugador ve la confirmación de `/registro` y aparece en
-el panel. O sea: **las dos bases divergen** y el sitio no muestra ninguna señal.
+**Con el modelo nuevo el sitio ya no puede empujar un octavo.** El formulario de
+`/registro` permite entre 5 y 7 tarjetas, y `registrar_equipo` valida el tamaño
+**antes** de insertar nada: un roster de más devuelve `max_jugadores` y no escribe
+ni una fila. O sea que el escenario viejo —el jugador nº 8 entraba local igual y las
+dos bases divergían— **ya no puede originarse desde el sitio**.
 
-Hay que **detectarlo a mano** revisando `net._http_response` en busca de 409, o
-comparando el conteo de jugadores del panel contra el de ATAK.
+Lo que sigue en pie: el límite es de ATAK, no nuestro, y una escritura hecha
+directamente en la base saltea esa validación. Si eso pasa, se **detecta a mano**
+revisando `net._http_response`, o comparando el conteo de jugadores del panel contra
+el de ATAK.
 
 ---
 
@@ -325,11 +363,82 @@ curl -s -D - -o /dev/null -H "Origin: https://lqc.revolution505.com" \
 
 ## Un `DELETE` directo en SQL no dispara nada
 
-Los triggers son de `INSERT` y `UPDATE` **solamente**. Si alguien borra filas con
-un `DELETE` a mano en la base, **ATAK no se entera**: el equipo se queda inscrito
-en el torneo sin ninguna fila local que lo respalde.
+El único trigger es de `UPDATE OF archivado_en`, y el alta la dispara
+`registrar_equipo`. **Ninguna de las dos cosas se entera de un `DELETE`.** Si
+alguien borra filas de `equipos` o de `jugadores` a mano en la base, **ATAK no se
+entera**: el equipo se queda inscrito en el torneo sin ninguna fila local que lo
+respalde.
 
 Es una razón más para la regla que el panel ya sigue: **nunca borrar, archivar**
-(`archivado_en`), que es la operación que sí propaga. La tabla además no tiene
+(`archivado_en`), que es la operación que sí propaga. Las tablas además no tienen
 política de DELETE para la app, así que un borrado solo puede venir de alguien
 entrando a la base directamente.
+
+**Ojo con `jugadores`:** borrar una fila de ahí tampoco avisa a nadie, y como el
+roster que ATAK tiene es el que se le mandó la última vez, el equipo seguiría allá
+con el jugador borrado. Para sincronizar después de tocar el roster a mano hay que
+reenviarlo (es idempotente, ver arriba).
+
+---
+
+## Histórico: los triggers sobre `inscripciones`
+
+**Ya no corren para nada nuevo** — `inscripciones` no recibe registros desde el
+2026-07-29. Se conserva porque explica por qué varias cosas son como son: el
+[incidente registrado](#incidente-registrado) ocurrió con este esquema, y la tabla de
+respuestas a nivel jugador (`player_added`, `player_updated`, `player_removed`) solo
+tiene sentido leyéndolo.
+
+Eran **dos** triggers sobre `public.inscripciones`, donde **una fila era un jugador**
+y el equipo era un string repetido:
+
+| Trigger | Cuándo | Llamada |
+| --- | --- | --- |
+| `atak_inscripcion_insert` (`AFTER INSERT`) | alguien completaba `/registro` | `POST /register` — alta **de un jugador** |
+| `atak_inscripcion_archivado` (`AFTER UPDATE OF archivado_en`) | el panel archivaba o restauraba | `POST /unregister` / `POST /register` |
+
+```sql
+-- Alta: cada fila nueva de /registro
+create or replace function public.atak_on_insert()
+returns trigger language plpgsql security definer as $$
+begin
+  perform public.atak_enviar('/register', to_jsonb(new));
+  return new;
+end;
+$$;
+
+create trigger atak_inscripcion_insert
+  after insert on public.inscripciones
+  for each row
+  execute function public.atak_on_insert();
+```
+
+```sql
+-- Archivar / restaurar
+create or replace function public.atak_on_archivado()
+returns trigger language plpgsql security definer as $$
+begin
+  if new.archivado_en is not null then
+    perform public.atak_enviar('/unregister', to_jsonb(new));
+  else
+    perform public.atak_enviar('/register', to_jsonb(new));
+  end if;
+  return new;
+end;
+$$;
+
+create trigger atak_inscripcion_archivado
+  after update of archivado_en on public.inscripciones
+  for each row
+  when (old.archivado_en is distinct from new.archivado_en)
+  execute function public.atak_on_archivado();
+```
+
+**Las dos diferencias que más importan** frente a lo vigente:
+
+1. El alta **sí** era un trigger, y podía serlo porque el INSERT de una fila ya
+   traía al jugador entero (`to_jsonb(new)`). Con `equipos` eso deja de funcionar:
+   la fila del equipo se inserta antes que su roster, así que un trigger equivalente
+   mandaría un equipo vacío. De ahí que ahora la llame `registrar_equipo`.
+2. El archivado se disparaba **una vez por cada fila del equipo** —de ahí el estado
+   `'parcial'` que tenía el panel—. Hoy es un solo UPDATE sobre una sola fila.
