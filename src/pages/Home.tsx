@@ -156,7 +156,7 @@ export default function Home() {
                   className={CLASE_CTA_PRIMARIO}
                 >
                   <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
-                  Registrarme
+                  Registrar equipo
                   <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
                 </Link>
                 <p className="text-sm text-gray-400">Inscripciones abiertas</p>
@@ -309,18 +309,21 @@ export default function Home() {
             Hero (sin fondo) → Transmisión (sin fondo) → este CTA (tintado) → Patrocinadores
             (sin fondo). Y de paso el tinte ayuda a que el bloque se despegue.
             El texto no promete fechas, cupos ni premios: nada de eso está confirmado. Lo que
-            dice del registro por jugador sí lo está (ver Registro.tsx y la FAQ de Contacto). */}
+            dice del roster sí lo está: son los mismos MIN_JUGADORES y MAX_JUGADORES que
+            /registro hace cumplir y que la RPC valida (ver Registro.tsx y la FAQ de
+            Contacto). */}
         <section className="py-20 bg-black/20">
           <div className="container mx-auto px-6 max-w-4xl text-center">
             {/* Tarjeta oscura de CTA, con el gradiente que AGENTS.md marca como canon. */}
             <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-10 md:p-12 shadow-2xl shadow-black/50">
               <h2 className="text-3xl font-light mb-4">¿Vas a competir?</h2>
               <p className="text-lg text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-                El registro es por jugador: cada integrante del equipo llena sus propios datos.
+                El capitán registra al equipo completo en un solo envío: un roster de 5 a
+                7 jugadores.
               </p>
               <Link to="/registro" onClick={irAlTope} className={CLASE_CTA_PRIMARIO}>
                 <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
-                Registrarme
+                Registrar equipo
                 <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
               </Link>
             </div>

@@ -56,14 +56,20 @@ const canales = [
 ]
 
 export default function Contacto() {
+  /* OJO: estas respuestas describen el modelo de registro, así que envejecen con él.
+     Los números del roster (5 a 7, 5 titulares) y la lista de campos que se piden son
+     los de `src/pages/Registro.tsx` —MIN_JUGADORES, MAX_JUGADORES, TITULARES y los
+     campos del payload— y los hace cumplir la RPC `registrar_equipo`. Si cambian ahí,
+     hay que tocarlos acá y en la tarjeta CTA de Home.tsx: son tres copias en prosa que
+     nada sincroniza. Nada de fechas, cupos ni premios: no están confirmados. */
   const faqs = [
     {
       question: "¿Cómo puedo inscribir a mi equipo?",
-      answer: "El registro está en la sección Registro del menú: es un formulario por jugador, así que cada integrante llena sus propios datos. El pago de inscripción, en cambio, es uno solo por equipo y lo realiza el capitán."
+      answer: "Lo hace el capitán, desde la sección Registro del menú: en un solo envío registra al equipo completo con su roster de 5 a 7 jugadores —los 5 primeros quedan como titulares y del 6º en adelante como suplentes—. De cada jugador se piden Riot ID, nombre, fecha de nacimiento, celular, correo, municipio, escolaridad y género; del capitán, su Riot ID y su celular. Conviene tenerlo todo a mano antes de empezar."
     },
     {
       question: "¿Cuáles son los requisitos para participar?",
-      answer: "Ser mayor de 16 años, residir en Querétaro o zonas cercanas, y formar un equipo completo (5 jugadores + suplentes opcionales)."
+      answer: "Tener al menos 16 años cumplidos, residir en Querétaro o zonas cercanas, y formar un equipo de 5 a 7 jugadores: 5 titulares y hasta 2 suplentes."
     },
     {
       question: "¿Hay algún costo de inscripción?",
