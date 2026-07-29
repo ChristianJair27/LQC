@@ -1,24 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { FileText, ExternalLink, Download, AlertCircle } from 'lucide-react'
-
-/* Ruta del PDF dentro de public/. Vivía en Footer.tsx mientras el pie enlazaba el archivo
-   directo; ahora el pie apunta a esta página y esta página es la ÚNICA que toca el archivo,
-   así que la constante se muda acá, al lado de su único consumidor. Si algún día la necesita
-   un segundo lugar, ahí sí conviene un módulo compartido — no antes.
-   El año va en el nombre para poder subir el de 2027 al lado sin romper enlaces ya
-   compartidos, lo que obliga a NO borrar el viejo. */
-const RUTA_REGLAMENTO = '/reglamento-lqc-2026.pdf'
-
-/* Nombre con el que se guarda el archivo al descargarlo: legible para una persona, no el
-   slug de la URL. `download` solo respeta esto en descargas del mismo origen — es el caso,
-   el PDF sale de public/. */
-const NOMBRE_DESCARGA = 'Reglamento LQC 2026.pdf'
-
-/* Peso real del archivo (346 960 bytes ≈ 338,8 KiB), redondeado como lo muestra un
-   explorador de archivos. Va a la vista para que quien está con datos móviles decida ANTES
-   de bajarlo. Está escrito a mano: si se reemplaza el PDF hay que actualizarlo acá, no se
-   calcula solo. */
-const PESO_REGLAMENTO = '339 KB'
+/* La ruta, el nombre de descarga y el peso del PDF ya no viven acá: los comparte esta
+   página con la tarjeta del reglamento de /registro. Ver src/lib/reglamento.ts. */
+import { RUTA_REGLAMENTO, NOMBRE_DESCARGA, PESO_REGLAMENTO } from '../lib/reglamento'
 
 /* Condición para montar el visor. El ancho SOLO no alcanza, y ese fue el primer intento:
    lo que hay que saber es "¿este navegador sabe dibujar un PDF embebido?", no "¿la pantalla
@@ -64,9 +48,10 @@ function leerVisorDisponible(): boolean {
 }
 
 /* El visor se MONTA o NO se monta, en vez de esconderse con `hidden md:block`.
-   La diferencia importa: con CSS el <object> sigue en el DOM y el navegador puede bajar los
-   339 KB igual en un celular — exactamente el gasto que esta página intenta que el usuario
-   decida. Montándolo condicionalmente, en pantalla chica el PDF ni se pide.
+   La diferencia importa: con CSS el <object> sigue en el DOM y el navegador puede bajar el
+   PDF entero igual en un celular — exactamente el gasto que esta página intenta que el
+   usuario decida. Montándolo condicionalmente, en pantalla chica el PDF ni se pide.
+   (El peso no se escribe acá: es PESO_REGLAMENTO, en src/lib/reglamento.ts.)
    Va con useSyncExternalStore y no con useState+useEffect porque matchMedia es literalmente
    un store externo: así el primer render ya sale con el valor correcto (nada de aparecer de
    un salto en escritorio) y React resincroniza solo al suscribirse, sin el setState dentro

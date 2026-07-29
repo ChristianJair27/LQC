@@ -4,9 +4,10 @@ import {
   Users, Gamepad2, User, Calendar, Phone, GraduationCap,
   MapPin, Mail, UserCircle, ShieldCheck, CreditCard,
   Send, CheckCircle, AlertCircle, Check, Facebook, MessageSquare,
-  Loader2, UserPlus, Trash2
+  Loader2, UserPlus, Trash2, FileText, ExternalLink, Download
 } from 'lucide-react'
 import { obtenerSupabase } from '../lib/supabase'
+import { RUTA_REGLAMENTO, NOMBRE_DESCARGA, PESO_REGLAMENTO } from '../lib/reglamento'
 import { validarRiotId } from '../lib/atak'
 import type { ResultadoRiotId } from '../lib/atak'
 
@@ -479,13 +480,40 @@ function TituloSeccion({ children }: { children: React.ReactNode }) {
 const CLASE_TARJETA =
   'bg-black/30 backdrop-blur-sm border border-white/5 rounded-2xl p-6 md:p-8'
 
-/* Pastillas de comunidad del estado de éxito. `after:hidden` desactiva la barra
-   de gradiente que la regla base `a::after` de index.css dibuja en hover. */
+/* Enlace secundario de la página, relleno fantasma: las pastillas de comunidad del
+   estado de éxito y la descarga del PDF en la tarjeta del reglamento. (Se llama
+   «COMUNIDAD» por el primer uso, y el nombre se conserva porque tres archivos lo citan
+   por nombre en sus comentarios —Reglamento.tsx, Contacto.tsx y Footer.tsx— para
+   señalar el mismo patrón.) `after:hidden` desactiva la barra de gradiente que la regla
+   base `a::after` de index.css dibuja en hover. */
 const CLASE_ENLACE_COMUNIDAD =
   'after:hidden inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl ' +
   'bg-black/40 border border-white/10 text-blue-300 ' +
   'hover:text-white hover:bg-blue-950/40 hover:border-blue-500/50 transition-all duration-300 ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+
+/* Acción principal de la tarjeta del reglamento. NO lleva el gradiente del canon del
+   CTA primario, y eso es deliberado: el CTA primario de esta página es «Registrar
+   equipo», el botón de envío a ancho completo que está dos secciones más abajo. Un
+   segundo botón relleno con el mismo gradiente lo empata y deja de haber un solo camino
+   obvio — la trampa que AGENTS.md documenta al revés (secundarios que se ven más
+   vívidos que el primario).
+   Así que queda un secundario reforzado: mismo esqueleto que CLASE_ENLACE_COMUNIDAD,
+   pero con el borde y el texto en el acento para que gane a la descarga, que reutiliza
+   ese secundario tal cual. Las dos van con `sm:flex-1` en el markup: sin eso el ancho lo
+   pone el largo del texto y «Ver reglamento» quedaba MÁS ANGOSTO que «Descargar PDF
+   (339 KB)», o sea la acción principal era la más chica de las dos.
+   `after:hidden` desactiva la barra de gradiente que la regla base `a::after` de
+   index.css dibuja en hover, y el color va explícito porque `a { color: #66a3ff }` de la
+   misma capa base lo pisaría. `outline-hidden` y no `outline-none`: en Tailwind 4 el
+   segundo es `outline-style: none`, que en modo de contraste forzado deja el foco sin
+   ningún indicador, porque el `ring` es un box-shadow y ahí se descarta. */
+const CLASE_VER_REGLAMENTO =
+  'after:hidden inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl ' +
+  'bg-lqc-900/40 border border-lqc-accent/40 text-lqc-accent font-semibold ' +
+  'hover:bg-blue-950/60 hover:border-lqc-accent hover:text-white transition-all duration-300 ' +
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
 /* Botones del roster (agregar / quitar). `bg-none` desactiva el gradiente que la
@@ -1795,6 +1823,118 @@ export default function Registro() {
                         </div>
                       ))}
                     </dl>
+                  </div>
+                </div>
+
+                {/* Reglamento.
+                    Va acá, entre el pago y el aviso de privacidad, y no arriba del
+                    formulario: en este punto el capitán ya armó el roster y está a un
+                    paso de enviar, que es cuando de verdad le sirve saber si su equipo
+                    es elegible. Arriba lo leería antes de tener a quién comparar contra
+                    los requisitos.
+                    No es un enlace suelto sino una tarjeta con las dos formas de leerlo,
+                    con el mismo lenguaje de la tarjeta de pago (misma familia de
+                    gradiente, mismo azulejo de icono). */}
+                <div>
+                  <TituloSeccion>Reglamento</TituloSeccion>
+                  <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-sm border border-blue-800/30 rounded-2xl p-6 md:p-8 shadow-lqc">
+                    <div className="flex items-start gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-xl bg-black/40 border border-blue-700/40 flex items-center justify-center shrink-0">
+                        <FileText className="w-6 h-6 text-lqc-accent" aria-hidden="true" />
+                      </div>
+                      <div>
+                        {/* «registrar tu equipo» y no «enviar»: es la acción que nombra el
+                            botón de abajo, que dice «Registrar equipo». */}
+                        <p className="text-lg md:text-xl font-medium text-white mb-2">
+                          Léelo antes de registrar tu equipo
+                        </p>
+                        <p className="text-sm md:text-base text-gray-300 leading-relaxed">
+                          El reglamento oficial define{' '}
+                          <span className="text-white font-medium">quién puede jugar</span>, el{' '}
+                          <span className="text-white font-medium">formato de la competencia</span>{' '}
+                          y las{' '}
+                          <span className="text-white font-medium">sanciones</span>.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {/* Se abre en pestaña nueva por una razón que pesa más que cualquier
+                          otra: quien está acá tiene el formulario a medio llenar y sin
+                          guardado, así que navegar en la misma pestaña le borra el roster.
+                          Un <a> normal y no un <Link> de react-router porque con
+                          target="_blank" el navegador hace una carga completa igual: el
+                          Link no aportaría navegación del cliente y esta página no importa
+                          nada de react-router.
+                          Apunta a la PÁGINA y no al PDF a propósito: /reglamento es el
+                          destino canónico y en un teléfono —donde no monta el visor— es una
+                          tarjeta que ofrece abrir o descargar el archivo, no un error. */}
+                      <a
+                        href="/reglamento"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        /* Arranca con el texto visible EXACTO para no romper el control por
+                           voz (WCAG 2.5.3, "Label in Name") y recién después avisa lo que
+                           el texto no dice. Misma fórmula que los enlaces de comunidad de
+                           más arriba en este archivo. */
+                        aria-label="Ver reglamento (abre en pestaña nueva)"
+                        className={`${CLASE_VER_REGLAMENTO} sm:flex-1`}
+                      >
+                        <ExternalLink className="w-5 h-5 shrink-0" aria-hidden="true" />
+                        Ver reglamento
+                      </a>
+
+                      {/* Apunta al PDF directo y no a /reglamento: es una descarga, y
+                          `download` solo funciona sobre el archivo del mismo origen. */}
+                      <a
+                        href={RUTA_REGLAMENTO}
+                        download={NOMBRE_DESCARGA}
+                        aria-label={`Descargar PDF (${PESO_REGLAMENTO}) del reglamento de la LQC 2026`}
+                        className={`${CLASE_ENLACE_COMUNIDAD} sm:flex-1`}
+                      >
+                        <Download className="w-5 h-5 shrink-0" aria-hidden="true" />
+                        {/* El peso es texto visible, no solo del aria-label: la decisión de
+                            gastar datos móviles la toma quien ve la pantalla. */}
+                        Descargar PDF{' '}
+                        <span className="text-gray-400">({PESO_REGLAMENTO})</span>
+                      </a>
+                    </div>
+
+                    {/* HUECO RESERVADO: acá va la casilla «He leído y acepto el
+                        reglamento», y está vacío a propósito — no es un olvido.
+                        Todavía no se pone porque el PDF publicado tiene puntos que van a
+                        cambiar, y marcar una casilla es aceptar UN texto concreto: quien la
+                        marcara hoy estaría aceptando algo distinto de lo que va a regir.
+                        Y no se puede arreglar después, porque no hay dónde guardar QUÉ
+                        versión se aceptó: ni `equipos` ni `jugadores` tienen columna para
+                        eso y `PayloadRegistro` es un tipo cerrado. (Contacto sí hay —el
+                        payload manda celular y correo de cada jugador—, así que el problema
+                        no es no poder avisar: es que no quedaría registro de qué se aceptó.)
+                        Mejor ofrecer el reglamento sin exigir aceptación que exigir una
+                        aceptación que no dice de qué.
+
+                        Cuando el PDF quede firme, esto es lo que hay que sumar. OJO: las
+                        cinco cosas son de cliente nomás, igual que `aceptaPrivacidad`, que
+                        tampoco se persiste. Si lo que se quiere es una aceptación
+                        REGISTRADA con fecha y versión, eso además necesita columna nueva y
+                        cambiar la RPC `registrar_equipo`, que vive en Supabase y no en este
+                        repo (ver AGENTS.md).
+                          1. estado `aceptaReglamento` + su `setState`;
+                          2. el `id` del input DEBE ser igual a la clave de error
+                             ('reglamento'): `enfocarClave` hace getElementById y si no lo
+                             encuentra sale por un `return` sin error, o sea que el foco al
+                             primer campo inválido se rompe EN SILENCIO;
+                          3. la clave 'reglamento' en `ordenClaves()`, y va ANTES de
+                             'privacidad', no al final: ese arreglo es el orden VISUAL y de
+                             ahí sale a qué campo salta el foco;
+                          4. la validación dentro de `validar()`, con el mismo patrón que
+                             `if (!aceptaPrivacidad)`;
+                          5. el reset dentro de `reiniciar()`, junto a
+                             `setAceptaPrivacidad(false)`.
+                        Copiar el bloque del checkbox del aviso de privacidad de abajo: ya
+                        tiene el input sr-only + `peer`, el foco visible y el MensajeError
+                        cableados. (El tipo de errores no hay que tocarlo: `Errores` es
+                        `Record<string, string>`, cualquier clave ya es válida.) */}
                   </div>
                 </div>
 

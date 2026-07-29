@@ -131,10 +131,17 @@ src/
   lib/
     supabase.ts            cliente de Supabase (perezoso; devuelve null sin credenciales)
     atak.ts                API pública de ATAK.GG: valida un Riot ID; nunca lanza ni bloquea
-  pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro
+    reglamento.ts          ruta, nombre de descarga y peso del PDF del reglamento
+  pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro · Reglamento
     admin/                 panel protegido: Login · RutaProtegida · Panel · ListaInscripciones
-public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico
+public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico,
+                           reglamento-lqc-2026.pdf
 ```
+
+El PDF del reglamento lo enlazan **dos** páginas —`/reglamento` (visor + acciones) y la
+tarjeta del reglamento de `/registro`—, y por eso su ruta, su nombre de descarga y su
+**peso escrito a mano** viven en `src/lib/reglamento.ts` y no en una de las dos. Al
+reemplazar el PDF hay que actualizar `PESO_REGLAMENTO` ahí: no se calcula solo.
 
 Las páginas se cargan con `lazy()` + `<Suspense>`. Cada página es un archivo
 autocontenido con su markup y sus clases de Tailwind inline.
@@ -175,6 +182,12 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   Si el CTA es un `<a>` y no un `<button>`, agregarle `text-white`: la regla base
   `a { color: #66a3ff }` de `index.css` no da contraste sobre azul.
 - **Tarjetas oscuras de CTA:** `from-blue-950/30 to-lqc-900/20`.
+- **Secundario reforzado** (`CLASE_VER_REGLAMENTO` en `Registro.tsx`): `bg-lqc-900/40`
+  con `border-lqc-accent/40` y `text-lqc-accent`. Es para la acción principal **de una
+  tarjeta** cuando la página ya tiene su CTA primario en otra parte: el gradiente del
+  canon repetido dentro de una tarjeta empata al CTA real y deja de haber un solo camino
+  obvio. Va con `sm:flex-1` en las dos acciones de la tarjeta, o el ancho lo decide el
+  largo del texto y la principal puede terminar más angosta que la secundaria.
 - Al necesitar cian, usar el token `lqc-accent` — nunca `cyan-*` ni un morado.
 
 ## Reglas de trabajo
