@@ -77,6 +77,11 @@ Arma el payload que ATAK espera, a partir de un `equipo_id`:
 con los jugadores **ordenados por `orden`** — el mismo orden que decidió quién es
 titular y quién suplente al registrarse.
 
+**`capitan_nombre` lleva el RIOT ID del capitán**, no su nombre: es lo que ATAK espera
+en ese campo (confirmado por los organizadores el 2026-07-29). La clave se llama así
+por herencia del modelo viejo y **no se renombra** —el nombre es el mismo en la
+columna, en el payload de la RPC y acá—, pero lo que viaja es un `nombre#tag`.
+
 La usan **los dos** caminos que dan de alta: `registrar_equipo` y el desarchivado
 del trigger. Existe justamente para que no haya dos versiones del payload que se
 puedan desfasar.

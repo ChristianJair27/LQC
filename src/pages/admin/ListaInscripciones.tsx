@@ -201,7 +201,9 @@ const COLUMNAS_CSV = [
   'Municipio',
   'Correo',
   'Género',
-  'Capitán',
+  /* `capitan_nombre` lleva el Riot ID del capitán, no su nombre. El encabezado lo dice
+     para que quien abra el CSV no lo tome por un nombre mal escrito. */
+  'Riot ID del Capitán',
   'Celular del Capitán',
   'Pagado',
   'Fecha de Pago',
@@ -713,11 +715,24 @@ function TarjetaEquipo({
                   la tarjeta, que es donde el organizador está escaneando la lista. */}
               {incompleto && <BadgeRosterIncompleto cantidad={cantidad} />}
             </span>
+            {/* `capitan_nombre` guarda el RIOT ID del capitán, no su nombre —es lo que
+                espera ATAK en ese campo—, así que la etiqueta lo dice y el valor va en
+                `font-mono`, como el resto de los identificadores del panel. Sin eso, un
+                «Capitán: Jugador#MX1» se lee como un nombre mal escrito. La columna no
+                se renombró a propósito: cambia lo que guarda, no cómo se llama. */}
             <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
               <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400">
-                Capitán
+                Capitán (Riot ID)
               </span>
-              <span className="text-gray-300">{equipo.capitan_nombre || '—'}</span>
+              <span className="font-mono text-gray-300">
+                {equipo.capitan_nombre || '—'}
+              </span>
+              {/* El teléfono lleva su propio rótulo desde que el de la izquierda dejó de
+                  ser genérico: colgando de «Capitán (Riot ID)» se leería como si también
+                  fuera parte del identificador. */}
+              <span className="font-mono text-[11px] uppercase tracking-wider text-gray-400">
+                Cel.
+              </span>
               <span className="font-mono text-gray-400">
                 {equipo.capitan_celular || '—'}
               </span>

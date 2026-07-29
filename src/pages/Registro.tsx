@@ -78,6 +78,16 @@ function nuevoUid(): string {
   return `j${contadorUid}`
 }
 
+/* El capitán también tiene Riot ID, y esa comprobación necesita exactamente lo mismo
+   que la de un jugador: su propio contador de peticiones para descartar respuestas
+   viejas, su propio veredicto atado al valor actual y su propio anuncio. Como no es
+   una tarjeta, no tiene uid — así que entra a los mismos diccionarios con esta clave
+   RESERVADA, en vez de duplicar toda la lógica de carreras en un juego de estados
+   aparte. No puede colisionar con un jugador: `nuevoUid()` siempre devuelve `j` + un
+   número. Lo único que no comparte es la clave de ERROR, que sigue siendo
+   `capitan_nombre` (la del campo), porque ese diccionario es otro. */
+const CLAVE_CAPITAN = 'capitan'
+
 function jugadorVacio(): JugadorForm {
   return {
     uid: nuevoUid(),
@@ -531,7 +541,9 @@ function TarjetaJugador({
   onCampo: (uid: string, campo: CampoJugador, valor: string) => void
   onOpcion: (uid: string, campo: 'escolaridad' | 'genero', valor: string) => void
   onGamertag: (uid: string, valor: string) => void
-  onComprobarRiotId: (uid: string) => void
+  /* Recibe el valor además de la clave: así quien comprueba no tiene que salir a
+     buscar la tarjeta en el array, y la misma función sirve para el capitán. */
+  onComprobarRiotId: (uid: string, valor: string) => void
   onQuitar: (uid: string) => void
 }) {
   const { uid } = jugador
@@ -623,7 +635,7 @@ function TarjetaJugador({
             placeholder="Jugador#MX1"
             autoComplete="off"
             describedById={idAyudaRiot}
-            onBlur={() => onComprobarRiotId(uid)}
+            onBlur={() => onComprobarRiotId(uid, jugador.gamertag)}
             /* El 'no_encontrado' no pone ícono: ya se ve como error de campo
                (borde rojo + mensaje con su propio ícono) y un segundo símbolo
                sería ruido. */
@@ -873,10 +885,10 @@ export default function Registro() {
   /* Estado efectivo de una tarjeta: el veredicto guardado solo vale si sigue siendo
      sobre el Riot ID que hay escrito AHORA en esa tarjeta. Cualquier otra cosa se
      lee como 'inactivo', que es el estado que no dice ni bloquea nada. */
-  const estadoRiotIdDe = (jugador: JugadorForm): EstadoRiotId => {
-    const validacion = validaciones[jugador.uid]
+  const estadoRiotIdDe = (clave: string, valorActual: string): EstadoRiotId => {
+    const validacion = validaciones[clave]
     if (!validacion) return 'inactivo'
-    return validacion.valor === jugador.gamertag.trim() ? validacion.estado : 'inactivo'
+    return validacion.valor === valorActual.trim() ? validacion.estado : 'inactivo'
   }
 
   /* Orden VISUAL de todas las claves de error, recalculado en cada render porque
@@ -991,20 +1003,34 @@ export default function Registro() {
     })
   }
 
-  /* El Riot ID tiene su propio onChange: además de lo que hace setCampoJugador,
-     toda edición invalida el veredicto anterior —era sobre otro valor— y descarta
-     la respuesta de una validación en vuelo DE ESA TARJETA. */
-  const setGamertag = (uid: string, valor: string) => {
-    setCampoJugador(uid, 'gamertag', valor)
-    peticionesRiotId.current.set(uid, (peticionesRiotId.current.get(uid) ?? 0) + 1)
+  /* Toda edición de un Riot ID invalida el veredicto anterior —era sobre otro valor—
+     y descarta la respuesta de una validación en vuelo DE ESA ENTRADA. Vale igual para
+     una tarjeta y para el capitán: lo único que cambia es la clave. */
+  const invalidarRiotId = (clave: string) => {
+    peticionesRiotId.current.set(clave, (peticionesRiotId.current.get(clave) ?? 0) + 1)
     /* Se limpia el veredicto guardado aunque el estado esté atado al valor: si la
        persona edita y vuelve a teclear el MISMO texto que se estaba comprobando, el
        valor coincide de nuevo pero aquella petición ya quedó descartada por el
        contador y su respuesta nunca se va a aplicar — sin esto, el indicador de
        "Validando…" giraba para siempre. No se pierde nada: al salir del campo, el
        caché repinta el veredicto sin volver a llamar. */
-    setValidaciones((prev) => ({ ...prev, [uid]: VALIDACION_INACTIVA }))
-    setAnunciosRiotId((prev) => ({ ...prev, [uid]: '' }))
+    setValidaciones((prev) => ({ ...prev, [clave]: VALIDACION_INACTIVA }))
+    setAnunciosRiotId((prev) => ({ ...prev, [clave]: '' }))
+  }
+
+  /* El Riot ID de un jugador tiene su propio onChange: además de lo que hace
+     setCampoJugador, invalida su veredicto. */
+  const setGamertag = (uid: string, valor: string) => {
+    setCampoJugador(uid, 'gamertag', valor)
+    invalidarRiotId(uid)
+  }
+
+  /* El del capitán, lo mismo pero sobre el campo del equipo. Se guarda en
+     `capitan_nombre` —la columna, la clave del payload de la RPC y el campo que
+     espera ATAK NO cambian de nombre—: lo que cambió es QUÉ se guarda ahí. */
+  const setCapitanRiotId = (valor: string) => {
+    setCampoEquipo('capitan_nombre', valor)
+    invalidarRiotId(CLAVE_CAPITAN)
   }
 
   /* Traduce el veredicto a lo que ve y oye la persona, siempre atado al valor que
@@ -1015,19 +1041,19 @@ export default function Registro() {
 
      Ojo con lo que NO hace: no escribe en `errores`. Ese objeto significa "lo que
      encontró el último envío" y es lo que enciende el banner de abajo. */
-  const aplicarVeredicto = (uid: string, valor: string, resultado: ResultadoRiotId) => {
+  const aplicarVeredicto = (clave: string, valor: string, resultado: ResultadoRiotId) => {
     if (resultado === 'existe') {
-      setValidaciones((prev) => ({ ...prev, [uid]: { valor, estado: 'valido' } }))
-      setAnunciosRiotId((prev) => ({ ...prev, [uid]: 'Riot ID verificado.' }))
+      setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'valido' } }))
+      setAnunciosRiotId((prev) => ({ ...prev, [clave]: 'Riot ID verificado.' }))
       return
     }
     if (resultado === 'no_existe') {
-      setValidaciones((prev) => ({ ...prev, [uid]: { valor, estado: 'no_encontrado' } }))
-      setAnunciosRiotId((prev) => ({ ...prev, [uid]: MENSAJE_RIOT_ID_NO_EXISTE }))
+      setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'no_encontrado' } }))
+      setAnunciosRiotId((prev) => ({ ...prev, [clave]: MENSAJE_RIOT_ID_NO_EXISTE }))
       return
     }
-    setValidaciones((prev) => ({ ...prev, [uid]: { valor, estado: 'inactivo' } }))
-    setAnunciosRiotId((prev) => ({ ...prev, [uid]: '' }))
+    setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'inactivo' } }))
+    setAnunciosRiotId((prev) => ({ ...prev, [clave]: '' }))
   }
 
   /* Al salir del campo, no en cada tecla: es una petición de red por comprobación.
@@ -1035,36 +1061,37 @@ export default function Registro() {
      formulario se envía sin que haya blur, así que nunca corre. Es coherente con no
      bloquear nunca por la validación, pero significa que no todo lo que se manda
      pasó por acá. No asumir lo contrario. */
-  const comprobarRiotId = (uid: string) => {
-    const jugador = jugadores.find((j) => j.uid === uid)
-    if (!jugador) return
-    const valor = jugador.gamertag.trim()
+  const comprobarRiotId = (clave: string, valorCrudo: string) => {
+    const valor = valorCrudo.trim()
 
     /* El formato local manda y corre primero: si ya está mal, su error es más
        accionable que cualquier respuesta remota y no se gasta una petición. */
     if (!valor || !REGEX_RIOT_ID.test(valor)) return
 
+    /* El caché va por VALOR y lo comparten todas las entradas —el capitán más los 5 a 7
+       jugadores—: si el capitán es también jugador (el caso normal), su Riot ID se
+       comprueba una sola vez. */
     const cacheado = riotIdComprobado.current.get(valor)
     if (cacheado) {
-      aplicarVeredicto(uid, valor, cacheado)
+      aplicarVeredicto(clave, valor, cacheado)
       return
     }
 
-    const idPeticion = (peticionesRiotId.current.get(uid) ?? 0) + 1
-    peticionesRiotId.current.set(uid, idPeticion)
-    setValidaciones((prev) => ({ ...prev, [uid]: { valor, estado: 'validando' } }))
-    setAnunciosRiotId((prev) => ({ ...prev, [uid]: '' }))
+    const idPeticion = (peticionesRiotId.current.get(clave) ?? 0) + 1
+    peticionesRiotId.current.set(clave, idPeticion)
+    setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'validando' } }))
+    setAnunciosRiotId((prev) => ({ ...prev, [clave]: '' }))
 
     /* Sin await ni try/catch: validarRiotId() no lanza por contrato y esto no debe
        bloquear nada de lo que la persona siga haciendo en el formulario. */
     void (async () => {
       const resultado = await validarRiotId(valor)
-      /* Respuesta superada por otra más nueva DE ESTA TARJETA: se tira. */
-      if (peticionesRiotId.current.get(uid) !== idPeticion) return
+      /* Respuesta superada por otra más nueva DE ESTA ENTRADA: se tira. */
+      if (peticionesRiotId.current.get(clave) !== idPeticion) return
       if (resultado !== 'indeterminado') {
         riotIdComprobado.current.set(valor, resultado)
       }
-      aplicarVeredicto(uid, valor, resultado)
+      aplicarVeredicto(clave, valor, resultado)
     })()
   }
 
@@ -1135,8 +1162,18 @@ export default function Registro() {
     const e: Errores = {}
 
     if (!equipoForm.equipo.trim()) e.equipo = 'Escribe el nombre del equipo.'
-    if (!equipoForm.capitan_nombre.trim()) {
-      e.capitan_nombre = 'Escribe el nombre del capitán.'
+    /* `capitan_nombre` guarda el RIOT ID del capitán, no su nombre: es lo que espera
+       ATAK en ese campo. Se valida con el mismo REGEX_RIOT_ID que los jugadores y con
+       las mismas dos ramas —formato primero, veredicto remoto después—, para que todas
+       las comprobaciones del formulario se comporten igual. */
+    const capitanRiotId = equipoForm.capitan_nombre.trim()
+    if (!capitanRiotId) {
+      e.capitan_nombre = 'Escribe el Riot ID del capitán.'
+    } else if (!REGEX_RIOT_ID.test(capitanRiotId)) {
+      e.capitan_nombre =
+        'Riot ID completo, con nombre y tag: nombre#tag (por ejemplo, Capitan#MX1).'
+    } else if (estadoRiotIdDe(CLAVE_CAPITAN, capitanRiotId) === 'no_encontrado') {
+      e.capitan_nombre = MENSAJE_RIOT_ID_NO_EXISTE
     }
     const errorCapitan = validarTelefono(
       equipoForm.capitan_celular,
@@ -1161,7 +1198,7 @@ export default function Registro() {
           'gamertag',
           'Riot ID completo, con nombre y tag: nombre#tag (por ejemplo, Jugador#MX1).'
         )
-      } else if (estadoRiotIdDe(j) === 'no_encontrado') {
+      } else if (estadoRiotIdDe(j.uid, j.gamertag) === 'no_encontrado') {
         /* El veredicto remoto se suma acá y no aparte: solo si el formato ya pasó.
            Ante los dos problemas, el de formato es el más accionable.
            Lo que NO frena el envío, a propósito: una comprobación en vuelo
@@ -1346,18 +1383,32 @@ export default function Registro() {
     setRechazo(null)
     setEnviado(false)
     setAnuncioRoster('')
-    /* El estado del Riot ID también se limpia y los contadores se descartan, para
-       que una comprobación del equipo anterior que llegue tarde no pinte su
-       veredicto sobre el formulario nuevo. El caché de veredictos por VALOR
-       sobrevive a propósito: sigue siendo cierto. */
+    /* El estado del Riot ID también se limpia, para que una comprobación del equipo
+       anterior que llegue tarde no pinte su veredicto sobre el formulario nuevo. El
+       caché de veredictos por VALOR sobrevive a propósito: sigue siendo cierto.
+
+       OJO con el contador del capitán. Para los jugadores, `clear()` alcanza: sus
+       claves son uid nuevos (`contadorUid` nunca vuelve atrás), así que una respuesta
+       vieja busca su clave, no la encuentra y se descarta sola. `CLAVE_CAPITAN`, en
+       cambio, es CONSTANTE y se reutiliza en el formulario siguiente: si se reiniciara
+       a 0, una respuesta en vuelo del equipo anterior podría volver a coincidir con el
+       `idPeticion` del nuevo, pasar el guard y pintar un veredicto que no es de este
+       formulario. Por eso su contador no se borra: se incrementa. */
+    const peticionesCapitan = peticionesRiotId.current.get(CLAVE_CAPITAN) ?? 0
+    peticionesRiotId.current.clear()
+    peticionesRiotId.current.set(CLAVE_CAPITAN, peticionesCapitan + 1)
     setValidaciones({})
     setAnunciosRiotId({})
-    peticionesRiotId.current.clear()
   }
 
   /* --- Derivados de render --- */
 
   const hayErrores = Object.keys(errores).length > 0
+
+  /* Estado efectivo de la comprobación del Riot ID del capitán, con la misma regla que
+     las tarjetas: el veredicto guardado solo vale si sigue siendo sobre lo que hay
+     escrito AHORA en el campo. */
+  const estadoCapitan = estadoRiotIdDe(CLAVE_CAPITAN, equipoForm.capitan_nombre)
 
   /* Qué tarjetas tienen algo mal, para poder decirlo en el banner. En un formulario
      de 7 jugadores, "revisa los campos marcados" obliga a recorrer toda la página
@@ -1524,16 +1575,55 @@ export default function Registro() {
                         placeholder="Nombre de tu equipo"
                         claseContenedor="md:col-span-2"
                       />
-                      <CampoTexto
-                        id="capitan_nombre"
-                        label="Nombre del Capitán"
-                        icono={User}
-                        valor={equipoForm.capitan_nombre}
-                        onChange={(v) => setCampoEquipo('capitan_nombre', v)}
-                        error={errores.capitan_nombre}
-                        placeholder="Nombre completo del capitán"
-                        autoComplete="name"
-                      />
+                      {/* El capitán se identifica por su RIOT ID, no por su nombre: es
+                          lo que ATAK espera en este campo. El id, la clave del estado,
+                          la columna y la clave del payload de la RPC siguen llamándose
+                          `capitan_nombre` — renombrarlos obligaría a tocar
+                          `registrar_equipo` y `armar_roster_atak`, que viven en la base
+                          y no en el repo. Cambia lo que se guarda, no cómo se llama. */}
+                      {/* `md:col-span-2` por la misma razón que el Riot ID de las
+                          tarjetas: la ayuda de formato son tres líneas y en media
+                          columna dejaría al campo de al lado con un hueco vertical. */}
+                      <div className="md:col-span-2">
+                        <CampoTexto
+                          id="capitan_nombre"
+                          label="Riot ID del Capitán"
+                          icono={Gamepad2}
+                          valor={equipoForm.capitan_nombre}
+                          onChange={setCapitanRiotId}
+                          /* Misma composición que en las tarjetas: el error del envío
+                             manda y, si no hay, se deriva del veredicto remoto. */
+                          error={
+                            errores.capitan_nombre ??
+                            (estadoCapitan === 'no_encontrado'
+                              ? MENSAJE_RIOT_ID_NO_EXISTE
+                              : undefined)
+                          }
+                          placeholder="Capitan#MX1"
+                          autoComplete="off"
+                          describedById="capitan_nombre-ayuda"
+                          onBlur={() =>
+                            comprobarRiotId(CLAVE_CAPITAN, equipoForm.capitan_nombre)
+                          }
+                          sufijo={
+                            estadoCapitan === 'validando' ? (
+                              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                            ) : estadoCapitan === 'valido' ? (
+                              <Check className="w-5 h-5 text-green-400" />
+                            ) : null
+                          }
+                        />
+                        <p id="capitan_nombre-ayuda" className="mt-2 text-sm text-gray-400">
+                          Riot ID completo: nombre, luego #, luego tag (por ejemplo,
+                          Capitan#MX1). Si el capitán también juega, es el mismo que pondrá
+                          en su tarjeta del roster.
+                        </p>
+                        {/* Región viva propia, como la de cada tarjeta: el resultado llega
+                            con el foco ya en otro campo. */}
+                        <span role="status" aria-live="polite" className="sr-only">
+                          {anunciosRiotId[CLAVE_CAPITAN] ?? ''}
+                        </span>
+                      </div>
                       <CampoTexto
                         id="capitan_celular"
                         label="Celular del Capitán"
@@ -1612,7 +1702,7 @@ export default function Registro() {
                         indice={indice}
                         total={jugadores.length}
                         errores={errores}
-                        estadoRiotId={estadoRiotIdDe(jugador)}
+                        estadoRiotId={estadoRiotIdDe(jugador.uid, jugador.gamertag)}
                         anuncioRiotId={anunciosRiotId[jugador.uid] ?? ''}
                         onCampo={setCampoJugador}
                         onOpcion={setOpcionJugador}

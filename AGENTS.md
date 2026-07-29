@@ -11,7 +11,8 @@ componentes: sus páginas no leen ninguna base.
 pero ni el registro ni el panel la tocan. El modelo pasó de *una fila = un jugador*,
 con el equipo como un **string repetido** en cada fila, a dos tablas:
 
-- **`public.equipos`** — `id` (uuid), `nombre`, `nombre_norm`, `capitan_nombre`,
+- **`public.equipos`** — `id` (uuid), `nombre`, `nombre_norm`,
+  `capitan_nombre` (**⚠ lleva el Riot ID, no un nombre — ver la trampa de abajo**),
   `capitan_celular`, `pagado`, `pagado_en`, `notas`, `archivado_en`, `creado_en`.
 - **`public.jugadores`** — `id`, `equipo_id`, `orden`, `gamertag`, `nombre`,
   `fecha_nacimiento`, `celular`, `correo`, `municipio`, `escolaridad`, `genero`,
@@ -28,6 +29,17 @@ Dos cosas tocan Supabase:
   códigos `min_jugadores`, `max_jugadores`, `falta_equipo` y `equipo_duplicado`.
   El cliente anónimo **solo puede llamar a la RPC**: no lee las tablas, así que no
   intentes un `.select()` de vuelta.
+
+  **TRAMPA: `capitan_nombre` NO lleva un nombre, lleva el RIOT ID del capitán**
+  (formato `nombre#tag`), porque es lo que ATAK espera en ese campo. Confirmado por
+  los organizadores el 2026-07-29. El nombre de la clave engaña, y engaña en tres
+  lugares a la vez —la columna de `equipos`, la clave del payload de la RPC y el campo
+  de ATAK—, así que es de lo más fácil de malinterpretar leyendo solo el esquema.
+  **No lo renombres:** los tres nombres son el mismo contrato, y cambiarlo obligaría a
+  tocar `registrar_equipo` y `armar_roster_atak`, que viven en la base y no en el
+  repo. `/registro` lo valida con el mismo `REGEX_RIOT_ID` que a los jugadores; el
+  panel lo etiqueta «Capitán (Riot ID)» y el CSV exporta esa columna como «Riot ID del
+  Capitán», justamente para que nadie lo lea como un nombre mal escrito.
 - El **panel de administración (`/admin`)**, detrás de login, lee las dos tablas con
   **un solo SELECT con join** (`equipos` con sus `jugadores` ordenados por `orden`) y
   **ya no agrupa nada en el cliente**. Tiene sesión de usuario; los admins se crean a
