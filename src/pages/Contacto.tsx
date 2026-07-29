@@ -61,7 +61,26 @@ export default function Contacto() {
      los de `src/pages/Registro.tsx` —MIN_JUGADORES, MAX_JUGADORES, TITULARES y los
      campos del payload— y los hace cumplir la RPC `registrar_equipo`. Si cambian ahí,
      hay que tocarlos acá y en la tarjeta CTA de Home.tsx: son tres copias en prosa que
-     nada sincroniza. Nada de fechas, cupos ni premios: no están confirmados. */
+     nada sincroniza.
+
+     La regla de residencia sale del REGLAMENTO, no del código: residentes del estado de
+     Querétaro con hasta 2 foráneos que residan en México. Se enuncia tal cual y se
+     remite al documento sin resumirla más, y eso es deliberado. El reglamento SÍ define
+     «jugador local» —haber vivido en Querétaro al menos 6 meses en los últimos «3-5
+     años», y 10 años si ya jugó la liga—, pero ese rango está sin cerrar y choca con su
+     propia definición de foráneo («quien no resida en el Estado»), que no es la misma
+     prueba. Los organizadores lo van a aclarar. Hasta entonces, parafrasearlo acá es
+     elegir por ellos. NO lo resumas.
+
+     Antes de afirmar CUALQUIER cosa sobre el reglamento, leelo — se extrae con:
+       pdftotext -layout -enc UTF-8 public/reglamento-lqc-2026.pdf salida.txt
+     (Verificado el 2026-07-29. `pdftotext` viene con Git for Windows. Descomprimir los
+     streams a mano NO sirve: las fuentes van en subconjunto y el texto sale como
+     índices de glifo.)
+
+     Qué dice hoy sobre cifras, para no inventar ni quedarse corto: inicio 25/08/2026,
+     gran final 28/11/2026, «máximo de 32 equipos» y «Premiación — Por definir». O sea
+     que fechas y cupo SÍ tienen fuente y los premios NO: nunca publicar un monto. */
   const faqs = [
     {
       question: "¿Cómo puedo inscribir a mi equipo?",
@@ -69,7 +88,7 @@ export default function Contacto() {
     },
     {
       question: "¿Cuáles son los requisitos para participar?",
-      answer: "Tener al menos 16 años cumplidos, residir en Querétaro o zonas cercanas, y formar un equipo de 5 a 7 jugadores: 5 titulares y hasta 2 suplentes."
+      answer: "Tener al menos 16 años cumplidos y formar un equipo de 5 a 7 jugadores: 5 titulares y 2 suplentes opcionales. El equipo debe estar conformado por residentes del estado de Querétaro, y puede incluir hasta 2 integrantes foráneos siempre que residan en México. Qué cuenta como jugador local lo define el reglamento oficial, que está enlazado en el pie del sitio: revísalo antes de armar el equipo."
     },
     {
       question: "¿Hay algún costo de inscripción?",
