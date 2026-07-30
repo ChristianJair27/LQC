@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   Users, Gamepad2, User, Calendar, Phone, GraduationCap,
-  MapPin, Mail, UserCircle, ShieldCheck, CreditCard,
+  MapPin, Mail, UserCircle, ShieldCheck, CreditCard, Crown,
   Send, CheckCircle, AlertCircle, Check, Facebook, MessageSquare,
-  Loader2, UserPlus, Trash2, FileText, ExternalLink, Download
+  Loader2, FileText, ExternalLink, Download
 } from 'lucide-react'
 import { obtenerSupabase } from '../lib/supabase'
 import { RUTA_REGLAMENTO, NOMBRE_DESCARGA, PESO_REGLAMENTO } from '../lib/reglamento'
@@ -15,20 +15,35 @@ import type { ResultadoRiotId } from '../lib/atak'
 /*  Modelo del formulario                                              */
 /* ------------------------------------------------------------------ */
 
-/* MODELO NUEVO: el CAPITÁN registra al equipo entero de una sola vez. Antes cada
-   jugador se registraba solo y una fila de `inscripciones` era un jugador; ahora
-   todo el envío pasa por la RPC `registrar_equipo`, que escribe en `equipos` y
-   `jugadores`. La tabla `inscripciones` sigue existiendo pero ya no la toca esta
-   página. (`/admin` todavía lee de la vieja: se arregla en otro commit.)
+/* MODELO ACTUAL: cada jugador se registra SOLO, sobre el esquema relacional.
+   Es la tercera forma que tiene esta página y conviene tener claras las tres,
+   porque la de en medio dejó rastros por todo el repo:
 
-   Consecuencia directa para el código de acá abajo: TODO lo que era un dato
-   suelto pasa a estar indexado por jugador. Los ids del DOM, las claves de error
-   y la validación del Riot ID no podían seguir siendo globales — con 7 jugadores
-   habría 7 elementos peleando por `id="nombre"`. */
+     1. Una fila de `inscripciones` = un jugador, con el nombre del equipo como
+        string repetido en cada fila. Un typo partía el equipo en dos.
+     2. El capitán registraba al equipo ENTERO en un envío (`registrar_equipo`),
+        con un roster de 5 a 7 tarjetas en la misma pantalla. Arregló el typo
+        —el equipo se escribía una sola vez— pero puso a una persona a cargar los
+        datos personales de otras seis desde un teléfono.
+     3. Ésta: vuelve el registro individual, pero el equipo ya no es un string
+        suelto. Quien se registra ELIGE su equipo de una lista de sugerencias que
+        sale de la base (`buscar_equipos`), y solo si no está lo crea escribiendo
+        el nombre. El typo se evita por reconocimiento, no por disciplina.
 
-/* Campos que se repiten por jugador. `escolaridad_otro` y `genero_otro` viven en
-   el estado pero NO viajan: se resuelven antes de armar el payload. */
-type CampoJugador =
+   Consecuencia directa para el código de acá abajo: todo lo que el modelo 2
+   había tenido que indexar por jugador —claves de error compuestas, ids del DOM
+   con uid delante, N validaciones de Riot ID en vuelo, alta y baja de tarjetas—
+   vuelve a ser un solo juego de campos planos. Si algo de eso reaparece en un
+   diff, es que alguien está resucitando el modelo 2 sin querer.
+
+   Lo que NO cambió: las dos tablas (`equipos` y `jugadores`) y el panel de
+   `/admin`, que las lee igual. Esta reescritura es de la superficie pública. */
+
+/* Campos del formulario. `escolaridad_otro` y `genero_otro` viven en el estado
+   pero NO viajan: se resuelven antes de armar el payload. `equipo` tampoco viaja
+   tal cual — ver `PayloadRegistro`. */
+type CampoForm =
+  | 'equipo'
   | 'gamertag'
   | 'nombre'
   | 'fecha_nacimiento'
@@ -40,9 +55,38 @@ type CampoJugador =
   | 'genero'
   | 'genero_otro'
 
-/* Orden VISUAL de los campos dentro de una tarjeta. Se usa para llevar el foco al
-   primer campo inválido: las claves de un objeto no garantizan este orden. */
-const CAMPOS_JUGADOR: CampoJugador[] = [
+type FormState = Record<CampoForm, string>
+
+const FORM_VACIO: FormState = {
+  equipo: '',
+  gamertag: '',
+  nombre: '',
+  fecha_nacimiento: '',
+  celular: '',
+  correo: '',
+  municipio: '',
+  escolaridad: '',
+  escolaridad_otro: '',
+  genero: '',
+  genero_otro: ''
+}
+
+/* Los dos números del roster. Ya no los aplica esta página —nadie arma un roster
+   acá—, pero los sigue necesitando para dos cosas distintas: MAX para saber qué
+   equipo sugerido está lleno y no dejar elegirlo, y MIN como referencia en la
+   pantalla de éxito ("tu equipo tiene 3 de 5 jugadores mínimos"), que es lo único
+   que le dice a alguien que todavía faltan compañeros por registrarse.
+   TITULARES parte el equipo en dos: la RPC asigna titular a los 5 primeros por el
+   `orden` que ella misma calcula, así que acá solo se refleja esa regla. */
+const MIN_JUGADORES = 5
+const MAX_JUGADORES = 7
+const TITULARES = 5
+
+/* Orden VISUAL de las claves de error, para llevar el foco al primer campo con
+   problema. Vuelve a ser una constante y no una función: sin roster de tamaño
+   variable, la lista de campos no depende del estado. */
+const ORDEN_CLAVES: string[] = [
+  'equipo',
   'gamertag',
   'nombre',
   'fecha_nacimiento',
@@ -52,116 +96,104 @@ const CAMPOS_JUGADOR: CampoJugador[] = [
   'escolaridad',
   'escolaridad_otro',
   'genero',
-  'genero_otro'
+  'genero_otro',
+  'privacidad'
 ]
-
-/* `uid` es la identidad ESTABLE de la tarjeta y no se manda a la base. Existe
-   porque el orden del array sí cambia: quitar al jugador 2 corre a todos los de
-   abajo, y si las claves de error, los ids del DOM y el estado de validación del
-   Riot ID colgaran del índice, cada eliminación se los mezclaría entre tarjetas
-   —el error del jugador 3 aparecería sobre los datos del 4—. El índice se usa
-   solo para lo que de verdad es posicional: el número que se ve y el rol que
-   asigna la RPC. */
-type JugadorForm = { uid: string } & Record<CampoJugador, string>
-
-type EquipoForm = {
-  equipo: string
-  capitan_nombre: string
-  capitan_celular: string
-}
-
-/* Contador de módulo, no un ref: los 5 jugadores iniciales se crean en el
-   inicializador de useState, antes de que exista ningún ref. Solo necesita ser
-   único dentro de la pestaña. */
-let contadorUid = 0
-function nuevoUid(): string {
-  contadorUid += 1
-  return `j${contadorUid}`
-}
-
-/* El capitán también tiene Riot ID, y esa comprobación necesita exactamente lo mismo
-   que la de un jugador: su propio contador de peticiones para descartar respuestas
-   viejas, su propio veredicto atado al valor actual y su propio anuncio. Como no es
-   una tarjeta, no tiene uid — así que entra a los mismos diccionarios con esta clave
-   RESERVADA, en vez de duplicar toda la lógica de carreras en un juego de estados
-   aparte. No puede colisionar con un jugador: `nuevoUid()` siempre devuelve `j` + un
-   número. Lo único que no comparte es la clave de ERROR, que sigue siendo
-   `capitan_nombre` (la del campo), porque ese diccionario es otro. */
-const CLAVE_CAPITAN = 'capitan'
-
-function jugadorVacio(): JugadorForm {
-  return {
-    uid: nuevoUid(),
-    gamertag: '',
-    nombre: '',
-    fecha_nacimiento: '',
-    celular: '',
-    correo: '',
-    municipio: '',
-    escolaridad: '',
-    escolaridad_otro: '',
-    genero: '',
-    genero_otro: ''
-  }
-}
-
-const EQUIPO_VACIO: EquipoForm = {
-  equipo: '',
-  capitan_nombre: '',
-  capitan_celular: ''
-}
-
-/* Los tres números que definen el roster. TITULARES parte el array en dos: la RPC
-   asigna titular a los 5 primeros y suplente del 6º en adelante POR EL ORDEN DEL
-   ARRAY, así que acá solo se refleja esa regla, no se decide. `rol` no se manda. */
-const MIN_JUGADORES = 5
-const MAX_JUGADORES = 7
-const TITULARES = 5
-
-/* Id del texto que explica los límites del roster. Vive en la barra de control,
-   pero lo referencian los botones «Quitar» de las tarjetas cuando están
-   deshabilitados: si no, con 5 jugadores hay 5 controles muertos sin ninguna
-   explicación para quien no ve el contador. Hay una sola barra por página, así que
-   un id fijo alcanza. */
-const ID_LIMITES_ROSTER = 'roster-limites'
 
 /* ------------------------------------------------------------------ */
 /*  Errores                                                            */
 /* ------------------------------------------------------------------ */
 
-/* Claves planas de dos formas: las del equipo son el nombre del campo a secas
-   ('equipo', 'capitan_celular', 'privacidad') y las de jugador van con el uid
-   delante ('j3.correo'). Un solo diccionario en vez de uno por jugador para que
-   el recuento de errores y el foco al primero sean un recorrido y no un árbol. */
+/* Claves planas, y ahora la clave de error y el `id` del control son LA MISMA
+   cadena. En el modelo del roster no podían serlo (las claves llevaban un punto,
+   que no es válido en un selector sin escapar) y había una función `idDeClave`
+   traduciendo entre las dos. Ya no hace falta, pero la regla que la justificaba
+   sigue en pie y es la que hace funcionar a `enfocarClave`: si un control no tiene
+   por id su clave de error, el foco al primer campo inválido lo salta EN SILENCIO.
+   La regla es sobre el `id` y nada más. El `name` coincide en los inputs por
+   comodidad, pero no siempre existe: en el campo de equipo con un equipo ya elegido,
+   el control con `id="equipo"` es un <button>, que no lleva `name`. */
 type Errores = Record<string, string>
 
-function claveJugador(uid: string, campo: CampoJugador): string {
-  return `${uid}.${campo}`
-}
-
-/* La clave de error y el id del DOM son la misma cosa con distinto separador: el
-   punto no es válido en un selector sin escapar y `getElementById` no lo necesita,
-   pero mantenerlos alineados evita tener dos convenciones que se puedan desfasar. */
-function idDeClave(clave: string): string {
-  return clave.replace('.', '-')
-}
-
 /* ------------------------------------------------------------------ */
-/*  Contrato con la RPC                                                */
+/*  Contrato con las RPC                                               */
 /* ------------------------------------------------------------------ */
 
-/* Forma EXACTA que espera `registrar_equipo`. Anotar el objeto literal con este
-   tipo activa el chequeo de propiedades en exceso de TypeScript: una clave de más
-   o un typo son error de compilación y no un fallo en runtime con el banner
-   genérico. Mismo motivo que tenía el payload del modelo viejo — el cliente está
-   tipado como `SupabaseClient` sin un `Database` generado, así que `.rpc()` acepta
-   literalmente cualquier cosa.
+/* El cliente anónimo NO lee las tablas: su única superficie son estas dos
+   funciones, que corren con permisos propios. No intentar un `.select()` sobre
+   `equipos` ni `jugadores` — no va a devolver nada y no es un bug de RLS. */
 
-   `rol` NO va: lo asigna la función por la posición en `jugadores`.
+/* --- buscar_equipos(termino) → hasta 5 filas, ordenadas por similitud --- */
 
-   DEUDA: lo correcto a futuro es generar los tipos del esquema con
-   `supabase gen types typescript` y pasarlos como `SupabaseClient<Database>`. */
-type PayloadJugador = {
+/* Lo que la RPC devuelve por equipo. Es información PÚBLICA a propósito: el
+   nombre y cuántos jugadores tiene, nada personal. `jugadores` no es decorativo
+   —es lo que permite reconocer al equipo correcto entre dos nombres parecidos y
+   lo que decide si está lleno—, así que una fila sin ese dato no sirve. */
+type EquipoSugerido = { id: string; nombre: string; jugadores: number }
+
+/* Tope de sugerencias que se pintan. La RPC ya devuelve como mucho 5; esto es un
+   segundo techo del lado del cliente para que un cambio del lado de la base no
+   se traduzca en una lista de 40 elementos tapando el formulario. */
+const MAX_SUGERENCIAS = 5
+
+/* Lectura defensiva, con el mismo criterio que `leerVeredicto` en src/lib/atak.ts:
+   llega como `unknown` y cada fila se acepta solo si tiene la forma exacta. Una
+   fila rota se descarta en vez de contaminar la lista con `undefined`.
+   `jugadores` se acepta como número o como cadena numérica: PostgREST serializa
+   los `bigint` (lo que devuelve un count) como número, pero si algún día llegara
+   como texto, aceptarlo cuesta dos líneas y evita que la lista quede vacía sin
+   que nadie entienda por qué. */
+function leerSugerencias(cuerpo: unknown): EquipoSugerido[] {
+  if (!Array.isArray(cuerpo)) return []
+
+  const lista: EquipoSugerido[] = []
+  for (const fila of cuerpo) {
+    if (typeof fila !== 'object' || fila === null) continue
+
+    const { id, nombre, jugadores } = fila as {
+      id?: unknown
+      nombre?: unknown
+      jugadores?: unknown
+    }
+    if (typeof id !== 'string' || !id) continue
+    if (typeof nombre !== 'string' || !nombre) continue
+
+    const cantidad =
+      typeof jugadores === 'number'
+        ? jugadores
+        : typeof jugadores === 'string' && /^\d+$/.test(jugadores)
+          ? Number(jugadores)
+          : null
+    if (cantidad === null || !Number.isFinite(cantidad)) continue
+
+    lista.push({ id, nombre, jugadores: cantidad })
+    if (lista.length >= MAX_SUGERENCIAS) break
+  }
+  return lista
+}
+
+/* --- registrar_jugador(datos) --- */
+
+/* Forma EXACTA que espera la RPC. El tipo es una UNIÓN y eso es el contrato, no
+   un adorno: el objeto lleva `equipo_id` (eligió un equipo existente) o `equipo`
+   (escribió un nombre nuevo y la función lo crea), NUNCA los dos. Los dos errores
+   quedan atrapados en compilación y no en runtime con el banner genérico, pero por
+   mecanismos distintos que conviene no confundir: mandar las DOS claves a la vez falla
+   por los `?: never` de abajo (ninguna rama de la unión lo acepta), mientras que mandar
+   una clave DESCONOCIDA —`rol`, por ejemplo— falla por el chequeo de propiedades en
+   exceso que activa anotar el objeto literal. Sin los `?: never`, las dos claves juntas
+   pasarían sin queja.
+
+   `rol` y `orden` NO van: los asigna la función. El rol sale del orden —titular
+   los 5 primeros, suplente del 6º— y el orden lo calcula ella contando lo que ya
+   hay en el equipo.
+
+   DEUDA (heredada, sigue vigente): lo correcto a futuro es generar los tipos del
+   esquema con `supabase gen types typescript` y pasarlos como
+   `SupabaseClient<Database>`. Hoy el cliente está tipado como `SupabaseClient`
+   pelado, así que `.rpc()` acepta literalmente cualquier cosa y esta unión es la
+   única red que hay. */
+type PayloadBase = {
   gamertag: string
   nombre: string
   fecha_nacimiento: string
@@ -170,71 +202,120 @@ type PayloadJugador = {
   municipio: string
   escolaridad: string
   genero: string
+  es_capitan: boolean
 }
 
-type PayloadRegistro = {
-  equipo: string
-  capitan_nombre: string
-  capitan_celular: string
-  jugadores: PayloadJugador[]
-}
+type PayloadRegistro =
+  | (PayloadBase & { equipo_id: string; equipo?: never })
+  | (PayloadBase & { equipo: string; equipo_id?: never })
 
-/* Códigos de rechazo que devuelve la RPC en `{ ok:false, error }`. Son rechazos de
-   NEGOCIO, no fallos técnicos: la llamada salió bien y la función dijo que no. Por
-   eso viajan por un estado propio y no por el mismo banner que un error de red. */
+/* Códigos de rechazo de la RPC. Son rechazos de NEGOCIO, no fallos técnicos: la
+   llamada salió bien y la función dijo que no. Por eso viajan por un estado
+   propio y no por el banner de error de red. */
 type CodigoRechazo =
-  | 'min_jugadores'
-  | 'max_jugadores'
+  | 'falta_gamertag'
   | 'falta_equipo'
-  | 'equipo_duplicado'
+  | 'equipo_lleno'
+  | 'gamertag_duplicado'
 
 const CODIGOS_RECHAZO: CodigoRechazo[] = [
-  'min_jugadores',
-  'max_jugadores',
+  'falta_gamertag',
   'falta_equipo',
-  'equipo_duplicado'
+  'equipo_lleno',
+  'gamertag_duplicado'
 ]
 
-/* Mensajes accionables: cada uno dice QUÉ pasó y QUÉ hacer. `equipo_duplicado` es
-   el que más contexto necesita —la persona no puede ver la lista de equipos ya
-   registrados (el cliente anónimo no lee las tablas), así que sin explicar cómo se
-   compara el nombre parecería un error del sitio—. */
+/* Mensajes accionables: cada uno dice QUÉ pasó y QUÉ hacer.
+   Los dos que más contexto necesitan son los que la persona no puede anticipar:
+   `equipo_lleno` describe una carrera (el equipo se llenó entre que salió en las
+   sugerencias y que se pulsó enviar) y `gamertag_duplicado` suele significar que
+   ya se registró antes, no que haya hecho algo mal. */
 const MENSAJE_RECHAZO: Record<CodigoRechazo, string> = {
-  min_jugadores: `El equipo necesita al menos ${MIN_JUGADORES} jugadores para competir. Agrega los que falten y vuelve a enviar.`,
-  max_jugadores: `El equipo no puede tener más de ${MAX_JUGADORES} jugadores. Quita los que sobren y vuelve a enviar.`,
-  falta_equipo: 'Falta el nombre del equipo. Escríbelo arriba y vuelve a enviar.',
-  equipo_duplicado:
-    'Ya hay un equipo registrado con ese nombre. La comparación no distingue mayúsculas, minúsculas ni espacios de más, así que «Los Panditas» y «los panditas» cuentan como el mismo.'
+  falta_gamertag: 'Falta tu Riot ID. Escríbelo arriba y vuelve a enviar.',
+  falta_equipo: 'Falta el equipo. Elígelo de las sugerencias o escribe un nombre nuevo.',
+  equipo_lleno: `Ese equipo ya llegó a ${MAX_JUGADORES} jugadores y no admite más. Si acaba de llenarse mientras llenabas el formulario, habla con tu capitán: puede que te toque otro equipo.`,
+  gamertag_duplicado:
+    'Ese Riot ID ya está registrado en ese equipo. Si fuiste tú, ya estás dentro y no hace falta registrarte de nuevo.'
 }
 
-/* Versión corta para el error del CAMPO. Los dos rechazos que apuntan al nombre
-   del equipo se pintan en dos lugares —el banner y el propio input, que además
-   recibe el foco—, así que con un solo texto largo un lector de pantalla lo lee
-   entero dos veces: una por el `role="alert"` y otra por el `aria-describedby`
-   del campo enfocado. La explicación completa vive solo en el banner. */
-const MENSAJE_RECHAZO_CAMPO: Partial<Record<CodigoRechazo, string>> = {
-  equipo_duplicado: 'Ese nombre ya está registrado. Lee el detalle en el aviso de abajo.',
-  falta_equipo: 'Escribe el nombre del equipo.'
+/* Versión corta para el error del CAMPO. Los rechazos se pintan en dos lugares
+   —el banner y el propio control, que además recibe el foco—, así que con un solo
+   texto largo un lector de pantalla lo lee entero dos veces: una por el
+   `role="alert"` y otra por el `aria-describedby` del control enfocado. La
+   explicación completa vive solo en el banner. */
+const MENSAJE_RECHAZO_CAMPO: Record<CodigoRechazo, string> = {
+  falta_gamertag: 'Escribe tu Riot ID.',
+  falta_equipo: 'Elige o escribe tu equipo.',
+  equipo_lleno: 'Ese equipo está lleno. Lee el detalle en el aviso de abajo.',
+  gamertag_duplicado: 'Ese Riot ID ya está en ese equipo. Lee el detalle abajo.'
 }
 
-/* Lectura defensiva de lo que devuelve la RPC, con el mismo criterio que
-   `leerVeredicto` en src/lib/atak.ts: llega como `unknown` y solo las formas
-   exactas producen un resultado. Cualquier otra cosa —clave ausente, tipo
-   distinto, un código que no conocemos— cae en 'desconocido' y se trata como
-   fallo genérico, que es lo único honesto que se puede decir de una respuesta
-   que no se entiende. */
-function leerRespuesta(cuerpo: unknown): 'ok' | CodigoRechazo | 'desconocido' {
-  if (typeof cuerpo !== 'object' || cuerpo === null) return 'desconocido'
+/* A qué control lleva el foco cada rechazo. Es el mapa que hace que un rechazo
+   del servidor termine en el campo que hay que corregir y no en el tope de la
+   página. */
+const CAMPO_DE_RECHAZO: Record<CodigoRechazo, 'equipo' | 'gamertag'> = {
+  falta_gamertag: 'gamertag',
+  gamertag_duplicado: 'gamertag',
+  falta_equipo: 'equipo',
+  equipo_lleno: 'equipo'
+}
 
-  const { ok, error } = cuerpo as { ok?: unknown; error?: unknown }
-  if (ok === true) return 'ok'
-  if (ok !== false) return 'desconocido'
+/* Lo que devuelve un registro exitoso, ya leído. `equipo_id` no se usa en la
+   pantalla —no hay nada que mostrarle a la persona con un uuid— así que no se
+   guarda; `orden` sí, y es el dato que sostiene toda la pantalla de éxito. */
+type RegistroOk = { orden: number }
 
-  return CODIGOS_RECHAZO.find((codigo) => codigo === error) ?? 'desconocido'
+/* Lectura defensiva de la respuesta. Cualquier forma que no reconozcamos cae en
+   'desconocido' y se trata como fallo genérico, que es lo único honesto que se
+   puede decir de una respuesta que no se entiende.
+
+   OJO con `orden`: se lee como el número de jugadores que el equipo tiene AHORA,
+   porque la función lo calcula contando lo que ya había e insertando a
+   continuación. O sea que se asume 1-based (el primero en registrarse es el 1, y
+   por eso el suplente empieza «del 6º»). Si algún día devolviera 0-based, el primer
+   jugador de cada equipo recibiría `orden:0`, que el guard de abajo rechaza: vería el
+   banner de «no pudimos enviar» sobre un registro que sí entró. Del segundo en adelante
+   sí se pintaría un jugador de menos. Es la única suposición de esta página sobre el
+   interior de la RPC, y falla ruidosamente en el primer caso, que es lo que se quiere. */
+function leerRespuesta(
+  cuerpo: unknown
+): { tipo: 'ok'; datos: RegistroOk } | { tipo: CodigoRechazo | 'desconocido' } {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return { tipo: 'desconocido' }
+
+  const { ok, error, orden } = cuerpo as {
+    ok?: unknown
+    error?: unknown
+    orden?: unknown
+  }
+
+  if (ok === true) {
+    /* Se acepta número o cadena numérica, por la misma razón que en
+       `leerSugerencias`: los dos valores son conteos que salen del mismo backend y no
+       hay motivo para ser estricto acá y flexible allá. La asimetría además costaba
+       caro: un `orden:"3"` caía en 'desconocido' y la persona veía «No pudimos enviar
+       tu registro» sobre una fila que YA se había insertado — y al reintentar, un
+       `gamertag_duplicado` diciéndole que ya estaba registrada. Tres mensajes
+       contradictorios seguidos, todos sobre un registro exitoso. */
+    const cantidad =
+      typeof orden === 'number'
+        ? orden
+        : typeof orden === 'string' && /^\d+$/.test(orden)
+          ? Number(orden)
+          : NaN
+    /* Un `ok:true` sin un `orden` utilizable sigue siendo 'desconocido': la pantalla
+       de éxito entera se apoya en ese número, e inventar un 1 le diría a la persona
+       algo falso sobre su equipo. */
+    if (!Number.isFinite(cantidad) || cantidad < 1) return { tipo: 'desconocido' }
+    return { tipo: 'ok', datos: { orden: cantidad } }
+  }
+
+  if (ok !== false) return { tipo: 'desconocido' }
+
+  return { tipo: CODIGOS_RECHAZO.find((codigo) => codigo === error) ?? 'desconocido' }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Validación (helpers puros reusados del modelo anterior)            */
+/*  Validación (helpers puros)                                         */
 /* ------------------------------------------------------------------ */
 
 const OPCIONES_ESCOLARIDAD = ['Secundaria', 'Prepa', 'Universidad', 'Otros']
@@ -324,6 +405,20 @@ const MIN_FECHA_NACIMIENTO = fechaMinimaNacimiento()
    navegador (que puede ser de minutos). */
 const TIEMPO_LIMITE_ENVIO_MS = 15_000
 
+/* Los dos tiempos de la búsqueda de equipos.
+   El retardo es lo que convierte "una petición por tecla" en "una petición por
+   pausa al escribir": con 300 ms, teclear «Los Panditas» son 1 o 2 llamadas y no
+   12. Más corto se nota poco; más largo se siente lento.
+   El techo es de 4 s, deliberadamente más corto que los 15 s del envío y del
+   mismo orden que los 5 s del Riot ID: esto corre MIENTRAS alguien escribe, así
+   que una búsqueda colgada tiene que rendirse rápido y dejar el campo libre. */
+const RETARDO_BUSQUEDA_MS = 300
+const TIEMPO_LIMITE_BUSQUEDA_MS = 4_000
+
+/* Con menos de 2 caracteres no se busca: una sola letra trae ruido —la similitud
+   difusa empareja casi todo— y gasta una petición por cada equipo del sistema. */
+const MIN_TERMINO_BUSQUEDA = 2
+
 /* ------------------------------------------------------------------ */
 /*  Piezas de UI reutilizables (a nivel de módulo para no remontar los  */
 /*  inputs en cada render y no perder el foco al escribir)              */
@@ -344,10 +439,6 @@ function MensajeError({ id, texto }: { id: string; texto: string }) {
   )
 }
 
-/* `id` pasó de `keyof FormState` a `string`: los campos de jugador se llaman
-   `j3-correo` y ya no hay un tipo cerrado que los enumere. La restricción vieja
-   servía cuando había un solo juego de campos; ahora quien construye el id es
-   `idDeClave`, que es el que garantiza que sea único. */
 type CampoTextoProps = {
   id: string
   label: string
@@ -494,11 +585,11 @@ const CLASE_ENLACE_COMUNIDAD =
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
 /* Acción principal de la tarjeta del reglamento. NO lleva el gradiente del canon del
-   CTA primario, y eso es deliberado: el CTA primario de esta página es «Registrar
-   equipo», el botón de envío a ancho completo que está dos secciones más abajo. Un
-   segundo botón relleno con el mismo gradiente lo empata y deja de haber un solo camino
-   obvio — la trampa que AGENTS.md documenta al revés (secundarios que se ven más
-   vívidos que el primario).
+   CTA primario, y eso es deliberado: el CTA primario de esta página es «Registrarme»,
+   el botón de envío a ancho completo que está dos secciones más abajo. Un segundo botón
+   relleno con el mismo gradiente lo empata y deja de haber un solo camino obvio — la
+   trampa que AGENTS.md documenta al revés (secundarios que se ven más vívidos que el
+   primario).
    Así que queda un secundario reforzado: mismo esqueleto que CLASE_ENLACE_COMUNIDAD,
    pero con el borde y el texto en el acento para que gane a la descarga, que reutiliza
    ese secundario tal cual. Las dos van con `sm:flex-1` en el markup: sin eso el ancho lo
@@ -516,336 +607,536 @@ const CLASE_VER_REGLAMENTO =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
-/* Botones del roster (agregar / quitar). `bg-none` desactiva el gradiente que la
-   regla base de index.css le pone a TODO <button>: sin él, "Quitar" se vería más
-   vívido que el CTA de envío. `hover:[transform:none]` y `hover:shadow-none`
-   matan el salto de -2px y el glow, que dentro de una tarjeta de datos se leen
-   como jank. Mismo tratamiento que los botones del panel de admin. */
-const CLASE_BOTON_ROSTER_BASE =
+/* Botón secundario de la página: el «Cambiar» de la elección de equipo y el reinicio
+   del estado de éxito, que le suma `px-8 py-4 text-base` para el tamaño grande.
+   `bg-none` desactiva el gradiente que la regla base de index.css le pone a TODO
+   <button>: sin él se vería más vívido que el CTA de envío.
+   `hover:[transform:none]` y `hover:shadow-none` matan el salto de -2px y el glow,
+   que dentro de una tarjeta de datos se leen como jank. */
+const CLASE_BOTON_SECUNDARIO =
   'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-sans font-medium tracking-normal ' +
-  'bg-none transition-colors duration-200 hover:[transform:none] hover:shadow-none ' +
-  'disabled:opacity-50 disabled:cursor-not-allowed ' +
+  'bg-none bg-black/50 border border-blue-800/40 text-gray-200 ' +
+  'hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white ' +
+  'transition-colors duration-200 hover:[transform:none] hover:shadow-none ' +
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
-const CLASE_BOTON_AGREGAR =
-  `${CLASE_BOTON_ROSTER_BASE} bg-black/50 border border-blue-800/40 text-gray-200 hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white`
-/* Familia `rose`, la misma que el proyecto usa para lo que retira o falla, pero
-   fantasma (sin relleno) para que no compita con el envío. */
-const CLASE_BOTON_QUITAR =
-  `${CLASE_BOTON_ROSTER_BASE} bg-black/40 border border-rose-500/30 text-rose-200 hover:bg-rose-950/30 hover:border-rose-400/60 hover:text-white`
 
 /* ------------------------------------------------------------------ */
-/*  Tarjeta de jugador                                                 */
+/*  Combobox de equipo                                                 */
 /* ------------------------------------------------------------------ */
 
-/* <fieldset> + <legend> y no un <div> con <h3>: es un grupo de controles de
-   formulario, que es exactamente lo que fieldset marca. Un lector de pantalla
-   antepone la leyenda al nombre de cada campo de adentro, así que "Nombre" se
-   anuncia como "Jugador 3 · Suplente, Nombre" y deja de haber siete campos
-   "Nombre" indistinguibles. Los radiogroups de escolaridad y género van
-   anidados: fieldsets dentro de fieldsets es HTML válido.
+/* LA PIEZA CENTRAL DE ESTA PÁGINA, y la razón de que el registro individual pueda
+   volver sin traer de vuelta el problema que lo mató: con el equipo como texto
+   libre, «Los Panditas», «los panditas» y «Los Pandiats» eran tres equipos
+   distintos en la base y nadie se enteraba hasta el día del torneo. Acá el equipo
+   se RECONOCE en una lista en vez de escribirse de memoria, y lo que se manda
+   cuando se elige uno es su `equipo_id`, no su nombre — así que el typo deja de
+   ser posible por construcción, no por disciplina de quien escribe.
 
-   `scroll-mt-28` para que el header sticky no tape la tarjeta cuando el foco
-   salta acá tras un envío con errores. */
-function TarjetaJugador({
-  jugador,
-  indice,
-  total,
-  errores,
-  estadoRiotId,
-  anuncioRiotId,
-  onCampo,
-  onOpcion,
-  onGamertag,
-  onComprobarRiotId,
-  onQuitar
+   Es un combobox de verdad (patrón ARIA 1.2 «combobox con listbox»), no un input
+   con un div debajo:
+   - el input lleva role="combobox", aria-expanded, aria-controls y
+     aria-autocomplete="list";
+   - la lista es un role="listbox" con role="option" adentro;
+   - el foco NUNCA se va del input: la opción activa se marca con
+     aria-activedescendant, que es lo que hace que un lector de pantalla anuncie
+     «Los Panditas, 3 jugadores, 2 de 5» sin mover el cursor de teclado;
+   - flechas para moverse, Enter para elegir, Escape para cerrar.
+   La alternativa barata —un div con onClick— no la puede usar nadie que navegue
+   con teclado o con lector, que es justamente quien más necesita no equivocarse
+   de equipo.
+
+   REGLA QUE NO SE NEGOCIA: la búsqueda NUNCA bloquea. Si la RPC falla, tarda o
+   devuelve vacío, se sigue pudiendo escribir un nombre libre y enviar. Es la
+   misma regla que la validación del Riot ID (ver src/lib/atak.ts) y por la misma
+   razón de negocio: perder una inscripción porque una consulta de conveniencia no
+   respondió es mucho peor que aceptar un equipo escrito a mano. */
+
+type EstadoBusqueda = 'inactiva' | 'buscando' | 'lista' | 'fallida'
+
+const ID_LISTBOX_EQUIPO = 'equipo-sugerencias'
+const idOpcionEquipo = (indice: number) => `equipo-opcion-${indice}`
+
+/* «3 jugadores» / «1 jugador». Se usa en la lista, en la tarjeta del equipo
+   elegido y en la pantalla de éxito, así que vive en un solo lugar. */
+function textoJugadores(cantidad: number): string {
+  return `${cantidad} ${cantidad === 1 ? 'jugador' : 'jugadores'}`
+}
+
+function ComboboxEquipo({
+  valor,
+  elegido,
+  error,
+  onTexto,
+  onElegir,
+  onDeshacer
 }: {
-  jugador: JugadorForm
-  indice: number
-  total: number
-  errores: Errores
-  estadoRiotId: EstadoRiotId
-  anuncioRiotId: string
-  onCampo: (uid: string, campo: CampoJugador, valor: string) => void
-  onOpcion: (uid: string, campo: 'escolaridad' | 'genero', valor: string) => void
-  onGamertag: (uid: string, valor: string) => void
-  /* Recibe el valor además de la clave: así quien comprueba no tiene que salir a
-     buscar la tarjeta en el array, y la misma función sirve para el capitán. */
-  onComprobarRiotId: (uid: string, valor: string) => void
-  onQuitar: (uid: string) => void
+  valor: string
+  elegido: EquipoSugerido | null
+  error?: string
+  onTexto: (valor: string) => void
+  onElegir: (equipo: EquipoSugerido) => void
+  onDeshacer: () => void
 }) {
-  const { uid } = jugador
-  const esTitular = indice < TITULARES
-  const numero = indice + 1
-  const idAyudaRiot = `${uid}-gamertag-ayuda`
+  const [sugerencias, setSugerencias] = useState<EquipoSugerido[]>([])
+  const [estado, setEstado] = useState<EstadoBusqueda>('inactiva')
+  const [abierto, setAbierto] = useState(false)
+  /* Índice de la opción activa, o -1 si no hay ninguna. -1 y no `null` para poder
+     sumarle y restarle sin ramas al mover con las flechas. */
+  const [activo, setActivo] = useState(-1)
+  /* Anuncio puntual que PISA al texto derivado de la región viva. Existe para los
+     avisos que no se pueden derivar del estado de la búsqueda porque son respuesta a
+     una acción concreta —hoy, intentar elegir un equipo lleno—. Se limpia en cuanto
+     la búsqueda vuelve a cambiar de estado, para no quedar contradiciendo a la lista. */
+  const [anuncio, setAnuncio] = useState('')
 
-  /* El error de un campo del jugador: se lee del diccionario plano con la clave
-     compuesta, no de un objeto por tarjeta. */
-  const err = (campo: CampoJugador) => errores[claveJugador(uid, campo)]
-  const id = (campo: CampoJugador) => idDeClave(claveJugador(uid, campo))
+  const inputRef = useRef<HTMLInputElement>(null)
+  const botonCambiarRef = useRef<HTMLButtonElement>(null)
+  const temporizador = useRef<number | null>(null)
+  /* Contador de peticiones: una respuesta cuyo id ya no es el último llegó tarde y
+     se descarta. Sin esto, teclear «pan» y después «pandit» puede terminar con las
+     sugerencias de «pan» pintadas encima de las de «pandit», que es peor que no
+     tener sugerencias — le muestra a la persona un equipo que no buscó. */
+  const peticiones = useRef(0)
+  /* Las dos mitades del traspaso de foco entre las dos caras del campo. Elegir un
+     equipo DESMONTA el input y montar la tarjeta; deshacer hace lo contrario. En los
+     dos casos el nodo que tenía el foco desaparece y el foco cae a <body>, que en un
+     formulario largo significa volver a tabular desde el principio del documento —y
+     justo después de la acción más importante de la página—. Son banderas y no un
+     `elegido ? ... : ...` en el efecto porque el foco solo debe moverse cuando el
+     cambio lo produjo ESTE componente: si `equipoElegido` cambiara por otra vía, el
+     combobox estaría robando el foco. */
+  const volverAlInput = useRef(false)
+  const irAlBotonCambiar = useRef(false)
+
+  const idError = 'equipo-error'
+  const idAyuda = 'equipo-ayuda'
+
+  /* Limpieza del temporizador al desmontar. Sin esto, un debounce en vuelo cuando
+     la página pasa al estado de éxito dispara una búsqueda sobre un componente que
+     ya no existe. */
+  useEffect(() => {
+    return () => {
+      if (temporizador.current !== null) window.clearTimeout(temporizador.current)
+    }
+  }, [])
+
+  /* Con la lista scrolleable, mover con flechas tiene que arrastrar el scroll: el foco
+     nunca sale del input (lo marca aria-activedescendant), así que el navegador no lo
+     hace solo y la opción activa se puede quedar fuera de la vista.
+     `block: 'nearest'` para que no salte cuando ya está visible. */
+  useEffect(() => {
+    if (!abierto || activo < 0) return
+    document.getElementById(idOpcionEquipo(activo))?.scrollIntoView({ block: 'nearest' })
+  }, [activo, abierto])
+
+  /* Traspaso del foco entre las dos caras del campo. En un efecto y no en los
+     handlers porque el nodo destino se monta recién en el render siguiente. */
+  useEffect(() => {
+    if (elegido) {
+      if (!irAlBotonCambiar.current) return
+      irAlBotonCambiar.current = false
+      botonCambiarRef.current?.focus()
+      return
+    }
+    if (!volverAlInput.current) return
+    volverAlInput.current = false
+    inputRef.current?.focus()
+    /* Se selecciona el texto, que quedó igual al nombre del equipo que se acaba de
+       soltar: así la primera tecla lo reemplaza en vez de agregarse al final. */
+    inputRef.current?.select()
+  }, [elegido])
+
+  const buscar = (termino: string) => {
+    const id = peticiones.current + 1
+    peticiones.current = id
+    setEstado('buscando')
+    setAnuncio('')
+
+    void (async () => {
+      /* Sin credenciales el cliente viene en `null`. Es un fallo de búsqueda más:
+         no bloquea nada, solo deja de haber sugerencias. */
+      const supabase = obtenerSupabase()
+      if (!supabase) {
+        if (peticiones.current === id) setEstado('fallida')
+        return
+      }
+
+      try {
+        const { data, error: errorRpc } = await supabase
+          .rpc('buscar_equipos', { termino })
+          .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_BUSQUEDA_MS))
+
+        /* Respuesta superada por otra más nueva: se tira sin tocar el estado. */
+        if (peticiones.current !== id) return
+
+        if (errorRpc) {
+          setEstado('fallida')
+          return
+        }
+
+        const lista = leerSugerencias(data)
+        setSugerencias(lista)
+        setEstado('lista')
+        /* La lista se abre SOLO si el campo sigue enfocado. Sin esta condición, una
+           respuesta lenta reabre el desplegable después de que la persona ya se fue al
+           campo siguiente: queda flotando sobre la sección de abajo, con
+           `aria-expanded="true"` en un combobox que no tiene el foco y sin ninguna
+           forma de cerrarlo salvo volver a entrar y salir. Cubre también el Escape —
+           cerrar a mano y que la respuesta lo deshiciera era la misma carrera. */
+        setAbierto(lista.length > 0 && document.activeElement === inputRef.current)
+        setActivo(-1)
+      } catch {
+        /* Red caída, aborto por timeout o cuerpo inesperado. Sin console.*: el
+           invariante de cero salida por consola vale para todo src/. */
+        if (peticiones.current !== id) return
+        setEstado('fallida')
+      }
+    })()
+  }
+
+  /* El debounce se dispara desde el onChange —un evento— y no desde un efecto
+     sobre `valor`. Es la diferencia entre "buscar porque la persona escribió" y
+     "buscar porque el estado cambió": lo segundo también se dispararía cuando el
+     valor lo cambia otro código (un reinicio del formulario, por ejemplo). */
+  const alEscribir = (siguiente: string) => {
+    onTexto(siguiente)
+    setActivo(-1)
+
+    cancelarBusquedaPendiente()
+    /* Toda tecla invalida lo que esté en vuelo, no solo el borrado: si no, durante
+       los 300 ms de debounce del término nuevo puede aterrizar la respuesta del
+       anterior y abrir la lista con sugerencias que ya no corresponden a lo escrito. */
+    peticiones.current += 1
+
+    const termino = siguiente.trim()
+    if (termino.length < MIN_TERMINO_BUSQUEDA) {
+      setSugerencias([])
+      setEstado('inactiva')
+      setAbierto(false)
+      return
+    }
+
+    temporizador.current = window.setTimeout(() => {
+      temporizador.current = null
+      buscar(termino)
+    }, RETARDO_BUSQUEDA_MS)
+  }
+
+  /* Cancela el debounce pendiente y deja la ref en null, para que `!== null` siga
+     significando "hay un timer vivo" y no "hubo uno alguna vez". */
+  const cancelarBusquedaPendiente = () => {
+    if (temporizador.current === null) return
+    window.clearTimeout(temporizador.current)
+    temporizador.current = null
+  }
+
+  const estaLleno = (equipo: EquipoSugerido) => equipo.jugadores >= MAX_JUGADORES
+
+  const elegir = (equipo: EquipoSugerido) => {
+    if (estaLleno(equipo)) {
+      /* No se elige, pero se dice por qué: sin esto, con teclado, Enter sobre una
+         opción llena no hace absolutamente nada y no hay forma de saber si la tecla
+         se perdió o si el control está roto. */
+      setAnuncio(`${equipo.nombre} está lleno: ya tiene ${MAX_JUGADORES} jugadores. Elige otro equipo.`)
+      return
+    }
+    /* Cualquier búsqueda pendiente deja de importar: ya hay equipo. */
+    cancelarBusquedaPendiente()
+    peticiones.current += 1
+    setAbierto(false)
+    setActivo(-1)
+    setSugerencias([])
+    setEstado('inactiva')
+    setAnuncio('')
+    /* El foco tiene que seguir al control: el input se desmonta en este mismo
+       cambio. Lo mueve el efecto, cuando el botón ya exista. */
+    irAlBotonCambiar.current = true
+    onElegir(equipo)
+  }
+
+  const alTeclado = (evento: React.KeyboardEvent<HTMLInputElement>) => {
+    if (evento.key === 'Escape') {
+      setAbierto(false)
+      setActivo(-1)
+      return
+    }
+
+    if (evento.key === 'ArrowDown' || evento.key === 'ArrowUp') {
+      if (sugerencias.length === 0) return
+      /* preventDefault para que la flecha no mueva el cursor dentro del texto:
+         con la lista abierta, las flechas son de la lista. */
+      evento.preventDefault()
+
+      if (!abierto) {
+        setAbierto(true)
+        setActivo(evento.key === 'ArrowDown' ? 0 : sugerencias.length - 1)
+        return
+      }
+
+      const paso = evento.key === 'ArrowDown' ? 1 : -1
+      setActivo((prev) => {
+        const siguiente = prev + paso
+        /* Circular: desde la última, abajo vuelve a la primera. Con 5 opciones
+           como mucho, es más rápido que topar contra el extremo. */
+        if (siguiente < 0) return sugerencias.length - 1
+        if (siguiente >= sugerencias.length) return 0
+        return siguiente
+      })
+      return
+    }
+
+    if (evento.key === 'Enter') {
+      /* Sin opción activa, Enter NO se toca: es el envío del formulario. Solo se
+         intercepta cuando hay algo que elegir, que es lo que la persona espera
+         que haga Enter en ese momento. */
+      if (!abierto || activo < 0) return
+      const opcion = sugerencias[activo]
+      if (!opcion) return
+      evento.preventDefault()
+      /* Una opción llena no se elige, pero el Enter igual se consume: si se dejara
+         pasar, el formulario se enviaría desde una lista abierta y la persona no
+         entendería por qué. */
+      elegir(opcion)
+    }
+  }
+
+  /* ---------- Equipo ya elegido ---------- */
+  if (elegido) {
+    return (
+      <div>
+        {/* El <label> no envuelve a nada enfocable en este estado, así que es un
+            <p>: un label sin control asociado es ruido para un lector de pantalla. */}
+        <p className="block text-sm text-gray-400 mb-2">
+          Tu equipo <span className="text-lqc-accent" aria-hidden="true">*</span>
+        </p>
+        <div
+          className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3.5 ${
+            error ? 'border-rose-500/60 bg-rose-950/20' : 'border-lqc-accent/40 bg-lqc-900/30'
+          }`}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <Check className="w-5 h-5 text-lqc-accent shrink-0" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-white font-medium truncate">{elegido.nombre}</p>
+              <p className="text-sm text-gray-400">{textoJugadores(elegido.jugadores)}</p>
+            </div>
+          </div>
+          {/* Lleva `id="equipo"` porque en este estado ÉSTE es el control del campo
+              equipo: es a donde tiene que ir el foco cuando el servidor rechaza por
+              'equipo_lleno'. `enfocarClave` busca el id que coincide con la clave de
+              error, así que si el id viviera solo en el input de arriba, el foco se
+              perdería en silencio justo en el rechazo que más lo necesita. */}
+          <button
+            type="button"
+            id="equipo"
+            ref={botonCambiarRef}
+            onClick={() => {
+              volverAlInput.current = true
+              /* Se relanza la búsqueda con el texto que queda —que es el nombre del
+                 equipo que se acaba de soltar—, para que la lista vuelva a aparecer con
+                 ese equipo arriba. Sin esto, deshacer deja el campo con el nombre EXACTO
+                 y sin sugerencias: enviar sin tocar nada manda `equipo` (nombre libre)
+                 en vez de `equipo_id`, o sea que crea un segundo equipo con el mismo
+                 nombre — exactamente el duplicado que este combobox existe para evitar.
+                 El foco vuelve al input en el efecto, así que para cuando llegue la
+                 respuesta el guard de `document.activeElement` ya se cumple. */
+              const termino = valor.trim()
+              if (termino.length >= MIN_TERMINO_BUSQUEDA) {
+                cancelarBusquedaPendiente()
+                buscar(termino)
+              }
+              onDeshacer()
+            }}
+            aria-label={`Cambiar de equipo. Ahora está elegido ${elegido.nombre}`}
+            aria-describedby={error ? idError : undefined}
+            className={`${CLASE_BOTON_SECUNDARIO} shrink-0`}
+          >
+            Cambiar
+          </button>
+        </div>
+        {error && <MensajeError id={idError} texto={error} />}
+        <p className="mt-2 text-sm text-gray-400">
+          Te vas a registrar en este equipo. Si no es el tuyo, pulsa «Cambiar».
+        </p>
+      </div>
+    )
+  }
+
+  /* ---------- Buscando o escribiendo ---------- */
+  const hayLista = abierto && sugerencias.length > 0
+  const sinResultados =
+    estado === 'lista' && sugerencias.length === 0 && valor.trim().length >= MIN_TERMINO_BUSQUEDA
 
   return (
-    /* Sin `border` (que trae CLASE_TARJETA) porque el <fieldset> ya tiene borde
-       propio del navegador y las dos utilidades se pisarían por su orden en el CSS
-       generado, no por el orden en que se escriben. El contorno lo da un `ring`,
-       que no compite con nada. */
-    <fieldset
-      /* `min-w-0`: el UA le da a <fieldset> `min-inline-size: min-content` y el
-         preflight de Tailwind NO lo resetea, así que con un input de fecha adentro
-         la tarjeta no podría encogerse por debajo de su contenido y a 320px
-         desbordaría a lo ancho. */
-      className={`scroll-mt-28 m-0 min-w-0 border-0 rounded-2xl bg-black/30 p-6 md:p-8 backdrop-blur-sm ring-1 ${
-        esTitular ? 'ring-lqc-accent/20' : 'ring-white/5'
-      }`}
-    >
-      {/* La leyenda es el nombre que un lector de pantalla antepone a CADA campo
-          del grupo ("Jugador 3, suplente. Nombre"), así que lleva solo eso. El
-          botón «Quitar» va fuera: dentro de <legend> su texto se colaría en el
-          nombre de los diez campos de la tarjeta. Va `sr-only` porque el mismo
-          rótulo se pinta abajo con jerarquía visual. */}
-      <legend className="sr-only">
-        Jugador {numero}, {esTitular ? 'titular' : 'suplente'}
-      </legend>
+    <div>
+      <label htmlFor="equipo" className="block text-sm text-gray-400 mb-2">
+        Tu equipo <span className="text-lqc-accent" aria-hidden="true">*</span>
+      </label>
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="font-heading text-lg md:text-xl text-white">
-            Jugador {numero}
-          </span>
-          {/* El rol es información, no un control: no se elige acá, lo asigna la
-              posición. Por eso es una pastilla y no un botón. */}
+      {/* `relative` para colgar la lista, y sin `overflow-hidden` en ningún padre
+          de esta caja o la lista quedaría recortada. */}
+      <div className="relative">
+        <Users
+          className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none ${
+            error ? 'text-rose-400' : 'text-gray-500'
+          }`}
+          aria-hidden="true"
+        />
+        <input
+          ref={inputRef}
+          id="equipo"
+          name="equipo"
+          type="text"
+          role="combobox"
+          value={valor}
+          onChange={(e) => alEscribir(e.target.value)}
+          onKeyDown={alTeclado}
+          /* Al salir del campo se cierra la lista. Que las opciones no roben el
+             foco lo resuelve el onMouseDown de más abajo, no un timeout. */
+          onBlur={() => {
+            setAbierto(false)
+            setActivo(-1)
+          }}
+          placeholder="Escribe el nombre de tu equipo"
+          /* `off` y no `organization`: lo que el navegador tiene guardado de otros
+             formularios no tiene nada que ver con los equipos de esta liga, y una
+             lista de autocompletado nativa taparía a las sugerencias reales. */
+          autoComplete="off"
+          required
+          aria-expanded={hayLista}
+          aria-controls={ID_LISTBOX_EQUIPO}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            hayLista && activo >= 0 ? idOpcionEquipo(activo) : undefined
+          }
+          aria-invalid={error ? true : undefined}
+          aria-describedby={`${idAyuda}${error ? ` ${idError}` : ''}`}
+          className={`${CLASE_INPUT_BASE} pr-12 ${error ? CLASE_INPUT_ERROR : CLASE_INPUT_OK}`}
+        />
+        {estado === 'buscando' && (
           <span
-            className={`rounded-full border px-3 py-1 text-xs font-medium ${
-              esTitular
-                ? 'border-lqc-accent/40 bg-lqc-900/40 text-lqc-accent'
-                : 'border-white/15 bg-black/40 text-gray-300'
-            }`}
+            className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none"
+            aria-hidden="true"
           >
-            {esTitular ? 'Titular' : 'Suplente'}
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
           </span>
-        </div>
-
-        {/* Quitar solo existe por encima del mínimo. Deshabilitado y no oculto:
-            que el control desaparezca cambiaría el layout de las 5 tarjetas
-            restantes justo cuando alguien acaba de usarlo. */}
-        <button
-          type="button"
-          onClick={() => onQuitar(uid)}
-          disabled={total <= MIN_JUGADORES}
-          aria-label={`Quitar al jugador ${numero}`}
-          aria-describedby={total <= MIN_JUGADORES ? ID_LIMITES_ROSTER : undefined}
-          className={CLASE_BOTON_QUITAR}
-        >
-          <Trash2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-          Quitar
-        </button>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="md:col-span-2">
-          <CampoTexto
-            id={id('gamertag')}
-            /* El label es «Riot ID» (lo que valida REGEX_RIOT_ID), pero la clave
-               del estado y la columna se llaman `gamertag`: renombrarlas rompe
-               el contrato con la RPC. */
-            label="Riot ID"
-            icono={Gamepad2}
-            valor={jugador.gamertag}
-            onChange={(v) => onGamertag(uid, v)}
-            /* El error del envío tiene prioridad; si no hay, se deriva del
-               veredicto remoto. Derivado y no guardado en `errores` a propósito:
-               ese objeto enciende el banner de "No pudimos enviar el registro",
-               que no corresponde cuando nadie envió nada todavía. */
-            error={
-              err('gamertag') ??
-              (estadoRiotId === 'no_encontrado' ? MENSAJE_RIOT_ID_NO_EXISTE : undefined)
-            }
-            placeholder="Jugador#MX1"
-            autoComplete="off"
-            describedById={idAyudaRiot}
-            onBlur={() => onComprobarRiotId(uid, jugador.gamertag)}
-            /* El 'no_encontrado' no pone ícono: ya se ve como error de campo
-               (borde rojo + mensaje con su propio ícono) y un segundo símbolo
-               sería ruido. */
-            sufijo={
-              estadoRiotId === 'validando' ? (
-                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-              ) : estadoRiotId === 'valido' ? (
-                <Check className="w-5 h-5 text-green-400" />
-              ) : null
-            }
-          />
-          <p id={idAyudaRiot} className="mt-2 text-sm text-gray-400">
-            Riot ID completo: nombre, luego #, luego tag (por ejemplo, Jugador#MX1).
-          </p>
-          {/* Región viva propia de ESTA tarjeta. Una sola región compartida entre
-              los 7 jugadores anunciaría "Riot ID verificado" sin decir de quién, y
-              dos comprobaciones que terminan juntas se pisarían. */}
-          <span role="status" aria-live="polite" className="sr-only">
-            {anuncioRiotId}
-          </span>
-        </div>
-
-        <CampoTexto
-          id={id('nombre')}
-          label="Nombre"
-          icono={User}
-          valor={jugador.nombre}
-          onChange={(v) => onCampo(uid, 'nombre', v)}
-          error={err('nombre')}
-          placeholder="Nombre completo"
-          autoComplete="off"
-        />
-        <CampoTexto
-          id={id('fecha_nacimiento')}
-          label="Fecha de Nacimiento"
-          icono={Calendar}
-          tipo="date"
-          valor={jugador.fecha_nacimiento}
-          onChange={(v) => onCampo(uid, 'fecha_nacimiento', v)}
-          error={err('fecha_nacimiento')}
-          min={MIN_FECHA_NACIMIENTO}
-          max={MAX_FECHA_NACIMIENTO}
-          claseInput="[color-scheme:dark]"
-        />
-        <CampoTexto
-          id={id('celular')}
-          label="Celular"
-          icono={Phone}
-          tipo="tel"
-          valor={jugador.celular}
-          onChange={(v) => onCampo(uid, 'celular', v)}
-          error={err('celular')}
-          placeholder="10 dígitos"
-          autoComplete="off"
-        />
-        <CampoTexto
-          id={id('correo')}
-          label="Correo electrónico"
-          icono={Mail}
-          tipo="email"
-          valor={jugador.correo}
-          onChange={(v) => onCampo(uid, 'correo', v)}
-          error={err('correo')}
-          placeholder="jugador@correo.com"
-          autoComplete="off"
-        />
-        <CampoTexto
-          id={id('municipio')}
-          label="Municipio"
-          icono={MapPin}
-          valor={jugador.municipio}
-          onChange={(v) => onCampo(uid, 'municipio', v)}
-          error={err('municipio')}
-          placeholder="Municipio donde vive"
-          autoComplete="off"
-          claseContenedor="md:col-span-2"
-        />
-      </div>
-
-      {/* Escolaridad. El campo condicional de «Otros» va FUERA del fieldset con
-          `role="radiogroup"`: un `textbox` no es hijo válido de un radiogroup y
-          algunos lectores lo saltan o anuncian mal la posición ("3 de 4"). Con 7
-          tarjetas × 2 grupos serían hasta 14 grupos malformados. */}
-      <div className="mt-8">
-      <fieldset
-        role="radiogroup"
-        aria-labelledby={`${uid}-escolaridad-label`}
-        aria-required="true"
-        aria-invalid={err('escolaridad') ? true : undefined}
-        aria-describedby={err('escolaridad') ? `${id('escolaridad')}-error` : undefined}
-        className="border-0 p-0 m-0"
-      >
-        <legend
-          id={`${uid}-escolaridad-label`}
-          className="flex items-center gap-2 text-sm text-gray-400 mb-3"
-        >
-          <GraduationCap className="w-4 h-4 text-blue-400" />
-          Escolaridad <span className="text-lqc-accent" aria-hidden="true">*</span>
-        </legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {OPCIONES_ESCOLARIDAD.map((opcion, i) => (
-            <OpcionPill
-              key={opcion}
-              id={i === 0 ? id('escolaridad') : undefined}
-              /* `name` por jugador: con un name compartido los 7 grupos de radios
-                 serían UN grupo y elegir "Prepa" en el jugador 2 desmarcaría al 1. */
-              name={`${uid}-escolaridad`}
-              valor={opcion}
-              seleccionado={jugador.escolaridad === opcion}
-              onSelect={(v) => onOpcion(uid, 'escolaridad', v)}
-              error={Boolean(err('escolaridad'))}
-            />
-          ))}
-        </div>
-        {err('escolaridad') && (
-          <MensajeError id={`${id('escolaridad')}-error`} texto={err('escolaridad') as string} />
         )}
-      </fieldset>
-      {jugador.escolaridad === 'Otros' && (
-        <div className="mt-4">
-          <CampoTexto
-            id={id('escolaridad_otro')}
-            label="Especifica la escolaridad"
-            icono={GraduationCap}
-            valor={jugador.escolaridad_otro}
-            onChange={(v) => onCampo(uid, 'escolaridad_otro', v)}
-            error={err('escolaridad_otro')}
-            placeholder="¿Cuál?"
-          />
-        </div>
-      )}
+
+        {/* La lista se oculta DESMONTÁNDOLA, así una lista cerrada no deja opciones
+            navegables por lector de pantalla. Eso deja a `aria-controls` apuntando a un
+            id ausente, que en general es ARIA inválido —es la razón por la que
+            ListaInscripciones.tsx mantiene su panel en el DOM con `hidden` en vez de
+            desmontarlo—, pero acá no lo es: el patrón combobox contempla exactamente
+            este caso mientras `aria-expanded` sea `false`, que es lo que garantiza
+            `hayLista`. Si alguna vez `aria-expanded` deja de seguir a la presencia de la
+            lista, este razonamiento se cae y hay que volver al `hidden`.
+            `onMouseDown` con preventDefault es lo que hace que un clic en una
+            opción NO dispare el blur del input antes del click: sin eso, el blur
+            cierra la lista y el click nunca llega a su destino. Es el truco
+            estándar del patrón, y es preferible a un setTimeout en el blur porque
+            no depende de que el click gane una carrera.
+            `max-h` + scroll: cinco opciones miden más que el espacio libre de un
+            teléfono con el teclado abierto, y las últimas quedaban debajo del teclado
+            sin forma de alcanzarlas con el dedo (con flechas sí, pero en móvil no hay). */}
+        {hayLista && (
+          <ul
+            id={ID_LISTBOX_EQUIPO}
+            role="listbox"
+            aria-label="Equipos que coinciden"
+            onMouseDown={(e) => e.preventDefault()}
+            className="absolute z-20 mt-2 w-full max-h-72 overflow-y-auto rounded-xl border border-blue-800/40 bg-gray-950/95 backdrop-blur-md shadow-lqc-lg"
+          >
+            {sugerencias.map((equipo, indice) => {
+              const lleno = estaLleno(equipo)
+              const esActivo = indice === activo
+              return (
+                <li
+                  key={equipo.id}
+                  id={idOpcionEquipo(indice)}
+                  role="option"
+                  aria-selected={esActivo}
+                  /* `aria-disabled` y no quitarlo de la lista: que un equipo lleno
+                     aparezca y se explique es información —«ya somos 7»—, mientras
+                     que esconderlo dejaría a la persona buscándolo para siempre y
+                     probablemente creando un equipo duplicado con el mismo nombre,
+                     que es exactamente lo que este combobox existe para evitar.
+                     Sigue siendo navegable con flechas a propósito: así un lector
+                     de pantalla lo anuncia y su motivo se escucha. */
+                  aria-disabled={lleno || undefined}
+                  onClick={() => elegir(equipo)}
+                  className={`flex items-center justify-between gap-3 px-4 py-3 cursor-pointer border-b border-white/5 last:border-b-0 ${
+                    lleno
+                      ? 'cursor-not-allowed opacity-60'
+                      : esActivo
+                        ? 'bg-lqc-900/60'
+                        : 'hover:bg-blue-950/40'
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className="block text-white truncate">{equipo.nombre}</span>
+                    <span className="block text-sm text-gray-400">
+                      {textoJugadores(equipo.jugadores)}
+                    </span>
+                  </span>
+                  {lleno && (
+                    <span className="shrink-0 rounded-full border border-rose-500/40 bg-rose-950/30 px-2.5 py-1 text-xs text-rose-200">
+                      Equipo lleno
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
 
-      {/* Género. Mismo criterio que escolaridad con el campo de «Otros». */}
-      <div className="mt-8">
-      <fieldset
-        role="radiogroup"
-        aria-labelledby={`${uid}-genero-label`}
-        aria-required="true"
-        aria-invalid={err('genero') ? true : undefined}
-        aria-describedby={err('genero') ? `${id('genero')}-error` : undefined}
-        className="border-0 p-0 m-0"
-      >
-        <legend
-          id={`${uid}-genero-label`}
-          className="flex items-center gap-2 text-sm text-gray-400 mb-3"
-        >
-          <UserCircle className="w-4 h-4 text-blue-400" />
-          Género <span className="text-lqc-accent" aria-hidden="true">*</span>
-        </legend>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {OPCIONES_GENERO.map((opcion, i) => (
-            <OpcionPill
-              key={opcion}
-              id={i === 0 ? id('genero') : undefined}
-              name={`${uid}-genero`}
-              valor={opcion}
-              seleccionado={jugador.genero === opcion}
-              onSelect={(v) => onOpcion(uid, 'genero', v)}
-              error={Boolean(err('genero'))}
-            />
-          ))}
-        </div>
-        {err('genero') && (
-          <MensajeError id={`${id('genero')}-error`} texto={err('genero') as string} />
-        )}
-      </fieldset>
-      {jugador.genero === 'Otros' && (
-        <div className="mt-4">
-          <CampoTexto
-            id={id('genero_otro')}
-            label="Especifica el género"
-            icono={UserCircle}
-            valor={jugador.genero_otro}
-            onChange={(v) => onCampo(uid, 'genero_otro', v)}
-            error={err('genero_otro')}
-            placeholder="¿Cuál?"
-          />
-        </div>
+      {error && <MensajeError id={idError} texto={error} />}
+
+      <p id={idAyuda} className="mt-2 text-sm text-gray-400">
+        Escribe y elige tu equipo de la lista para no crear uno repetido. Si todavía no
+        está registrado, escribe el nombre y lo creamos con tu inscripción.
+      </p>
+
+      {/* Región viva del estado de la búsqueda. Va aparte de la ayuda porque es lo
+          único que cambia solo, sin que la persona haya hecho nada: sin esto, quien
+          no ve la pantalla no se entera de que aparecieron cinco sugerencias.
+          `polite` para no interrumpir mientras se escribe.
+          El caso 'fallida' se anuncia con lo que hay que hacer, no con lo que pasó:
+          la búsqueda es una comodidad y su fallo no cambia lo que la persona puede
+          hacer a continuación.
+          El primer caso se ata a `hayLista` y no a `estado`: la lista puede estar
+          cerrada con sugerencias cargadas —tras un Escape, o cuando la respuesta llega
+          con el foco en otro campo— y decir «usa las flechas para elegir» sobre un
+          desplegable que no está abierto manda a la persona a teclas que no hacen nada. */}
+      <span role="status" aria-live="polite" className="sr-only">
+        {anuncio ||
+          (hayLista
+            ? `${sugerencias.length} ${
+                sugerencias.length === 1 ? 'equipo encontrado' : 'equipos encontrados'
+              }. Usa las flechas para elegir.`
+            : sinResultados
+              ? 'No hay equipos con ese nombre. Puedes escribirlo y lo creamos.'
+              : estado === 'fallida'
+                ? 'No pudimos buscar equipos. Escribe el nombre completo y sigue adelante.'
+                : '')}
+      </span>
+
+      {/* Los dos mensajes visibles equivalentes. Ninguno bloquea ni pinta el campo
+          como error: en los dos casos escribir el nombre a mano es una salida
+          válida y completa. */}
+      {sinResultados && (
+        <p className="mt-2 text-sm text-gray-400">
+          No hay ningún equipo con ese nombre. Se creará al enviar tu registro.
+        </p>
       )}
-      </div>
-    </fieldset>
+      {estado === 'fallida' && (
+        <p className="mt-2 text-sm text-amber-200/80">
+          No pudimos cargar las sugerencias. Puedes escribir el nombre completo de tu
+          equipo y continuar: tu registro se envía igual.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -854,86 +1145,64 @@ function TarjetaJugador({
 /* ------------------------------------------------------------------ */
 
 export default function Registro() {
-  const [equipoForm, setEquipoForm] = useState<EquipoForm>(EQUIPO_VACIO)
-  const [jugadores, setJugadores] = useState<JugadorForm[]>(() =>
-    Array.from({ length: MIN_JUGADORES }, jugadorVacio)
-  )
+  const [form, setForm] = useState<FormState>(FORM_VACIO)
+  /* El equipo elegido de las sugerencias, o null si el nombre es texto libre. Es
+     lo que decide cuál de las dos claves lleva el payload — `equipo_id` o
+     `equipo`— y no se puede derivar del texto: dos equipos pueden llamarse
+     parecido y solo el id dice a cuál se une la persona. */
+  const [equipoElegido, setEquipoElegido] = useState<EquipoSugerido | null>(null)
+  const [esCapitan, setEsCapitan] = useState(false)
   const [errores, setErrores] = useState<Errores>({})
   const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false)
-  const [enviado, setEnviado] = useState(false)
   const [enviando, setEnviando] = useState(false)
   /* Bandera, no el error real: el mensaje que se muestra es literal en el JSX,
      así que ningún detalle técnico del backend puede filtrarse a la pantalla. */
   const [errorEnvio, setErrorEnvio] = useState(false)
   /* Rechazo de negocio de la RPC. Separado de `errorEnvio` (fallo técnico) y de
      `errores` (validación local) porque los tres significan cosas distintas y
-     mezclarlos haría aparecer el banner equivocado: un 'equipo_duplicado' no es
-     "falta información en el formulario". */
+     mezclarlos haría aparecer el banner equivocado. */
   const [rechazo, setRechazo] = useState<CodigoRechazo | null>(null)
-  /* Anuncio de alta/baja de tarjetas. Es un cambio de estructura de la página que
-     no mueve el foco, así que sin esto quien no ve la pantalla no se entera. */
-  const [anuncioRoster, setAnuncioRoster] = useState('')
+  /* Resultado del registro. Reemplaza al booleano `enviado` del modelo anterior:
+     la pantalla de éxito ya no puede armarse solo con lo que hay en el formulario
+     —el número de jugadores del equipo lo sabe la base, no el cliente—, así que el
+     estado guarda lo que la RPC devolvió. `null` = todavía no se envió. */
+  const [resultado, setResultado] = useState<RegistroOk | null>(null)
+  /* Nombre del equipo al que se entró, capturado en el envío. Se guarda aparte
+     porque `reiniciar()` limpia el formulario y la pantalla de éxito tiene que
+     seguir diciendo a qué equipo se unió la persona. */
+  const [equipoRegistrado, setEquipoRegistrado] = useState('')
 
   const tituloExitoRef = useRef<HTMLHeadingElement>(null)
   const tarjetaExitoRef = useRef<HTMLDivElement>(null)
-  const enviadoPrevio = useRef(enviado)
-  const botonAgregarRef = useRef<HTMLButtonElement>(null)
-  const barraRosterRef = useRef<HTMLDivElement>(null)
+  const enviadoPrevio = useRef(false)
 
   /* --- Comprobación del Riot ID contra ATAK.GG (ver src/lib/atak.ts) --- */
 
-  /* N validaciones independientes, una por tarjeta, indexadas por uid. Antes era
-     un solo estado porque había un solo Riot ID; con un roster, dos comprobaciones
-     pueden estar en vuelo a la vez y cada una tiene que poder terminar sin pisar
-     a la otra. */
-  const [validaciones, setValidaciones] = useState<Record<string, ValidacionRiotId>>({})
-  const [anunciosRiotId, setAnunciosRiotId] = useState<Record<string, string>>({})
+  /* Un solo Riot ID por envío, así que el estado vuelve a ser escalar. En el
+     modelo del roster esto era un diccionario por uid con N comprobaciones en
+     vuelo; con un jugador por formulario, esa maquinaria sobra entera. */
+  const [validacionRiot, setValidacionRiot] = useState<ValidacionRiotId>(VALIDACION_INACTIVA)
+  const [anuncioRiot, setAnuncioRiot] = useState('')
 
-  /* Contador de peticiones POR JUGADOR: una respuesta cuyo id ya no es el último
-     de SU tarjeta llegó tarde y se descarta. Un contador global haría que teclear
-     en el jugador 4 invalidara la comprobación en vuelo del jugador 2. */
-  const peticionesRiotId = useRef<Map<string, number>>(new Map())
+  /* Contador de peticiones: una respuesta cuyo id ya no es el último llegó tarde
+     y se descarta. */
+  const peticionesRiot = useRef(0)
 
-  /* Caché de veredictos firmes, compartido entre tarjetas y keyeado por el VALOR
-     del Riot ID, no por el jugador: dos tarjetas que escriban el mismo texto
-     preguntan una sola vez, y el veredicto sigue siendo correcto porque depende
-     del valor y de nada más.
-     Los 'indeterminado' NO se guardan a propósito: si ATAK o Riot estaban caídos,
-     el siguiente blur es una oportunidad legítima de reintentar. */
+  /* Caché de veredictos FIRMES, keyeado por el valor del Riot ID. Los
+     'indeterminado' NO se guardan a propósito: si ATAK o Riot estaban caídos, el
+     siguiente blur es una oportunidad legítima de reintentar. */
   const riotIdComprobado = useRef<Map<string, ResultadoRiotId>>(new Map())
 
-  /* Campo al que hay que llevar el foco después del próximo render. Lo usan alta y
-     baja de tarjetas: el nodo destino todavía no existe cuando corre el handler. */
-  const focoPendiente = useRef<string | null>(null)
-  /* Lo mismo para el botón de agregar, que SÍ está montado pero puede estar
-     deshabilitado en el momento del handler. Enfocarlo ahí sería un no-op —ver el
-     comentario de `quitarJugador`—, así que también se difiere. */
-  const focoBotonAgregar = useRef(false)
+  /* Estado efectivo: el veredicto guardado solo vale si sigue siendo sobre el Riot
+     ID que hay escrito AHORA. Cualquier otra cosa se lee como 'inactivo', que es
+     el estado que no dice ni bloquea nada. */
+  const estadoRiot: EstadoRiotId =
+    validacionRiot.valor === form.gamertag.trim() ? validacionRiot.estado : 'inactivo'
 
-  /* Estado efectivo de una tarjeta: el veredicto guardado solo vale si sigue siendo
-     sobre el Riot ID que hay escrito AHORA en esa tarjeta. Cualquier otra cosa se
-     lee como 'inactivo', que es el estado que no dice ni bloquea nada. */
-  const estadoRiotIdDe = (clave: string, valorActual: string): EstadoRiotId => {
-    const validacion = validaciones[clave]
-    if (!validacion) return 'inactivo'
-    return validacion.valor === valorActual.trim() ? validacion.estado : 'inactivo'
-  }
-
-  /* Orden VISUAL de todas las claves de error, recalculado en cada render porque
-     depende de cuántas tarjetas hay. Reemplaza al ORDEN_CAMPOS fijo del modelo
-     viejo, que no podía existir con un roster de tamaño variable. */
-  const ordenClaves = (): string[] => [
-    'equipo',
-    'capitan_nombre',
-    'capitan_celular',
-    ...jugadores.flatMap((j) => CAMPOS_JUGADOR.map((campo) => claveJugador(j.uid, campo))),
-    'privacidad'
-  ]
-
-  /* Foco + scroll a un campo por su clave de error. `preventScroll` separa las dos
-     cosas para que el scroll sea suave y el foco instantáneo. */
+  /* Foco + scroll a un control por su clave de error. `preventScroll` separa las
+     dos cosas para que el scroll sea suave y el foco instantáneo. */
   const enfocarClave = (clave: string) => {
-    const elemento = document.getElementById(idDeClave(clave))
+    const elemento = document.getElementById(clave)
     if (!elemento) return
     elemento.focus({ preventScroll: true })
     elemento.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -943,6 +1212,7 @@ export default function Registro() {
      desmonta y el foco cae en <body>. Se compara contra el valor previo en vez de
      usar una bandera de "primer render": así la página no roba el foco al cargar y
      es inmune al doble montaje de StrictMode. */
+  const enviado = resultado !== null
   useEffect(() => {
     if (enviadoPrevio.current === enviado) return
     enviadoPrevio.current = enviado
@@ -955,34 +1225,11 @@ export default function Registro() {
     enfocarClave('equipo')
   }, [enviado])
 
-  /* Foco diferido tras agregar o quitar una tarjeta: el destino recién existe
-     después del render. Se limpia siempre, incluso si el nodo ya no está, para que
-     un destino viejo no se dispare en un render posterior. */
-  useEffect(() => {
-    if (focoBotonAgregar.current) {
-      focoBotonAgregar.current = false
-      botonAgregarRef.current?.focus()
-      return
-    }
-    const clave = focoPendiente.current
-    if (!clave) return
-    focoPendiente.current = null
-    enfocarClave(clave)
-  }, [jugadores])
-
   /* Foco tras un rechazo de la RPC. En un efecto y no en `handleSubmit` porque el
-     destino puede estar deshabilitado en el momento de la respuesta: con el roster
-     lleno, un 'max_jugadores' llegaría cuando el botón de agregar está `disabled`.
-     La barra del roster es un contenedor —nunca se deshabilita— y es donde están
-     los controles que arreglan los dos rechazos de cantidad. */
+     destino puede no estar montado todavía en el momento de la respuesta. */
   useEffect(() => {
     if (!rechazo) return
-    if (rechazo === 'equipo_duplicado' || rechazo === 'falta_equipo') {
-      enfocarClave('equipo')
-      return
-    }
-    barraRosterRef.current?.focus({ preventScroll: true })
-    barraRosterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    enfocarClave(CAMPO_DE_RECHAZO[rechazo])
   }, [rechazo])
 
   /* --- Escrituras del formulario --- */
@@ -996,92 +1243,101 @@ export default function Registro() {
     })
   }
 
-  const setCampoEquipo = (campo: keyof EquipoForm, valor: string) => {
-    setEquipoForm((prev) => ({ ...prev, [campo]: valor }))
+  const setCampo = (campo: CampoForm, valor: string) => {
+    setForm((prev) => ({ ...prev, [campo]: valor }))
     limpiarError(campo)
-    /* Editar el nombre del equipo descarta el rechazo del servidor: era sobre el
-       nombre anterior. Sin esto, el mensaje de "ya existe un equipo con ese
-       nombre" seguiría en pantalla mientras se teclea el nombre nuevo. */
-    if (campo === 'equipo') setRechazo(null)
-  }
-
-  const setCampoJugador = (uid: string, campo: CampoJugador, valor: string) => {
-    setJugadores((prev) =>
-      prev.map((j) => (j.uid === uid ? { ...j, [campo]: valor } : j))
-    )
-    limpiarError(claveJugador(uid, campo))
+    /* Tocar el campo que un rechazo del servidor señalaba lo descarta: era sobre
+       el valor anterior. Sin esto, el aviso de «ese equipo está lleno» seguiría en
+       pantalla mientras se escribe el nombre de otro equipo. */
+    if (rechazo && CAMPO_DE_RECHAZO[rechazo] === campo) setRechazo(null)
   }
 
   /* Escolaridad y Género: al salir de "Otros" se descarta el texto libre. */
-  const setOpcionJugador = (uid: string, campo: 'escolaridad' | 'genero', valor: string) => {
-    const campoOtro: CampoJugador =
-      campo === 'escolaridad' ? 'escolaridad_otro' : 'genero_otro'
-    setJugadores((prev) =>
-      prev.map((j) =>
-        j.uid === uid
-          ? { ...j, [campo]: valor, ...(valor !== 'Otros' ? { [campoOtro]: '' } : {}) }
-          : j
-      )
-    )
+  const setOpcion = (campo: 'escolaridad' | 'genero', valor: string) => {
+    const campoOtro: CampoForm = campo === 'escolaridad' ? 'escolaridad_otro' : 'genero_otro'
+    setForm((prev) => ({
+      ...prev,
+      [campo]: valor,
+      ...(valor !== 'Otros' ? { [campoOtro]: '' } : {})
+    }))
     setErrores((prev) => {
       const siguiente = { ...prev }
-      delete siguiente[claveJugador(uid, campo)]
-      if (valor !== 'Otros') delete siguiente[claveJugador(uid, campoOtro)]
+      delete siguiente[campo]
+      if (valor !== 'Otros') delete siguiente[campoOtro]
       return siguiente
     })
   }
 
-  /* Toda edición de un Riot ID invalida el veredicto anterior —era sobre otro valor—
-     y descarta la respuesta de una validación en vuelo DE ESA ENTRADA. Vale igual para
-     una tarjeta y para el capitán: lo único que cambia es la clave. */
-  const invalidarRiotId = (clave: string) => {
-    peticionesRiotId.current.set(clave, (peticionesRiotId.current.get(clave) ?? 0) + 1)
+  /* Toda edición del Riot ID invalida el veredicto anterior —era sobre otro valor—
+     y descarta la respuesta de una validación en vuelo. */
+  const setGamertag = (valor: string) => {
+    setCampo('gamertag', valor)
+    peticionesRiot.current += 1
     /* Se limpia el veredicto guardado aunque el estado esté atado al valor: si la
        persona edita y vuelve a teclear el MISMO texto que se estaba comprobando, el
        valor coincide de nuevo pero aquella petición ya quedó descartada por el
        contador y su respuesta nunca se va a aplicar — sin esto, el indicador de
        "Validando…" giraba para siempre. No se pierde nada: al salir del campo, el
        caché repinta el veredicto sin volver a llamar. */
-    setValidaciones((prev) => ({ ...prev, [clave]: VALIDACION_INACTIVA }))
-    setAnunciosRiotId((prev) => ({ ...prev, [clave]: '' }))
+    setValidacionRiot(VALIDACION_INACTIVA)
+    setAnuncioRiot('')
   }
 
-  /* El Riot ID de un jugador tiene su propio onChange: además de lo que hace
-     setCampoJugador, invalida su veredicto. */
-  const setGamertag = (uid: string, valor: string) => {
-    setCampoJugador(uid, 'gamertag', valor)
-    invalidarRiotId(uid)
+  /* --- Elección de equipo --- */
+
+  const elegirEquipo = (equipo: EquipoSugerido) => {
+    setEquipoElegido(equipo)
+    /* El texto se sincroniza con el nombre elegido: es lo que se manda si la
+       persona después deshace la elección y envía igual, y es lo que ve si vuelve
+       al campo. */
+    setForm((prev) => ({ ...prev, equipo: equipo.nombre }))
+    limpiarError('equipo')
+    if (rechazo && CAMPO_DE_RECHAZO[rechazo] === 'equipo') setRechazo(null)
   }
 
-  /* El del capitán, lo mismo pero sobre el campo del equipo. Se guarda en
-     `capitan_nombre` —la columna, la clave del payload de la RPC y el campo que
-     espera ATAK NO cambian de nombre—: lo que cambió es QUÉ se guarda ahí. */
-  const setCapitanRiotId = (valor: string) => {
-    setCampoEquipo('capitan_nombre', valor)
-    invalidarRiotId(CLAVE_CAPITAN)
+  /* Deshacer NO borra el texto a propósito: quien pulsa «Cambiar» casi siempre
+     quiere ver la lista otra vez —se equivocó de equipo entre dos nombres
+     parecidos—, y vaciar el campo lo obligaría a escribirlo todo de nuevo.
+     El riesgo del texto que queda es real y conocido: si se envía tal cual, viaja
+     como `equipo` (nombre libre) y no como `equipo_id`. Por eso la ayuda del campo
+     insiste en elegir de la lista, y por eso al deshacer el foco vuelve al input
+     con las sugerencias a un carácter de distancia. */
+  const deshacerEquipo = () => {
+    setEquipoElegido(null)
+    if (rechazo && CAMPO_DE_RECHAZO[rechazo] === 'equipo') setRechazo(null)
   }
+
+  /* El texto del combobox pasa por acá y no por `setCampo` directo porque escribir
+     a mano después de haber elegido significa que la elección ya no vale: el id
+     guardado apuntaría a un equipo cuyo nombre ya no es el que se ve en pantalla. */
+  const setTextoEquipo = (valor: string) => {
+    setCampo('equipo', valor)
+    if (equipoElegido) setEquipoElegido(null)
+  }
+
+  /* --- Comprobación remota del Riot ID --- */
 
   /* Traduce el veredicto a lo que ve y oye la persona, siempre atado al valor que
-     se comprobó y a la tarjeta que lo pidió. Es el único lugar donde
-     'indeterminado' se vuelve silencio: ni tilde, ni error, ni anuncio. Es la regla
-     más importante de todo esto —una validación que no se pudo hacer nunca frena
-     una inscripción— y por eso vive en una sola rama.
+     se comprobó. Es el único lugar donde 'indeterminado' se vuelve silencio: ni
+     tilde, ni error, ni anuncio. Es la regla más importante de todo esto —una
+     validación que no se pudo hacer nunca frena una inscripción— y por eso vive en
+     una sola rama.
 
      Ojo con lo que NO hace: no escribe en `errores`. Ese objeto significa "lo que
      encontró el último envío" y es lo que enciende el banner de abajo. */
-  const aplicarVeredicto = (clave: string, valor: string, resultado: ResultadoRiotId) => {
-    if (resultado === 'existe') {
-      setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'valido' } }))
-      setAnunciosRiotId((prev) => ({ ...prev, [clave]: 'Riot ID verificado.' }))
+  const aplicarVeredicto = (valor: string, resultadoRiot: ResultadoRiotId) => {
+    if (resultadoRiot === 'existe') {
+      setValidacionRiot({ valor, estado: 'valido' })
+      setAnuncioRiot('Riot ID verificado.')
       return
     }
-    if (resultado === 'no_existe') {
-      setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'no_encontrado' } }))
-      setAnunciosRiotId((prev) => ({ ...prev, [clave]: MENSAJE_RIOT_ID_NO_EXISTE }))
+    if (resultadoRiot === 'no_existe') {
+      setValidacionRiot({ valor, estado: 'no_encontrado' })
+      setAnuncioRiot(MENSAJE_RIOT_ID_NO_EXISTE)
       return
     }
-    setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'inactivo' } }))
-    setAnunciosRiotId((prev) => ({ ...prev, [clave]: '' }))
+    setValidacionRiot({ valor, estado: 'inactivo' })
+    setAnuncioRiot('')
   }
 
   /* Al salir del campo, no en cada tecla: es una petición de red por comprobación.
@@ -1089,99 +1345,34 @@ export default function Registro() {
      formulario se envía sin que haya blur, así que nunca corre. Es coherente con no
      bloquear nunca por la validación, pero significa que no todo lo que se manda
      pasó por acá. No asumir lo contrario. */
-  const comprobarRiotId = (clave: string, valorCrudo: string) => {
+  const comprobarRiotId = (valorCrudo: string) => {
     const valor = valorCrudo.trim()
 
     /* El formato local manda y corre primero: si ya está mal, su error es más
        accionable que cualquier respuesta remota y no se gasta una petición. */
     if (!valor || !REGEX_RIOT_ID.test(valor)) return
 
-    /* El caché va por VALOR y lo comparten todas las entradas —el capitán más los 5 a 7
-       jugadores—: si el capitán es también jugador (el caso normal), su Riot ID se
-       comprueba una sola vez. */
     const cacheado = riotIdComprobado.current.get(valor)
     if (cacheado) {
-      aplicarVeredicto(clave, valor, cacheado)
+      aplicarVeredicto(valor, cacheado)
       return
     }
 
-    const idPeticion = (peticionesRiotId.current.get(clave) ?? 0) + 1
-    peticionesRiotId.current.set(clave, idPeticion)
-    setValidaciones((prev) => ({ ...prev, [clave]: { valor, estado: 'validando' } }))
-    setAnunciosRiotId((prev) => ({ ...prev, [clave]: '' }))
+    const idPeticion = peticionesRiot.current + 1
+    peticionesRiot.current = idPeticion
+    setValidacionRiot({ valor, estado: 'validando' })
+    setAnuncioRiot('')
 
     /* Sin await ni try/catch: validarRiotId() no lanza por contrato y esto no debe
        bloquear nada de lo que la persona siga haciendo en el formulario. */
     void (async () => {
-      const resultado = await validarRiotId(valor)
-      /* Respuesta superada por otra más nueva DE ESTA ENTRADA: se tira. */
-      if (peticionesRiotId.current.get(clave) !== idPeticion) return
-      if (resultado !== 'indeterminado') {
-        riotIdComprobado.current.set(valor, resultado)
+      const resultadoRiot = await validarRiotId(valor)
+      if (peticionesRiot.current !== idPeticion) return
+      if (resultadoRiot !== 'indeterminado') {
+        riotIdComprobado.current.set(valor, resultadoRiot)
       }
-      aplicarVeredicto(clave, valor, resultado)
+      aplicarVeredicto(valor, resultadoRiot)
     })()
-  }
-
-  /* --- Alta y baja de tarjetas --- */
-
-  const agregarJugador = () => {
-    if (jugadores.length >= MAX_JUGADORES) return
-    const nuevo = jugadorVacio()
-    const posicion = jugadores.length + 1
-    setJugadores((prev) => [...prev, nuevo])
-    setRechazo(null)
-    setAnuncioRoster(
-      `Jugador ${posicion} agregado como ${
-        posicion <= TITULARES ? 'titular' : 'suplente'
-      }. El equipo tiene ${posicion} de ${MAX_JUGADORES} jugadores.`
-    )
-    /* Al primer campo de la tarjeta nueva: en móvil aparece fuera de pantalla y sin
-       esto habría que buscarla scrolleando. */
-    focoPendiente.current = claveJugador(nuevo.uid, 'gamertag')
-  }
-
-  const quitarJugador = (uid: string) => {
-    if (jugadores.length <= MIN_JUGADORES) return
-    const indice = jugadores.findIndex((j) => j.uid === uid)
-    if (indice === -1) return
-
-    setJugadores((prev) => prev.filter((j) => j.uid !== uid))
-    setRechazo(null)
-
-    /* Los errores y el estado de validación de la tarjeta que se va se descartan:
-       si no, quedarían para siempre en los diccionarios —nada los volvería a
-       tocar— y el recuento de errores contaría campos que ya no existen. */
-    setErrores((prev) => {
-      const siguiente = { ...prev }
-      for (const campo of CAMPOS_JUGADOR) delete siguiente[claveJugador(uid, campo)]
-      return siguiente
-    })
-    setValidaciones((prev) => {
-      const siguiente = { ...prev }
-      delete siguiente[uid]
-      return siguiente
-    })
-    setAnunciosRiotId((prev) => {
-      const siguiente = { ...prev }
-      delete siguiente[uid]
-      return siguiente
-    })
-    peticionesRiotId.current.delete(uid)
-
-    const quedan = jugadores.length - 1
-    setAnuncioRoster(
-      `Jugador ${indice + 1} eliminado. El equipo tiene ${quedan} ${
-        quedan === 1 ? 'jugador' : 'jugadores'
-      }. Los que estaban debajo cambiaron de número.`
-    )
-    /* El foco caería a <body> porque el botón que se acaba de usar se desmontó.
-       Va al botón de agregar, que está al lado del roster y siempre montado — pero
-       DIFERIDO al efecto de más arriba, no acá: con el roster en 7 el botón todavía
-       tiene `disabled` en el DOM mientras corre este handler (el re-render que lo
-       habilita no ocurrió), y `.focus()` sobre un control deshabilitado no hace
-       nada. Justo el caso más frecuente: quitar a alguien con el roster lleno. */
-    focoBotonAgregar.current = true
   }
 
   /* --- Validación --- */
@@ -1189,116 +1380,74 @@ export default function Registro() {
   const validar = (): Errores => {
     const e: Errores = {}
 
-    if (!equipoForm.equipo.trim()) e.equipo = 'Escribe el nombre del equipo.'
-    /* `capitan_nombre` guarda el RIOT ID del capitán, no su nombre: es lo que espera
-       ATAK en ese campo. Se valida con el mismo REGEX_RIOT_ID que los jugadores y con
-       las mismas dos ramas —formato primero, veredicto remoto después—, para que todas
-       las comprobaciones del formulario se comporten igual. */
-    const capitanRiotId = equipoForm.capitan_nombre.trim()
-    if (!capitanRiotId) {
-      e.capitan_nombre = 'Escribe el Riot ID del capitán.'
-    } else if (!REGEX_RIOT_ID.test(capitanRiotId)) {
-      e.capitan_nombre =
-        'Riot ID completo, con nombre y tag: nombre#tag (por ejemplo, Capitan#MX1).'
-    } else if (estadoRiotIdDe(CLAVE_CAPITAN, capitanRiotId) === 'no_encontrado') {
-      e.capitan_nombre = MENSAJE_RIOT_ID_NO_EXISTE
+    /* El equipo vale si se eligió uno de la lista O si hay texto escrito. Se mira
+       el texto y no solo la elección porque crear un equipo nuevo es un camino de
+       primera clase, no un caso raro: el primero de cada equipo en registrarse
+       siempre pasa por ahí. */
+    if (!equipoElegido && !form.equipo.trim()) {
+      e.equipo = 'Elige tu equipo de la lista o escribe el nombre.'
     }
-    const errorCapitan = validarTelefono(
-      equipoForm.capitan_celular,
-      'Escribe el celular del capitán.'
-    )
-    if (errorCapitan) e.capitan_celular = errorCapitan
+
+    const gamertag = form.gamertag.trim()
+    if (!gamertag) {
+      e.gamertag = 'Escribe tu Riot ID.'
+    } else if (!REGEX_RIOT_ID.test(gamertag)) {
+      e.gamertag =
+        'Riot ID completo, con nombre y tag: nombre#tag (por ejemplo, Jugador#MX1).'
+    } else if (estadoRiot === 'no_encontrado') {
+      /* El veredicto remoto se suma acá y no aparte: solo si el formato ya pasó.
+         Ante los dos problemas, el de formato es el más accionable.
+         Lo que NO frena el envío, a propósito: una comprobación en vuelo
+         ('validando') y una que no se pudo hacer ('inactivo'). */
+      e.gamertag = MENSAJE_RIOT_ID_NO_EXISTE
+    }
+
+    if (!form.nombre.trim()) e.nombre = 'Escribe tu nombre completo.'
 
     const hoy = fechaLocalISO(new Date())
     const maxNacimiento = fechaMaximaNacimiento()
     const minNacimiento = fechaMinimaNacimiento()
 
-    for (const j of jugadores) {
-      const poner = (campo: CampoJugador, mensaje: string) => {
-        e[claveJugador(j.uid, campo)] = mensaje
-      }
-
-      const gamertag = j.gamertag.trim()
-      if (!gamertag) {
-        poner('gamertag', 'Escribe el Riot ID.')
-      } else if (!REGEX_RIOT_ID.test(gamertag)) {
-        poner(
-          'gamertag',
-          'Riot ID completo, con nombre y tag: nombre#tag (por ejemplo, Jugador#MX1).'
-        )
-      } else if (estadoRiotIdDe(j.uid, j.gamertag) === 'no_encontrado') {
-        /* El veredicto remoto se suma acá y no aparte: solo si el formato ya pasó.
-           Ante los dos problemas, el de formato es el más accionable.
-           Lo que NO frena el envío, a propósito: una comprobación en vuelo
-           ('validando') y una que no se pudo hacer ('inactivo'). */
-        poner('gamertag', MENSAJE_RIOT_ID_NO_EXISTE)
-      }
-
-      if (!j.nombre.trim()) poner('nombre', 'Escribe el nombre completo.')
-
-      /* Orden de ramas: de lo más específico a lo más general, para que cada caso
-         dé su propio mensaje. El piso va último: un año tecleado a medias ("0206")
-         cae ahí y el mensaje apunta al año, no a la edad. */
-      if (!j.fecha_nacimiento) {
-        poner('fecha_nacimiento', 'Selecciona la fecha de nacimiento.')
-      } else if (j.fecha_nacimiento > hoy) {
-        poner('fecha_nacimiento', 'La fecha no puede ser futura.')
-      } else if (j.fecha_nacimiento > maxNacimiento) {
-        poner(
-          'fecha_nacimiento',
-          `Cada jugador debe tener al menos ${EDAD_MINIMA} años cumplidos.`
-        )
-      } else if (j.fecha_nacimiento < minNacimiento) {
-        poner('fecha_nacimiento', 'Revisa el año de nacimiento.')
-      }
-
-      const errorCelular = validarTelefono(j.celular, 'Escribe el número de celular.')
-      if (errorCelular) poner('celular', errorCelular)
-
-      if (!j.correo.trim()) {
-        poner('correo', 'Escribe el correo electrónico.')
-      } else if (!REGEX_CORREO.test(j.correo.trim())) {
-        poner('correo', 'El correo no tiene un formato válido (ejemplo: nombre@correo.com).')
-      }
-
-      if (!j.municipio.trim()) poner('municipio', 'Escribe el municipio.')
-
-      if (!j.escolaridad) poner('escolaridad', 'Selecciona la escolaridad.')
-      if (j.escolaridad === 'Otros' && !j.escolaridad_otro.trim()) {
-        poner('escolaridad_otro', 'Especifica la escolaridad.')
-      }
-
-      if (!j.genero) poner('genero', 'Selecciona el género.')
-      if (j.genero === 'Otros' && !j.genero_otro.trim()) {
-        poner('genero_otro', 'Especifica el género.')
-      }
+    /* Orden de ramas: de lo más específico a lo más general, para que cada caso
+       dé su propio mensaje. El piso va último: un año tecleado a medias ("0206")
+       cae ahí y el mensaje apunta al año, no a la edad. */
+    if (!form.fecha_nacimiento) {
+      e.fecha_nacimiento = 'Selecciona tu fecha de nacimiento.'
+    } else if (form.fecha_nacimiento > hoy) {
+      e.fecha_nacimiento = 'La fecha no puede ser futura.'
+    } else if (form.fecha_nacimiento > maxNacimiento) {
+      e.fecha_nacimiento = `Debes tener al menos ${EDAD_MINIMA} años cumplidos.`
+    } else if (form.fecha_nacimiento < minNacimiento) {
+      e.fecha_nacimiento = 'Revisa el año de nacimiento.'
     }
 
-    /* Riot ID repetido dentro del roster. Esta comprobación no existía —ni podía—
-       en el modelo viejo: cada envío traía UN jugador y nadie veía el equipo
-       completo. Ahora el capitán llena 7 tarjetas parecidas en un teléfono y
-       duplicar una por copiar y pegar sin cambiar el tag es de lo más fácil.
-       No lo cubre ninguno de los cuatro códigos de rechazo de la RPC, así que sin
-       esto el equipo entra con el mismo jugador dos veces y del lado de ATAK
-       termina probablemente en un 409 mudo (ver docs/INTEGRACION-ATAK.md).
-       Se compara en minúsculas por el mismo criterio con el que la base compara
-       nombres de equipo. El error va en el DUPLICADO, no en el primero: el primero
-       no tiene nada malo. */
-    const riotIdVistos = new Map<string, number>()
-    jugadores.forEach((j, i) => {
-      const clave = j.gamertag.trim().toLowerCase()
-      if (!clave) return
-      const primero = riotIdVistos.get(clave)
-      if (primero === undefined) {
-        riotIdVistos.set(clave, i)
-        return
-      }
-      /* No pisa un error de formato ya puesto: ese es más accionable. */
-      const claveError = claveJugador(j.uid, 'gamertag')
-      if (!e[claveError]) {
-        e[claveError] = `Este Riot ID ya está en el jugador ${primero + 1}. Cada jugador debe ser distinto.`
-      }
-    })
+    const errorCelular = validarTelefono(form.celular, 'Escribe tu número de celular.')
+    if (errorCelular) e.celular = errorCelular
+
+    if (!form.correo.trim()) {
+      e.correo = 'Escribe tu correo electrónico.'
+    } else if (!REGEX_CORREO.test(form.correo.trim())) {
+      e.correo = 'El correo no tiene un formato válido (ejemplo: nombre@correo.com).'
+    }
+
+    if (!form.municipio.trim()) e.municipio = 'Escribe tu municipio.'
+
+    if (!form.escolaridad) e.escolaridad = 'Selecciona tu escolaridad.'
+    if (form.escolaridad === 'Otros' && !form.escolaridad_otro.trim()) {
+      e.escolaridad_otro = 'Especifica la escolaridad.'
+    }
+
+    if (!form.genero) e.genero = 'Selecciona tu género.'
+    if (form.genero === 'Otros' && !form.genero_otro.trim()) {
+      e.genero_otro = 'Especifica el género.'
+    }
+
+    /* `es_capitan` NO se valida y no tiene error posible: es opcional por diseño.
+       Si nadie de un equipo la marca, la organización toma al primero que se
+       registró. Una advertencia acá ("nadie es capitán todavía") sería falsa —esta
+       página no puede saber si alguien más del equipo ya la marcó, porque el
+       cliente anónimo no lee las tablas— y le pediría a la persona que resuelva
+       algo que no está en sus manos. */
 
     if (!aceptaPrivacidad) {
       e.privacidad = 'Debes aceptar el aviso de privacidad para continuar.'
@@ -1322,31 +1471,36 @@ export default function Registro() {
     setRechazo(null)
 
     if (Object.keys(nuevosErrores).length > 0) {
-      const primera = ordenClaves().find((clave) => nuevosErrores[clave])
+      const primera = ORDEN_CLAVES.find((clave) => nuevosErrores[clave])
       if (primera) enfocarClave(primera)
       return
     }
 
     /* Escolaridad y Género se mandan resueltos: si se eligió "Otros", el valor
-       final es el texto especificado, no la etiqueta genérica. Los celulares van
-       normalizados a 10 dígitos, sin separadores.
-       El ORDEN del array es el contrato: la RPC asigna titular/suplente por
-       posición, así que se manda tal cual está en pantalla. */
-    const payload: PayloadRegistro = {
-      equipo: equipoForm.equipo.trim(),
-      capitan_nombre: equipoForm.capitan_nombre.trim(),
-      capitan_celular: soloDigitos(equipoForm.capitan_celular),
-      jugadores: jugadores.map((j) => ({
-        gamertag: j.gamertag.trim(),
-        nombre: j.nombre.trim(),
-        fecha_nacimiento: j.fecha_nacimiento,
-        celular: soloDigitos(j.celular),
-        correo: j.correo.trim(),
-        municipio: j.municipio.trim(),
-        escolaridad: j.escolaridad === 'Otros' ? j.escolaridad_otro.trim() : j.escolaridad,
-        genero: j.genero === 'Otros' ? j.genero_otro.trim() : j.genero
-      }))
+       final es el texto especificado, no la etiqueta genérica. El celular va
+       normalizado a 10 dígitos, sin separadores. */
+    const base: PayloadBase = {
+      gamertag: form.gamertag.trim(),
+      nombre: form.nombre.trim(),
+      fecha_nacimiento: form.fecha_nacimiento,
+      celular: soloDigitos(form.celular),
+      correo: form.correo.trim(),
+      municipio: form.municipio.trim(),
+      escolaridad: form.escolaridad === 'Otros' ? form.escolaridad_otro.trim() : form.escolaridad,
+      genero: form.genero === 'Otros' ? form.genero_otro.trim() : form.genero,
+      es_capitan: esCapitan
     }
+
+    /* Una clave o la otra, nunca las dos: el `equipo_id` de una elección real gana
+       siempre al texto, que en ese caso es solo lo que se ve en pantalla. */
+    const payload: PayloadRegistro = equipoElegido
+      ? { ...base, equipo_id: equipoElegido.id }
+      : { ...base, equipo: form.equipo.trim() }
+
+    /* El nombre que va a ver la persona en la pantalla de éxito. Sale de la
+       elección cuando la hubo —es el nombre canónico, tal como está en la base— y
+       del texto cuando el equipo se está creando. */
+    const nombreEquipo = equipoElegido ? equipoElegido.nombre : form.equipo.trim()
 
     setEnviando(true)
     try {
@@ -1358,15 +1512,15 @@ export default function Registro() {
         return
       }
 
-      /* Todo el registro entra por esta RPC: es la única superficie que el cliente
-         anónimo puede tocar. NO se intenta un `.select()` de vuelta —la RLS no le
-         da lectura sobre `equipos` ni `jugadores`— y no hace falta: la función
-         devuelve el veredicto en su propio valor de retorno.
+      /* Todo el registro entra por esta RPC: es la única superficie de escritura
+         que el cliente anónimo puede tocar. NO se intenta un `.select()` de vuelta
+         —la RLS no le da lectura sobre `equipos` ni `jugadores`— y no hace falta:
+         la función devuelve el veredicto y el `orden` en su valor de retorno.
          El `abortSignal` corta a los 15 s: sin él, un backend colgado deja el botón
          en "Enviando…" hasta el timeout del navegador. El aborto vuelve como
          `error` en la respuesta, así que cae en la misma rama de abajo. */
       const { data, error } = await supabase
-        .rpc('registrar_equipo', { datos: payload })
+        .rpc('registrar_jugador', { datos: payload })
         .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_ENVIO_MS))
 
       if (error) {
@@ -1376,25 +1530,26 @@ export default function Registro() {
 
       const respuesta = leerRespuesta(data)
 
-      if (respuesta === 'ok') {
-        setEnviado(true)
+      if (respuesta.tipo === 'ok') {
+        setEquipoRegistrado(nombreEquipo)
+        setResultado(respuesta.datos)
         return
       }
 
       /* Una respuesta que no se entiende se trata como fallo genérico: es lo único
          honesto que se puede decir de algo que no sabemos leer. */
-      if (respuesta === 'desconocido') {
+      if (respuesta.tipo === 'desconocido') {
         setErrorEnvio(true)
         return
       }
 
       /* El foco lo mueve el efecto de `[rechazo]`: acá el destino todavía no está
          renderizado ni necesariamente habilitado. */
-      setRechazo(respuesta)
+      setRechazo(respuesta.tipo)
     } catch {
       /* Fallo de red o de configuración. No se captura el error ni se registra en
-         consola: el payload son datos personales de varias personas y el mensaje al
-         usuario es genérico a propósito. */
+         consola: el payload son datos personales y el mensaje al usuario es
+         genérico a propósito. */
       setErrorEnvio(true)
     } finally {
       /* En `finally` para que un fallo de red no deje el botón trabado. */
@@ -1402,63 +1557,60 @@ export default function Registro() {
     }
   }
 
+  /* Reinicio COMPLETO, equipo incluido. Se podría conservar el equipo elegido para
+     encadenar registros del mismo roster en un mismo teléfono, y es tentador —en
+     un evento presencial pasa—, pero el consentimiento de privacidad de abajo está
+     en primera persona: quien lo marca acepta el tratamiento de SUS datos. Dejar
+     el formulario a medio llenar para la persona siguiente invita justo a lo que
+     ese texto ya no cubre. Volver a elegir el equipo cuesta dos letras y una
+     flecha. */
   const reiniciar = () => {
-    setEquipoForm(EQUIPO_VACIO)
-    setJugadores(Array.from({ length: MIN_JUGADORES }, jugadorVacio))
+    /* OJO: acá no se limpia el estado INTERNO del combobox (sus sugerencias, si
+       está abierto, la opción activa). No hace falta porque la pantalla de éxito
+       reemplaza el <form> entero, así que `ComboboxEquipo` se desmonta y vuelve a
+       montarse limpio. Es implícito y frágil: si alguna vez el éxito pasa a ser un
+       overlay sobre el formulario en vez de reemplazarlo, este reinicio deja las
+       sugerencias del registro anterior y nadie se entera. */
+    setForm(FORM_VACIO)
+    setEquipoElegido(null)
+    setEsCapitan(false)
     setErrores({})
     setAceptaPrivacidad(false)
     setErrorEnvio(false)
     setRechazo(null)
-    setEnviado(false)
-    setAnuncioRoster('')
-    /* El estado del Riot ID también se limpia, para que una comprobación del equipo
-       anterior que llegue tarde no pinte su veredicto sobre el formulario nuevo. El
-       caché de veredictos por VALOR sobrevive a propósito: sigue siendo cierto.
-
-       OJO con el contador del capitán. Para los jugadores, `clear()` alcanza: sus
-       claves son uid nuevos (`contadorUid` nunca vuelve atrás), así que una respuesta
-       vieja busca su clave, no la encuentra y se descarta sola. `CLAVE_CAPITAN`, en
-       cambio, es CONSTANTE y se reutiliza en el formulario siguiente: si se reiniciara
-       a 0, una respuesta en vuelo del equipo anterior podría volver a coincidir con el
-       `idPeticion` del nuevo, pasar el guard y pintar un veredicto que no es de este
-       formulario. Por eso su contador no se borra: se incrementa. */
-    const peticionesCapitan = peticionesRiotId.current.get(CLAVE_CAPITAN) ?? 0
-    peticionesRiotId.current.clear()
-    peticionesRiotId.current.set(CLAVE_CAPITAN, peticionesCapitan + 1)
-    setValidaciones({})
-    setAnunciosRiotId({})
+    setResultado(null)
+    setEquipoRegistrado('')
+    /* El estado del Riot ID también se limpia, para que una comprobación del
+       registro anterior que llegue tarde no pinte su veredicto sobre el formulario
+       nuevo. El contador se INCREMENTA en vez de volver a cero: si se reiniciara, una
+       respuesta en vuelo podría volver a coincidir con el `idPeticion` del formulario
+       siguiente, pasar el guard y pintar un veredicto que no es de este registro.
+       El caché de veredictos por VALOR sobrevive a propósito: sigue siendo cierto. */
+    peticionesRiot.current += 1
+    setValidacionRiot(VALIDACION_INACTIVA)
+    setAnuncioRiot('')
   }
 
   /* --- Derivados de render --- */
 
   const hayErrores = Object.keys(errores).length > 0
 
-  /* Estado efectivo de la comprobación del Riot ID del capitán, con la misma regla que
-     las tarjetas: el veredicto guardado solo vale si sigue siendo sobre lo que hay
-     escrito AHORA en el campo. */
-  const estadoCapitan = estadoRiotIdDe(CLAVE_CAPITAN, equipoForm.capitan_nombre)
+  /* Error del control «equipo» o del Riot ID derivado del rechazo del servidor.
+     Derivado y no guardado en `errores` por lo mismo que el veredicto del Riot ID:
+     ese objeto enciende el banner de validación local, que acá no corresponde —el
+     formulario estaba bien, lo rechazó la base—. */
+  const campoRechazado = rechazo ? CAMPO_DE_RECHAZO[rechazo] : null
+  const errorEquipoServidor =
+    campoRechazado === 'equipo' && rechazo ? MENSAJE_RECHAZO_CAMPO[rechazo] : undefined
+  const errorGamertagServidor =
+    campoRechazado === 'gamertag' && rechazo ? MENSAJE_RECHAZO_CAMPO[rechazo] : undefined
 
-  /* Qué tarjetas tienen algo mal, para poder decirlo en el banner. En un formulario
-     de 7 jugadores, "revisa los campos marcados" obliga a recorrer toda la página
-     en el teléfono; el número de jugador es lo que convierte el aviso en accionable. */
-  const jugadoresConError = jugadores
-    .map((j, i) => ({
-      numero: i + 1,
-      tiene: CAMPOS_JUGADOR.some((campo) => errores[claveJugador(j.uid, campo)])
-    }))
-    .filter((x) => x.tiene)
-    .map((x) => x.numero)
-
-  /* Error del campo «equipo» derivado del rechazo del servidor. Derivado y no
-     guardado en `errores` por lo mismo que el Riot ID: ese objeto enciende el banner
-     de validación local, que acá no corresponde —el formulario estaba bien, lo
-     rechazó la base—. */
-  const errorEquipoServidor = rechazo ? MENSAJE_RECHAZO_CAMPO[rechazo] : undefined
-
-  /* Reparto titular/suplente tal como lo va a aplicar la RPC, para poder confirmarlo
-     en la pantalla de éxito. Es la misma regla de las pastillas de cada tarjeta. */
-  const titularesEnviados = Math.min(jugadores.length, TITULARES)
-  const suplentesEnviados = jugadores.length - titularesEnviados
+  /* Lo que la pantalla de éxito puede afirmar, todo derivado del `orden` que
+     devolvió la RPC —ningún número inventado del lado del cliente—:
+     cuántos son ahora, si ya llegaron al mínimo y con qué rol quedó la persona. */
+  const jugadoresEnEquipo = resultado?.orden ?? 0
+  const faltanParaMinimo = Math.max(0, MIN_JUGADORES - jugadoresEnEquipo)
+  const rolAsignado = jugadoresEnEquipo <= TITULARES ? 'titular' : 'suplente'
 
   /* La CLABE y el nombre de la cuenta se muestran aparte, con más jerarquía. */
   const datosPago = [
@@ -1497,7 +1649,8 @@ export default function Registro() {
               LQC Split Otoño 2026
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
-              El capitán registra al equipo completo en un solo envío.
+              Cada jugador se registra por su cuenta. Si tu equipo ya está inscrito,
+              elígelo de las sugerencias para no crear uno repetido.
             </p>
           </div>
         </section>
@@ -1505,7 +1658,7 @@ export default function Registro() {
         {/* Formulario */}
         <section className="pb-28">
           <div className="container mx-auto px-6 max-w-4xl">
-            {enviado ? (
+            {resultado ? (
               /* ---------- Estado de éxito ----------
                  Sin `role="status"`: la live region se inserta junto con su
                  contenido (varios lectores no la anuncian) y, si anuncia, lee la
@@ -1525,30 +1678,52 @@ export default function Registro() {
                   tabIndex={-1}
                   className="text-2xl md:text-3xl font-light mb-4 focus:outline-none"
                 >
-                  ¡Equipo registrado!
+                  ¡Listo, ya estás registrado!
                 </h2>
-                {/* Devolución concreta de lo que se acaba de enviar. Después de hasta
-                    73 campos, "recibimos tu registro" no alcanza para saber que el
-                    roster salió como se pretendía. Sale del estado, que todavía está
-                    lleno —`reiniciar()` no corrió—, así que no inventa nada: son los
-                    mismos datos que se mandaron. Nada de fechas ni de próximos pasos
-                    que no estén confirmados. */}
-                <p className="text-gray-300 mb-4 max-w-lg mx-auto leading-relaxed">
-                  Registramos a{' '}
-                  <span className="text-white font-medium">{equipoForm.equipo.trim()}</span>{' '}
-                  con {jugadores.length} jugadores: {titularesEnviados} titulares
-                  {suplentesEnviados > 0 && (
-                    <>
-                      {' '}
-                      y {suplentesEnviados}{' '}
-                      {suplentesEnviados === 1 ? 'suplente' : 'suplentes'}
-                    </>
-                  )}
-                  .
+
+                <p className="text-gray-300 mb-8 max-w-lg mx-auto leading-relaxed">
+                  Te uniste a{' '}
+                  <span className="text-white font-medium">{equipoRegistrado}</span> como{' '}
+                  <span className="text-white font-medium">{rolAsignado}</span>.
                 </p>
+
+                {/* El contador del equipo. Es la razón de ser de esta pantalla: sin
+                    él, nadie sabe que su equipo todavía no puede competir. El número
+                    sale del `orden` que devolvió la RPC —la base, no el cliente—, y
+                    el mínimo va explícito porque «3 jugadores» a secas no dice si eso
+                    alcanza o no. */}
+                <div className="mb-8 mx-auto max-w-md rounded-2xl border border-blue-800/30 bg-blue-950/20 p-6">
+                  {/* La referencia cambia al llegar al mínimo. Con el piso fijo, un
+                      equipo de 6 o 7 —casos normales, no raros— mostraba «6 de 5», que
+                      se lee como un error de la página. Pasado el mínimo, el número que
+                      informa es el techo: cuántos más caben. */}
+                  <p className="font-heading text-2xl md:text-3xl text-white mb-2">
+                    {jugadoresEnEquipo} de {faltanParaMinimo > 0 ? MIN_JUGADORES : MAX_JUGADORES}
+                  </p>
+                  <p className="text-sm text-gray-400 mb-4">
+                    {faltanParaMinimo > 0
+                      ? `jugadores registrados, de los ${MIN_JUGADORES} mínimos para competir`
+                      : `jugadores registrados, de los ${MAX_JUGADORES} que caben en un equipo`}
+                  </p>
+                  {faltanParaMinimo > 0 ? (
+                    <p className="text-gray-300 leading-relaxed">
+                      {faltanParaMinimo === 1
+                        ? 'Falta 1 compañero por registrarse.'
+                        : `Faltan ${faltanParaMinimo} compañeros por registrarse.`}{' '}
+                      Cada uno se registra por su cuenta en esta misma página y elige{' '}
+                      <span className="text-white font-medium">{equipoRegistrado}</span> de
+                      las sugerencias.
+                    </p>
+                  ) : (
+                    <p className="text-gray-300 leading-relaxed">
+                      Tu equipo ya llegó al mínimo para competir. Todavía pueden sumarse
+                      hasta {MAX_JUGADORES} jugadores en total.
+                    </p>
+                  )}
+                </div>
+
                 <p className="text-gray-300 mb-10 max-w-lg mx-auto leading-relaxed">
-                  Te contactaremos al celular del capitán para confirmar la inscripción
-                  y el pago.
+                  Te contactaremos para confirmar la inscripción y el pago.
                 </p>
 
                 <div className="mb-10">
@@ -1577,193 +1752,291 @@ export default function Registro() {
                   </div>
                 </div>
 
+                {/* Reusa la clase compartida en vez de repetirla inline, que es como
+                    estaba: la versión inline no traía el `focus-visible:ring`, así que
+                    tabulando sobre fondo negro no se veía dónde estaba el foco. */}
                 <button
                   type="button"
                   onClick={reiniciar}
-                  className="bg-none px-8 py-4 bg-black/50 border border-blue-800/40 text-gray-200 rounded-xl hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white transition-all duration-300"
+                  className={`${CLASE_BOTON_SECUNDARIO} px-8 py-4 text-base`}
                 >
-                  Registrar otro equipo
+                  Registrar a otra persona
                 </button>
               </div>
             ) : (
               /* ---------- Formulario ---------- */
               <form onSubmit={handleSubmit} noValidate className="space-y-12">
-                {/* Datos del equipo */}
-                <div>
-                  <TituloSeccion>Datos del Equipo</TituloSeccion>
+                {/* Equipo.
+                    `relative z-20` en la SECCIÓN, no en la lista: `CLASE_TARJETA` lleva
+                    `backdrop-blur-sm`, y un backdrop-filter crea contexto de apilamiento,
+                    así que el `z-20` del desplegable solo vale dentro de su tarjeta. Sin
+                    esto, la tarjeta de «Tus Datos» —otro contexto, posterior en el DOM—
+                    se pinta encima de las sugerencias desplegadas. */}
+                <div className="relative z-20">
+                  <TituloSeccion>Tu Equipo</TituloSeccion>
                   <div className={CLASE_TARJETA}>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <CampoTexto
-                        id="equipo"
-                        label="Nombre del equipo"
-                        icono={Users}
-                        valor={equipoForm.equipo}
-                        onChange={(v) => setCampoEquipo('equipo', v)}
-                        error={errores.equipo ?? errorEquipoServidor}
-                        placeholder="Nombre de tu equipo"
-                        claseContenedor="md:col-span-2"
-                      />
-                      {/* El capitán se identifica por su RIOT ID, no por su nombre: es
-                          lo que ATAK espera en este campo. El id, la clave del estado,
-                          la columna y la clave del payload de la RPC siguen llamándose
-                          `capitan_nombre` — renombrarlos obligaría a tocar
-                          `registrar_equipo` y `armar_roster_atak`, que viven en la base
-                          y no en el repo. Cambia lo que se guarda, no cómo se llama. */}
-                      {/* `md:col-span-2` por la misma razón que el Riot ID de las
-                          tarjetas: la ayuda de formato son tres líneas y en media
-                          columna dejaría al campo de al lado con un hueco vertical. */}
-                      <div className="md:col-span-2">
-                        <CampoTexto
-                          id="capitan_nombre"
-                          label="Riot ID del Capitán"
-                          icono={Gamepad2}
-                          valor={equipoForm.capitan_nombre}
-                          onChange={setCapitanRiotId}
-                          /* Misma composición que en las tarjetas: el error del envío
-                             manda y, si no hay, se deriva del veredicto remoto. */
-                          error={
-                            errores.capitan_nombre ??
-                            (estadoCapitan === 'no_encontrado'
-                              ? MENSAJE_RIOT_ID_NO_EXISTE
-                              : undefined)
-                          }
-                          placeholder="Capitan#MX1"
-                          autoComplete="off"
-                          describedById="capitan_nombre-ayuda"
-                          onBlur={() =>
-                            comprobarRiotId(CLAVE_CAPITAN, equipoForm.capitan_nombre)
-                          }
-                          sufijo={
-                            estadoCapitan === 'validando' ? (
-                              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-                            ) : estadoCapitan === 'valido' ? (
-                              <Check className="w-5 h-5 text-green-400" />
-                            ) : null
-                          }
+                    <ComboboxEquipo
+                      valor={form.equipo}
+                      elegido={equipoElegido}
+                      error={errores.equipo ?? errorEquipoServidor}
+                      onTexto={setTextoEquipo}
+                      onElegir={elegirEquipo}
+                      onDeshacer={deshacerEquipo}
+                    />
+
+                    {/* Capitán. Va acá y no con los datos personales porque no es un
+                        dato de la persona sino de su relación con el equipo, que es
+                        justo lo que esta tarjeta trata.
+                        Sin `required`, sin validación y sin advertencia si nadie la
+                        marca: ver el comentario de `validar()`. */}
+                    <div className="mt-8 pt-6 border-t border-white/5">
+                      <label className="flex items-start gap-4 cursor-pointer group">
+                        <input
+                          id="es_capitan"
+                          type="checkbox"
+                          name="es_capitan"
+                          checked={esCapitan}
+                          onChange={(e) => setEsCapitan(e.target.checked)}
+                          className="peer sr-only"
                         />
-                        <p id="capitan_nombre-ayuda" className="mt-2 text-sm text-gray-400">
-                          Riot ID completo: nombre, luego #, luego tag (por ejemplo,
-                          Capitan#MX1). Si el capitán también juega, es el mismo que pondrá
-                          en su tarjeta del roster.
-                        </p>
-                        {/* Región viva propia, como la de cada tarjeta: el resultado llega
-                            con el foco ya en otro campo. */}
-                        <span role="status" aria-live="polite" className="sr-only">
-                          {anunciosRiotId[CLAVE_CAPITAN] ?? ''}
+                        <span
+                          className={`
+                            mt-0.5 w-6 h-6 shrink-0 rounded-md border-2 flex items-center justify-center transition-all duration-300
+                            peer-focus:ring-2 peer-focus:ring-lqc-accent/60 peer-focus:ring-offset-2 peer-focus:ring-offset-black
+                            ${esCapitan
+                              ? 'bg-gradient-to-br from-lqc-700 to-lqc-500 border-lqc-500'
+                              : 'bg-black/40 border-white/20 group-hover:border-blue-500/60'
+                            }
+                          `}
+                        >
+                          {esCapitan && <Check className="w-4 h-4 text-white" />}
                         </span>
-                      </div>
-                      <CampoTexto
-                        id="capitan_celular"
-                        label="Celular del Capitán"
-                        icono={Phone}
-                        tipo="tel"
-                        valor={equipoForm.capitan_celular}
-                        onChange={(v) => setCampoEquipo('capitan_celular', v)}
-                        error={errores.capitan_celular}
-                        placeholder="10 dígitos"
-                        autoComplete="tel"
-                      />
+                        <span className="text-sm md:text-base text-gray-200 leading-relaxed">
+                          <span className="flex items-center gap-2 text-white font-medium mb-1">
+                            <Crown className="w-4 h-4 text-lqc-accent" aria-hidden="true" />
+                            Soy el capitán del equipo
+                          </span>
+                          <span className="text-gray-400">
+                            El capitán es el contacto con la organización: recibe los
+                            avisos y representa al equipo en las decisiones. Si nadie de
+                            tu equipo la marca, tomamos al primero que se registró.
+                          </span>
+                        </span>
+                      </label>
                     </div>
                   </div>
                 </div>
 
-                {/* Roster */}
+                {/* Datos del jugador */}
                 <div>
-                  <TituloSeccion>Roster</TituloSeccion>
-
-                  {/* Barra de control del roster. Va ARRIBA de las tarjetas: en
-                      móvil, después de 7 tarjetas el botón de agregar quedaría a
-                      varias pantallas de distancia del contador que lo justifica. */}
-                  {/* tabIndex -1: destino de foco programático tras un rechazo de
-                      cantidad de la RPC. No es tabulable. */}
-                  <div
-                    ref={barraRosterRef}
-                    tabIndex={-1}
-                    className="mb-8 scroll-mt-28 rounded-2xl border border-blue-800/30 bg-blue-950/20 p-5 md:p-6 focus:outline-none"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        <p className="text-white font-medium">
-                          {jugadores.length} de {MAX_JUGADORES} jugadores
+                  <TituloSeccion>Tus Datos</TituloSeccion>
+                  <div className={CLASE_TARJETA}>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="md:col-span-2">
+                        <CampoTexto
+                          id="gamertag"
+                          /* El label es «Riot ID» (lo que valida REGEX_RIOT_ID), pero la
+                             clave del estado y la columna se llaman `gamertag`:
+                             renombrarlas rompe el contrato con la RPC. */
+                          label="Riot ID"
+                          icono={Gamepad2}
+                          valor={form.gamertag}
+                          onChange={setGamertag}
+                          /* Prioridad: el rechazo del servidor, después el error del
+                             envío local y por último el veredicto remoto. El del
+                             servidor va primero porque es el más nuevo — llegó después
+                             de que el formulario ya había pasado la validación local. */
+                          error={
+                            errorGamertagServidor ??
+                            errores.gamertag ??
+                            (estadoRiot === 'no_encontrado' ? MENSAJE_RIOT_ID_NO_EXISTE : undefined)
+                          }
+                          placeholder="Jugador#MX1"
+                          autoComplete="off"
+                          describedById="gamertag-ayuda"
+                          onBlur={() => comprobarRiotId(form.gamertag)}
+                          /* El 'no_encontrado' no pone ícono: ya se ve como error de
+                             campo (borde rojo + mensaje con su propio ícono) y un
+                             segundo símbolo sería ruido. */
+                          sufijo={
+                            estadoRiot === 'validando' ? (
+                              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                            ) : estadoRiot === 'valido' ? (
+                              <Check className="w-5 h-5 text-green-400" />
+                            ) : null
+                          }
+                        />
+                        <p id="gamertag-ayuda" className="mt-2 text-sm text-gray-400">
+                          Riot ID completo: nombre, luego #, luego tag (por ejemplo,
+                          Jugador#MX1).
                         </p>
-                        <p id={ID_LIMITES_ROSTER} className="mt-1 text-sm text-gray-400">
-                          Mínimo {MIN_JUGADORES}, máximo {MAX_JUGADORES}.
-                        </p>
+                        {/* El resultado llega con el foco ya en otro campo, así que se
+                            anuncia por su propia región viva. */}
+                        <span role="status" aria-live="polite" className="sr-only">
+                          {anuncioRiot}
+                        </span>
                       </div>
-                      <button
-                        type="button"
-                        ref={botonAgregarRef}
-                        onClick={agregarJugador}
-                        disabled={jugadores.length >= MAX_JUGADORES}
-                        className={CLASE_BOTON_AGREGAR}
-                      >
-                        <UserPlus className="w-4 h-4 shrink-0" aria-hidden="true" />
-                        Agregar jugador
-                      </button>
-                    </div>
 
-                    <p className="mt-4 text-sm text-gray-300 leading-relaxed">
-                      El orden de las tarjetas es el que se envía: los{' '}
-                      <span className="text-white font-medium">
-                        primeros {TITULARES} quedan como titulares
-                      </span>{' '}
-                      y del {TITULARES + 1}º en adelante como suplentes. Si quitas a
-                      alguien, los de abajo suben de número y pueden cambiar de rol.
-                    </p>
-
-                    {/* Alta y baja de tarjetas no mueven el foco a un sitio que lo
-                        explique, así que se anuncian acá. `polite`: no interrumpe lo
-                        que se esté leyendo. */}
-                    <span role="status" aria-live="polite" className="sr-only">
-                      {anuncioRoster}
-                    </span>
-                  </div>
-
-                  <div className="space-y-8">
-                    {jugadores.map((jugador, indice) => (
-                      <TarjetaJugador
-                        /* key por uid y NO por índice: con el índice, quitar la
-                           tarjeta 2 haría que React reusara sus inputs para los datos
-                           del jugador 3 y el DOM quedaría desfasado del estado. */
-                        key={jugador.uid}
-                        jugador={jugador}
-                        indice={indice}
-                        total={jugadores.length}
-                        errores={errores}
-                        estadoRiotId={estadoRiotIdDe(jugador.uid, jugador.gamertag)}
-                        anuncioRiotId={anunciosRiotId[jugador.uid] ?? ''}
-                        onCampo={setCampoJugador}
-                        onOpcion={setOpcionJugador}
-                        onGamertag={setGamertag}
-                        onComprobarRiotId={comprobarRiotId}
-                        onQuitar={quitarJugador}
+                      <CampoTexto
+                        id="nombre"
+                        label="Nombre"
+                        icono={User}
+                        valor={form.nombre}
+                        onChange={(v) => setCampo('nombre', v)}
+                        error={errores.nombre}
+                        placeholder="Nombre completo"
+                        autoComplete="name"
                       />
-                    ))}
-                  </div>
-
-                  {/* Segundo botón de agregar, DESPUÉS de la última tarjeta. El de
-                      arriba sirve para dimensionar el roster antes de empezar; este
-                      es para el recorrido real: llenar las tarjetas de arriba abajo
-                      y darse cuenta al final de que falta un suplente. En ese
-                      momento, en un teléfono, el botón de arriba está a varias
-                      pantallas completas de distancia.
-                      Es un botón real y no un atajo visual, y se oculta al llegar al
-                      máximo en vez de deshabilitarse: acá abajo no hay contador al
-                      lado que explique por qué estaría apagado. Si se desmonta con
-                      el foco puesto no se pierde nada — quien lo pulsó acaba de
-                      mandar el foco a la tarjeta nueva. */}
-                  {jugadores.length < MAX_JUGADORES && (
-                    <div className="mt-8 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={agregarJugador}
-                        className={CLASE_BOTON_AGREGAR}
-                      >
-                        <UserPlus className="w-4 h-4 shrink-0" aria-hidden="true" />
-                        Agregar jugador {jugadores.length + 1}
-                      </button>
+                      <CampoTexto
+                        id="fecha_nacimiento"
+                        label="Fecha de Nacimiento"
+                        icono={Calendar}
+                        tipo="date"
+                        valor={form.fecha_nacimiento}
+                        onChange={(v) => setCampo('fecha_nacimiento', v)}
+                        error={errores.fecha_nacimiento}
+                        min={MIN_FECHA_NACIMIENTO}
+                        max={MAX_FECHA_NACIMIENTO}
+                        claseInput="[color-scheme:dark]"
+                      />
+                      <CampoTexto
+                        id="celular"
+                        label="Celular"
+                        icono={Phone}
+                        tipo="tel"
+                        valor={form.celular}
+                        onChange={(v) => setCampo('celular', v)}
+                        error={errores.celular}
+                        placeholder="10 dígitos"
+                        autoComplete="tel"
+                      />
+                      <CampoTexto
+                        id="correo"
+                        label="Correo electrónico"
+                        icono={Mail}
+                        tipo="email"
+                        valor={form.correo}
+                        onChange={(v) => setCampo('correo', v)}
+                        error={errores.correo}
+                        placeholder="jugador@correo.com"
+                        autoComplete="email"
+                      />
+                      <CampoTexto
+                        id="municipio"
+                        label="Municipio"
+                        icono={MapPin}
+                        valor={form.municipio}
+                        onChange={(v) => setCampo('municipio', v)}
+                        error={errores.municipio}
+                        placeholder="Municipio donde vives"
+                        autoComplete="address-level2"
+                        claseContenedor="md:col-span-2"
+                      />
                     </div>
-                  )}
+
+                    {/* Escolaridad. El campo condicional de «Otros» va FUERA del
+                        fieldset con `role="radiogroup"`: un `textbox` no es hijo válido
+                        de un radiogroup y algunos lectores lo saltan o anuncian mal la
+                        posición ("3 de 4"). */}
+                    <div className="mt-8">
+                      <fieldset
+                        role="radiogroup"
+                        aria-labelledby="escolaridad-label"
+                        aria-required="true"
+                        aria-invalid={errores.escolaridad ? true : undefined}
+                        aria-describedby={errores.escolaridad ? 'escolaridad-error' : undefined}
+                        className="border-0 p-0 m-0"
+                      >
+                        <legend
+                          id="escolaridad-label"
+                          className="flex items-center gap-2 text-sm text-gray-400 mb-3"
+                        >
+                          <GraduationCap className="w-4 h-4 text-blue-400" />
+                          Escolaridad <span className="text-lqc-accent" aria-hidden="true">*</span>
+                        </legend>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                          {OPCIONES_ESCOLARIDAD.map((opcion, i) => (
+                            <OpcionPill
+                              key={opcion}
+                              /* El id va en la PRIMERA opción: es el nodo al que
+                                 `enfocarClave('escolaridad')` lleva el foco. */
+                              id={i === 0 ? 'escolaridad' : undefined}
+                              name="escolaridad"
+                              valor={opcion}
+                              seleccionado={form.escolaridad === opcion}
+                              onSelect={(v) => setOpcion('escolaridad', v)}
+                              error={Boolean(errores.escolaridad)}
+                            />
+                          ))}
+                        </div>
+                        {errores.escolaridad && (
+                          <MensajeError id="escolaridad-error" texto={errores.escolaridad} />
+                        )}
+                      </fieldset>
+                      {form.escolaridad === 'Otros' && (
+                        <div className="mt-4">
+                          <CampoTexto
+                            id="escolaridad_otro"
+                            label="Especifica la escolaridad"
+                            icono={GraduationCap}
+                            valor={form.escolaridad_otro}
+                            onChange={(v) => setCampo('escolaridad_otro', v)}
+                            error={errores.escolaridad_otro}
+                            placeholder="¿Cuál?"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Género. Mismo criterio que escolaridad con el campo de «Otros». */}
+                    <div className="mt-8">
+                      <fieldset
+                        role="radiogroup"
+                        aria-labelledby="genero-label"
+                        aria-required="true"
+                        aria-invalid={errores.genero ? true : undefined}
+                        aria-describedby={errores.genero ? 'genero-error' : undefined}
+                        className="border-0 p-0 m-0"
+                      >
+                        <legend
+                          id="genero-label"
+                          className="flex items-center gap-2 text-sm text-gray-400 mb-3"
+                        >
+                          <UserCircle className="w-4 h-4 text-blue-400" />
+                          Género <span className="text-lqc-accent" aria-hidden="true">*</span>
+                        </legend>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {OPCIONES_GENERO.map((opcion, i) => (
+                            <OpcionPill
+                              key={opcion}
+                              id={i === 0 ? 'genero' : undefined}
+                              name="genero"
+                              valor={opcion}
+                              seleccionado={form.genero === opcion}
+                              onSelect={(v) => setOpcion('genero', v)}
+                              error={Boolean(errores.genero)}
+                            />
+                          ))}
+                        </div>
+                        {errores.genero && (
+                          <MensajeError id="genero-error" texto={errores.genero} />
+                        )}
+                      </fieldset>
+                      {form.genero === 'Otros' && (
+                        <div className="mt-4">
+                          <CampoTexto
+                            id="genero_otro"
+                            label="Especifica el género"
+                            icono={UserCircle}
+                            valor={form.genero_otro}
+                            onChange={(v) => setCampo('genero_otro', v)}
+                            error={errores.genero_otro}
+                            placeholder="¿Cuál?"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Pago de inscripción (informativo) */}
@@ -1794,6 +2067,9 @@ export default function Registro() {
                       </div>
                     </div>
 
+                    {/* Con el registro individual esto importa MÁS que antes, no menos:
+                        cada quien manda su formulario por separado, así que sin decirlo
+                        siete personas podrían pagar $500 cada una. */}
                     <p className="mb-6 text-sm md:text-base text-gray-300 leading-relaxed">
                       La inscripción es de{' '}
                       <span className="text-white font-medium">$500 MXN por equipo</span>,{' '}
@@ -1828,10 +2104,9 @@ export default function Registro() {
 
                 {/* Reglamento.
                     Va acá, entre el pago y el aviso de privacidad, y no arriba del
-                    formulario: en este punto el capitán ya armó el roster y está a un
+                    formulario: en este punto la persona ya llenó sus datos y está a un
                     paso de enviar, que es cuando de verdad le sirve saber si su equipo
-                    es elegible. Arriba lo leería antes de tener a quién comparar contra
-                    los requisitos.
+                    es elegible.
                     No es un enlace suelto sino una tarjeta con las dos formas de leerlo,
                     con el mismo lenguaje de la tarjeta de pago (misma familia de
                     gradiente, mismo azulejo de icono). */}
@@ -1843,10 +2118,10 @@ export default function Registro() {
                         <FileText className="w-6 h-6 text-lqc-accent" aria-hidden="true" />
                       </div>
                       <div>
-                        {/* «registrar tu equipo» y no «enviar»: es la acción que nombra el
-                            botón de abajo, que dice «Registrar equipo». */}
+                        {/* «registrarte» y no «enviar»: es la acción que nombra el botón
+                            de abajo, que dice «Registrarme». */}
                         <p className="text-lg md:text-xl font-medium text-white mb-2">
-                          Léelo antes de registrar tu equipo
+                          Léelo antes de registrarte
                         </p>
                         <p className="text-sm md:text-base text-gray-300 leading-relaxed">
                           El reglamento oficial define{' '}
@@ -1861,7 +2136,7 @@ export default function Registro() {
                     <div className="flex flex-col sm:flex-row gap-4">
                       {/* Se abre en pestaña nueva por una razón que pesa más que cualquier
                           otra: quien está acá tiene el formulario a medio llenar y sin
-                          guardado, así que navegar en la misma pestaña le borra el roster.
+                          guardado, así que navegar en la misma pestaña le borra los datos.
                           Un <a> normal y no un <Link> de react-router porque con
                           target="_blank" el navegador hace una carga completa igual: el
                           Link no aportaría navegación del cliente y esta página no importa
@@ -1875,8 +2150,7 @@ export default function Registro() {
                         rel="noopener noreferrer"
                         /* Arranca con el texto visible EXACTO para no romper el control por
                            voz (WCAG 2.5.3, "Label in Name") y recién después avisa lo que
-                           el texto no dice. Misma fórmula que los enlaces de comunidad de
-                           más arriba en este archivo. */
+                           el texto no dice. Misma fórmula que los enlaces de comunidad. */
                         aria-label="Ver reglamento (abre en pestaña nueva)"
                         className={`${CLASE_VER_REGLAMENTO} sm:flex-1`}
                       >
@@ -1907,30 +2181,28 @@ export default function Registro() {
                         marcara hoy estaría aceptando algo distinto de lo que va a regir.
                         Y no se puede arreglar después, porque no hay dónde guardar QUÉ
                         versión se aceptó: ni `equipos` ni `jugadores` tienen columna para
-                        eso y `PayloadRegistro` es un tipo cerrado. (Contacto sí hay —el
-                        payload manda celular y correo de cada jugador—, así que el problema
-                        no es no poder avisar: es que no quedaría registro de qué se aceptó.)
+                        eso y el payload de la RPC es un tipo cerrado. (Contacto sí hay —el
+                        payload manda celular y correo—, así que el problema no es no poder
+                        avisar: es que no quedaría registro de qué se aceptó.)
                         Mejor ofrecer el reglamento sin exigir aceptación que exigir una
                         aceptación que no dice de qué.
 
                         Cuando el PDF quede firme, esto es lo que hay que sumar. OJO: las
-                        cinco cosas son de cliente nomás, igual que `aceptaPrivacidad`, que
+                        cuatro cosas son de cliente nomás, igual que `aceptaPrivacidad`, que
                         tampoco se persiste. Si lo que se quiere es una aceptación
                         REGISTRADA con fecha y versión, eso además necesita columna nueva y
-                        cambiar la RPC `registrar_equipo`, que vive en Supabase y no en este
-                        repo (ver AGENTS.md).
+                        cambiar la RPC `registrar_jugador`, que vive en Supabase y no en
+                        este repo (ver AGENTS.md).
                           1. estado `aceptaReglamento` + su `setState`;
                           2. el `id` del input DEBE ser igual a la clave de error
                              ('reglamento'): `enfocarClave` hace getElementById y si no lo
                              encuentra sale por un `return` sin error, o sea que el foco al
                              primer campo inválido se rompe EN SILENCIO;
-                          3. la clave 'reglamento' en `ordenClaves()`, y va ANTES de
+                          3. la clave 'reglamento' en `ORDEN_CLAVES`, y va ANTES de
                              'privacidad', no al final: ese arreglo es el orden VISUAL y de
                              ahí sale a qué campo salta el foco;
                           4. la validación dentro de `validar()`, con el mismo patrón que
-                             `if (!aceptaPrivacidad)`;
-                          5. el reset dentro de `reiniciar()`, junto a
-                             `setAceptaPrivacidad(false)`.
+                             `if (!aceptaPrivacidad)`.
                         Copiar el bloque del checkbox del aviso de privacidad de abajo: ya
                         tiene el input sr-only + `peer`, el foco visible y el MensajeError
                         cableados. (El tipo de errores no hay que tocarlo: `Errores` es
@@ -1939,14 +2211,13 @@ export default function Registro() {
                 </div>
 
                 {/* Aviso de privacidad.
-                    AJUSTADO AL MODELO NUEVO: antes cada persona enviaba sus propios
-                    datos y el texto hablaba en segunda persona singular ("tus datos",
-                    "como titular puedes"). Ahora quien envía es el capitán y los datos
-                    son DE TERCEROS —hasta 6 personas que no están tocando el
-                    formulario—, así que el consentimiento que se marca abajo ya no
-                    puede ser solo el suyo: tiene que declarar que cuenta con el de
-                    cada integrante. Los derechos ARCO siguen siendo de cada titular,
-                    no del capitán, y el texto ahora lo dice. */}
+                    VUELVE A LA PRIMERA PERSONA. Con el registro por equipo, quien
+                    enviaba era el capitán y los datos eran DE TERCEROS —hasta seis
+                    personas que no estaban tocando el formulario—, así que el
+                    consentimiento tenía que ser una declaración de que contaba con
+                    la autorización de cada integrante. Ahora cada quien manda los
+                    suyos: el consentimiento es propio y los derechos ARCO los
+                    ejerce la misma persona que está leyendo esto. */}
                 <div>
                   <TituloSeccion>Aviso de Privacidad</TituloSeccion>
                   <div className="bg-black/40 backdrop-blur-sm border border-lqc-accent/20 rounded-2xl p-6 md:p-8 shadow-lqc">
@@ -1955,8 +2226,7 @@ export default function Registro() {
                         <ShieldCheck className="w-6 h-6 text-lqc-accent" />
                       </div>
                       <p className="text-gray-300 leading-relaxed text-sm md:text-base">
-                        Los datos personales de todas las personas registradas en este
-                        formulario se tratan conforme a la{' '}
+                        Tus datos personales se tratan conforme a la{' '}
                         <span className="text-white font-medium">
                           Ley Federal de Protección de Datos Personales en Posesión de los
                           Particulares
@@ -1986,22 +2256,21 @@ export default function Registro() {
                       <li className="flex items-start gap-3">
                         <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
                         <span className="text-gray-300">
-                          Los datos{' '}
+                          Tus datos{' '}
                           <span className="text-white font-medium">
                             no se comparten con terceros
                           </span>{' '}
-                          sin el consentimiento de cada titular.
+                          sin tu consentimiento.
                         </span>
                       </li>
                       <li className="flex items-start gap-3">
                         <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
                         <span className="text-gray-300">
-                          Cada persona registrada, y no solo quien llena este formulario,
-                          puede ejercer sus{' '}
+                          Puedes ejercer tus{' '}
                           <span className="text-white font-medium">
                             derechos ARCO (acceso, rectificación, cancelación u oposición)
                           </span>{' '}
-                          sobre sus propios datos. Para hacerlo, puede escribir a{' '}
+                          sobre tus propios datos escribiendo a{' '}
                           <a
                             href="mailto:contactolqc@revolution505.com"
                             className="after:hidden text-lqc-accent font-medium underline underline-offset-4 decoration-lqc-accent/40 hover:decoration-lqc-accent"
@@ -2013,12 +2282,6 @@ export default function Registro() {
                       </li>
                     </ul>
 
-                    {/* Consentimiento: UNO para todo el envío, no uno por jugador.
-                        El texto es lo que cambia respecto del modelo viejo: quien
-                        marca la casilla no está consintiendo solo por sí mismo, está
-                        declarando que tiene autorización de cada integrante. Sin esa
-                        declaración, el capitán estaría enviando datos de terceros sin
-                        base para hacerlo. */}
                     <div className="mt-8 pt-6 border-t border-white/5">
                       <label className="flex items-start gap-4 cursor-pointer group">
                         <input
@@ -2050,9 +2313,7 @@ export default function Registro() {
                           {aceptaPrivacidad && <Check className="w-4 h-4 text-white" />}
                         </span>
                         <span className="text-sm md:text-base text-gray-200 leading-relaxed">
-                          Confirmo que cada integrante del equipo me autorizó a registrar
-                          sus datos, y acepto su tratamiento conforme al aviso de
-                          privacidad.{' '}
+                          Acepto que mis datos se traten conforme al aviso de privacidad.{' '}
                           <span className="text-lqc-accent" aria-hidden="true">*</span>
                         </span>
                       </label>
@@ -2072,20 +2333,8 @@ export default function Registro() {
                     >
                       <AlertCircle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
                       <p className="text-sm md:text-base text-rose-200">
-                        No pudimos enviar el registro: falta información o hay datos que
-                        revisar.{' '}
-                        {jugadoresConError.length > 0 && (
-                          <>
-                            Revisa{' '}
-                            {jugadoresConError.length === 1
-                              ? `el jugador ${jugadoresConError[0]}`
-                              : `los jugadores ${jugadoresConError.slice(0, -1).join(', ')} y ${
-                                  jugadoresConError[jugadoresConError.length - 1]
-                                }`}
-                            .{' '}
-                          </>
-                        )}
-                        Los campos con problemas tienen un mensaje debajo.
+                        No pudimos enviar tu registro: falta información o hay datos que
+                        revisar. Los campos con problemas tienen un mensaje debajo.
                       </p>
                     </div>
                   )}
@@ -2103,18 +2352,17 @@ export default function Registro() {
                         {/* El correo va como enlace y no dentro de la cadena: en un
                             teléfono, un correo en texto plano hay que transcribirlo
                             a mano. */}
-                        {rechazo === 'equipo_duplicado' && (
+                        {rechazo === 'gamertag_duplicado' && (
                           <>
                             {' '}
-                            Si alguien de tu equipo ya lo registró, no lo registres de
-                            nuevo: escríbenos a{' '}
+                            Si crees que es un error, escríbenos a{' '}
                             <a
                               href="mailto:contactolqc@revolution505.com"
                               className="after:hidden text-lqc-accent font-medium underline underline-offset-4 decoration-lqc-accent/40 hover:decoration-lqc-accent"
                             >
                               contactolqc@revolution505.com
                             </a>{' '}
-                            y lo verificamos. Si es otro equipo, elige un nombre distinto.
+                            y lo verificamos.
                           </>
                         )}
                       </p>
@@ -2128,7 +2376,7 @@ export default function Registro() {
                     >
                       <AlertCircle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
                       <p className="text-sm md:text-base text-rose-200">
-                        No pudimos enviar el registro. Revisa tu conexión e inténtalo de
+                        No pudimos enviar tu registro. Revisa tu conexión e inténtalo de
                         nuevo en unos minutos. Los datos siguen escritos en el formulario.
                       </p>
                     </div>
@@ -2155,7 +2403,7 @@ export default function Registro() {
                     ) : (
                       <>
                         <Send className="w-5 h-5" />
-                        Registrar equipo
+                        Registrarme
                       </>
                     )}
                   </button>

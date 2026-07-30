@@ -80,7 +80,7 @@ const CLASE_ACCION_PRIMARIA =
   'hover:from-lqc-600 hover:to-lqc-400 text-white shadow-lg shadow-blue-900/30'
 
 /* `bg-none` desactiva el gradiente de la capa base para que el secundario no compita con el
-   primario: es el mismo parche que ya lleva el botón "Registrar otro equipo" de Registro.tsx. */
+   primario: es el mismo parche que lleva `CLASE_BOTON_SECUNDARIO` en Registro.tsx. */
 const CLASE_ACCION_SECUNDARIA =
   `${CLASE_ACCION_BASE} bg-none bg-black/40 border border-blue-800/40 text-gray-200 ` +
   'hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white'

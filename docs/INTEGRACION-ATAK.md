@@ -1,5 +1,24 @@
 # Integración con ATAK.GG
 
+> ## ⚠ AVISO DEL 2026-07-30 — LEER ANTES QUE EL RESTO
+>
+> **El camino de ALTA que documenta este archivo colgaba de la RPC
+> `registrar_equipo`, y el sitio ya no la llama.** `/registro` se reescribió: ahora
+> el registro es individual y entra por `registrar_jugador` (ver AGENTS.md). Todo lo
+> que este documento dice **en presente** sobre el alta —incluido «`/registro`
+> permite entre 5 y 7 tarjetas»— describe el modelo anterior.
+>
+> Lo que **no** cambió y sigue vigente tal cual está documentado: el trigger
+> `trg_atak_equipo` sobre `equipos.archivado_en` (baja y alta por archivado), el
+> contrato de `/register-team` y `/unregister`, el riesgo fire-and-forget y el
+> diagnóstico con `net._http_response`.
+>
+> **Lo que hay que verificar en la base, no acá:** si `registrar_jugador` hace su
+> propio `atak_enviar`. Si no lo hace, las altas dejaron de sincronizarse **en
+> silencio**. Si lo hace, manda un roster incompleto en cada alta, lo cual es
+> inofensivo solo porque `/register-team` es idempotente. Este archivo se actualiza
+> cuando alguien lo compruebe.
+
 **La sincronización con ATAK YA FUNCIONA en producción, pero no vive en este
 repo.** Está implementada **dentro de Supabase**, en PL/pgSQL: en parte como un
 **trigger** y en parte como una **llamada explícita desde la función de registro**

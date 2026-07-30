@@ -8,10 +8,12 @@ diseño y reglas de trabajo. Este archivo solo agrega lo específico de Claude C
 
 - Sitio estático de la **League Querétaro Championship (LQC)**, liga de esports de
   **Revolution505** en Querétaro. React 19 + TypeScript + Vite + Tailwind 4, sin
-  backend propio: todo el contenido vive en los componentes. Lo único que manda
-  datos a un servicio es el formulario de `/registro`, que hace un **INSERT
-  anónimo** en la tabla `inscripciones` de Supabase y no lee nada. La política de
-  RLS (INSERT sí, SELECT no) todavía no se verificó de punta a punta.
+  backend propio: todo el contenido **público** vive en los componentes. Lo que sí
+  toca Supabase es `/registro` —cada jugador se registra solo, con las RPC
+  `buscar_equipos` (sugerencias de equipo) y `registrar_jugador` (el envío)— y el
+  panel de `/admin`, detrás de login. **El detalle del modelo está en AGENTS.md y
+  cambió dos veces: leelo antes de tocar el registro.** Ojo: `inscripciones`, la
+  tabla del modelo original, ya no la usa nadie.
 - **Regla de color: paleta azul/negro (`#0066ff` / acento `#00d4ff` / fondo `#0a0a0f`)
   y nada de `purple-*`.**
 - **`npm run build` (`tsc -b && vite build`) debe pasar antes de commitear.** Que

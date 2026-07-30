@@ -54,9 +54,10 @@ export function obtenerSupabase(): ClienteSupabase | null {
     cliente = createClient(url, claveAnon, {
       /* persistSession + autoRefreshToken: el panel de admin (`/admin`) necesita
          mantener la sesión entre recargas y refrescar el token antes de que
-         venza. El INSERT anónimo de `/registro` no se ve afectado: persistir la
-         sesión no cambia el request del insert y un usuario sin sesión sigue
-         pudiendo insertar bajo la RLS de `inscripciones`.
+         venza. Las dos RPC anónimas de `/registro` —`buscar_equipos` y
+         `registrar_jugador`— no se ven afectadas: persistir la sesión no cambia
+         el request, y sin sesión se sigue pudiendo llamar a las dos, que corren
+         con permisos propios (ver AGENTS.md).
          detectSessionInUrl se queda en false: el panel entra solo con
          correo+contraseña, no hay OAuth ni magic links que dejen el token en el
          hash de la URL para parsear al cargar. */

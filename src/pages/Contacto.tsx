@@ -57,9 +57,13 @@ const canales = [
 
 export default function Contacto() {
   /* OJO: estas respuestas describen el modelo de registro, así que envejecen con él.
+     Ya envejecieron una vez: hasta el 2026-07-30 esta FAQ decía que el capitán
+     registraba al equipo entero en un solo envío, y siguió diciéndolo un rato después
+     de que dejara de ser cierto. Hoy el modelo es individual —cada quien manda lo suyo
+     y ELIGE su equipo de las sugerencias de `buscar_equipos`—.
      Los números del roster (5 a 7, 5 titulares) y la lista de campos que se piden son
      los de `src/pages/Registro.tsx` —MIN_JUGADORES, MAX_JUGADORES, TITULARES y los
-     campos del payload— y los hace cumplir la RPC `registrar_equipo`. Si cambian ahí,
+     campos del payload— y los hace cumplir la RPC `registrar_jugador`. Si cambian ahí,
      hay que tocarlos acá y en la tarjeta CTA de Home.tsx: son tres copias en prosa que
      nada sincroniza.
 
@@ -83,8 +87,8 @@ export default function Contacto() {
      que fechas y cupo SÍ tienen fuente y los premios NO: nunca publicar un monto. */
   const faqs = [
     {
-      question: "¿Cómo puedo inscribir a mi equipo?",
-      answer: "Lo hace el capitán, desde la sección Registro del menú: en un solo envío registra al equipo completo con su roster de 5 a 7 jugadores —los 5 primeros quedan como titulares y del 6º en adelante como suplentes—. De cada jugador se piden Riot ID, nombre, fecha de nacimiento, celular, correo, municipio, escolaridad y género; del capitán, su Riot ID y su celular. Conviene tenerlo todo a mano antes de empezar."
+      question: "¿Cómo nos inscribimos?",
+      answer: "Cada jugador se registra por su cuenta, desde la sección Registro del menú. Al escribir el nombre del equipo aparecen los que ya están inscritos: si el tuyo está en la lista, elígelo de ahí para no crear uno repetido; si eres el primero de tu equipo, escribe el nombre y se crea con tu registro. Se piden Riot ID, nombre, fecha de nacimiento, celular, correo, municipio, escolaridad y género, más una casilla opcional para marcar quién es el capitán. Un equipo compite con 5 a 7 jugadores: los 5 primeros en registrarse quedan como titulares y del 6º en adelante como suplentes."
     },
     {
       question: "¿Cuáles son los requisitos para participar?",

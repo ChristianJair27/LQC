@@ -9,7 +9,24 @@ componentes: sus páginas no leen ninguna base.
 
 **La tabla `inscripciones` ya NO se usa.** Sigue existiendo en la base —no se borró—
 pero ni el registro ni el panel la tocan. El modelo pasó de *una fila = un jugador*,
-con el equipo como un **string repetido** en cada fila, a dos tablas:
+con el equipo como un **string repetido** en cada fila, a dos tablas.
+
+> **Cómo se registra la gente cambió DOS veces, y las dos siguen dejando rastro.**
+> Las tablas de abajo son las mismas desde el 2026-07-29; lo que cambió el
+> **2026-07-30** es la superficie pública. Resumen, porque el orden importa para leer
+> los comentarios viejos del repo:
+>
+> 1. **Registro individual sobre `inscripciones`** — una fila por jugador y el equipo
+>    como texto libre repetido. Un typo partía el equipo en dos.
+> 2. **Registro por equipo** (`registrar_equipo`) — el capitán cargaba el roster de 5
+>    a 7 jugadores en un solo envío. Arregló el typo, pero puso a una persona a
+>    tipear los datos personales de otras seis desde un teléfono.
+> 3. **Registro individual sobre el esquema relacional** (vigente) — cada quien manda
+>    lo suyo otra vez, pero el equipo se **elige de una lista** que sale de la base,
+>    no se escribe de memoria. El typo se evita por reconocimiento.
+>
+> **`registrar_equipo` ya no la llama nadie desde el repo.** No se comprobó si sigue
+> existiendo en la base: si vas a tocarla, verificá primero.
 
 - **`public.equipos`** — `id` (uuid), `nombre`, `nombre_norm`,
   `capitan_nombre` (**⚠ lleva el Riot ID, no un nombre — ver la trampa de abajo**),
@@ -20,26 +37,49 @@ con el equipo como un **string repetido** en cada fila, a dos tablas:
 
 Dos cosas tocan Supabase:
 
-- El **formulario público de `/registro`** ya no hace un INSERT: el **capitán registra
-  al equipo completo con su roster de 5 a 7 jugadores en un solo envío**, por la RPC
-  **`registrar_equipo(datos jsonb)`**. `datos` es
-  `{ equipo, capitan_nombre, capitan_celular, jugadores: [...] }` y **`rol` no se
-  manda**: la función asigna titular a los 5 primeros y suplente del 6º en adelante,
-  **por el orden del array**. Devuelve `{ ok:true }` o `{ ok:false, error }` con los
-  códigos `min_jugadores`, `max_jugadores`, `falta_equipo` y `equipo_duplicado`.
-  El cliente anónimo **solo puede llamar a la RPC**: no lee las tablas, así que no
-  intentes un `.select()` de vuelta.
+- El **formulario público de `/registro`** llama a **dos** RPC, y a nada más. El
+  cliente anónimo **no lee las tablas**: no intentes un `.select()` sobre `equipos` ni
+  `jugadores`, no va a devolver nada y no es un bug de RLS.
+
+  - **`buscar_equipos(termino)`** — alimenta el combobox de equipo. Devuelve hasta 5
+    filas `{ id, nombre, jugadores }` ordenadas por similitud, por coincidencia
+    parcial **y difusa** (`pg_trgm` según quien la escribió; desde el repo no se puede
+    comprobar), así que «los pandit» encuentra «Los Panditas».
+    Es pública y **no devuelve datos personales**: solo el nombre del equipo y cuántos
+    jugadores tiene. Ese conteo no es decorativo — es lo que deja reconocer al equipo
+    correcto entre dos nombres parecidos y lo que marca a un equipo lleno (7).
+  - **`registrar_jugador(datos jsonb)`** — el envío. `datos` lleva siempre los datos
+    del jugador (`gamertag`, `nombre`, `fecha_nacimiento`, `celular`, `correo`,
+    `municipio`, `escolaridad`, `genero`, `es_capitan`) **más una de estas dos, nunca
+    las dos**: `equipo_id` si se eligió un equipo de las sugerencias, o `equipo` con
+    un nombre nuevo, que la función crea. **`rol` y `orden` no se mandan**: los asigna
+    la función —titular los 5 primeros, suplente del 6º— contando lo que ya hay.
+    Devuelve `{ ok:true, equipo_id, orden }` o `{ ok:false, error }` con los códigos
+    `falta_gamertag`, `falta_equipo`, `equipo_lleno` y `gamertag_duplicado`.
+
+  **La página lee `orden` como "cuántos jugadores tiene el equipo ahora"** para poder
+  decir «tu equipo tiene 3 de 5 jugadores mínimos» en la pantalla de éxito. O sea que
+  **asume que `orden` es 1-based**. Es la única suposición del cliente sobre el
+  interior de la RPC; si algún día fuera 0-based, esa pantalla diría un jugador de
+  menos siempre.
 
   **TRAMPA: `capitan_nombre` NO lleva un nombre, lleva el RIOT ID del capitán**
   (formato `nombre#tag`), porque es lo que ATAK espera en ese campo. Confirmado por
-  los organizadores el 2026-07-29. El nombre de la clave engaña, y engaña en tres
-  lugares a la vez —la columna de `equipos`, la clave del payload de la RPC y el campo
-  de ATAK—, así que es de lo más fácil de malinterpretar leyendo solo el esquema.
-  **No lo renombres:** los tres nombres son el mismo contrato, y cambiarlo obligaría a
-  tocar `registrar_equipo` y `armar_roster_atak`, que viven en la base y no en el
-  repo. `/registro` lo valida con el mismo `REGEX_RIOT_ID` que a los jugadores; el
-  panel lo etiqueta «Capitán (Riot ID)» y el CSV exporta esa columna como «Riot ID del
-  Capitán», justamente para que nadie lo lea como un nombre mal escrito.
+  los organizadores el 2026-07-29. El nombre de la columna engaña y es de lo más fácil
+  de malinterpretar leyendo solo el esquema. **No la renombres:** el nombre es el mismo
+  contrato que espera ATAK, y cambiarlo obligaría a tocar funciones que viven en la
+  base y no en el repo. El panel la etiqueta «Capitán (Riot ID)» y el CSV la exporta
+  como «Riot ID del Capitán», justamente para que nadie la lea como un nombre mal
+  escrito.
+
+  Ojo con una consecuencia del modelo nuevo: **el formulario ya no manda
+  `capitan_nombre` ni `capitan_celular`**. Manda un booleano `es_capitan` por jugador,
+  y quién termina en esas columnas de `equipos` lo resuelve la base. Cómo lo resuelve
+  exactamente **no está verificado desde acá** — si te importa, leelo en Supabase, no
+  lo deduzcas del formulario. Lo que sí es decisión del cliente: la casilla **no es
+  obligatoria y no se valida**. Esta página no puede saber si alguien más del equipo
+  ya la marcó (no lee las tablas), así que advertir «nadie es capitán todavía» sería
+  mentir; si nadie la marca, la organización toma al primero que se registró.
 - El **panel de administración (`/admin`)**, detrás de login, lee las dos tablas con
   **un solo SELECT con join** (`equipos` con sus `jugadores` ordenados por `orden`) y
   **ya no agrupa nada en el cliente**. Tiene sesión de usuario; los admins se crean a
@@ -62,10 +102,20 @@ conservó, pero con otro propósito: comprobar que alcanzó una fila visible, o 
 Supabase que sincroniza con **ATAK.GG** vía `pg_net`, por **dos caminos y solo uno es
 un trigger** (verificado en producción el 2026-07-29):
 
-- **Alta: NO es un trigger.** La propia RPC `registrar_equipo` llama al final de su
-  transacción a `atak_enviar('/register-team', armar_roster_atak(id))`. Se hace así a
+- **Alta: NO es un trigger.** La RPC `registrar_equipo` llamaba al final de su
+  transacción a `atak_enviar('/register-team', armar_roster_atak(id))`. Se hacía así a
   propósito: un `AFTER INSERT` sobre `equipos` correría **antes** de que se inserte el
   roster y mandaría un equipo con cero jugadores.
+
+  ⚠ **SIN VERIFICAR desde el 2026-07-30.** Ese camino colgaba de `registrar_equipo`, y
+  el sitio **ya no la llama**: ahora registra con `registrar_jugador`, una persona por
+  vez. Si `registrar_jugador` no hace su propio `atak_enviar`, las altas dejaron de
+  sincronizarse con ATAK **en silencio** —las llamadas son fire-and-forget, así que no
+  hay error del lado local que lo delate— y si lo hace, manda un roster incompleto en
+  cada alta (el equipo va creciendo de a un jugador), lo cual es inofensivo solo
+  porque `/register-team` es idempotente y reemplaza el roster anterior. **Cuál de las
+  dos cosas pasa no se puede saber leyendo este repo:** hay que mirar el cuerpo de
+  `registrar_jugador` en Supabase y `net._http_response`.
 - **Baja y alta por archivado: sí es trigger.** `trg_atak_equipo`, `AFTER UPDATE OF
   archivado_en ON public.equipos`, con `WHEN (old IS DISTINCT FROM new)` para que
   marcar pago o guardar notas no disparen nada. Archivar llama a `/unregister`;
@@ -96,9 +146,10 @@ datos de nadie.)
 La RLS con el modelo nuevo:
 
 - **`equipos` y `jugadores`**: el anónimo **no lee ni escribe** ninguna de las dos —su
-  única superficie es la RPC `registrar_equipo`, que corre con permisos propios—. El
-  usuario **autenticado** tiene **SELECT en las dos** y **UPDATE solo en `equipos`**
-  (por eso el panel no edita jugadores).
+  única superficie son las RPC `buscar_equipos` y `registrar_jugador`, que corren con
+  permisos propios—. `buscar_equipos` es la excepción aparente y no lo es: devuelve
+  nombre y conteo, nunca datos personales. El usuario **autenticado** tiene **SELECT en
+  las dos** y **UPDATE solo en `equipos`** (por eso el panel no edita jugadores).
 - **`inscripciones`** (la tabla vieja, ya sin uso): INSERT anónimo y SELECT
   autenticado. Se verificó de punta a punta en producción el 2026-07-23, cuando era la
   tabla en uso.
@@ -113,8 +164,9 @@ permisos, ese es el primer lugar donde mirar, no el código.
   `src/index.css`, **no** hay `tailwind.config.js`
 - **react-router-dom 7** — rutas declaradas en `src/App.tsx`
 - `lucide-react` (iconos), `react-lazy-load-image-component` (galería)
-- **`@supabase/supabase-js`** — INSERT anónimo del formulario de `/registro` y el
-  login + SELECT autenticado del panel de `/admin`
+- **`@supabase/supabase-js`** — las dos RPC anónimas de `/registro`
+  (`buscar_equipos` y `registrar_jugador`) y el login + SELECT autenticado del
+  panel de `/admin`
 - **Infra:** Docker + nginx (`Dockerfile`, `nginx.conf`) y `nixpacks.toml`
 
 ## Estructura
