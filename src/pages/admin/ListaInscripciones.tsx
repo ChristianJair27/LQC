@@ -484,19 +484,26 @@ function BadgeRol({ rol }: { rol: Rol }) {
    a ignorar la señal — justo lo que arruina que sirva el día que marque algo real. (Y
    siguió en rojo unos días después del cambio de modelo, anotado como pendiente de
    decidir; esto cierra esa deuda.)
-   El «3 de 5» ya dice todo lo que hay que saber; el icono solo agregaba alarma.
+   El «Roster 3 de 5» ya dice todo lo que hay que saber; el icono solo agregaba alarma.
    Sigue apareciendo únicamente por debajo del mínimo, o sea que sigue siendo información
-   y no decoración: un equipo completo no lo lleva.
-   Sin `gap`: con el icono fuera queda un solo ítem de flexbox —el `sr-only` está fuera de
-   flujo— y no había nada que separar. */
+   y no decoración: un equipo completo no lo lleva — en su lugar va el conteo normal, ver
+   el ternario del encabezado.
+   Sin `gap`: sin icono queda un solo ítem de flexbox y no hay nada que separar. */
 function BadgeRosterIncompleto({ cantidad }: { cantidad: number }) {
   return (
     <span className="inline-flex shrink-0 items-center rounded-full border border-blue-800/50 bg-blue-950/30 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-blue-300">
-      {/* Sin esto se oye "3 jugadores, 3 de 5": el número se repite y el badge llega sin
-          sustantivo. Dice «jugadores registrados» y no «roster incompleto» por lo mismo
-          que el color dejó de ser rojo: lo que se anuncia es un avance, no una falta. */}
-      <span className="sr-only">Jugadores registrados: </span>
-      {cantidad} de {MIN_JUGADORES}
+      {/* El sustantivo va en el texto VISIBLE y no en un `sr-only`, que es como estuvo
+          hasta ahora. Mientras el badge convivía con el conteo «3 jugadores» de al lado,
+          el ojo sacaba el sustantivo de ahí y el `sr-only` solo tapaba el agujero del
+          lector de pantalla; desde que el badge REEMPLAZA a ese conteo, un «3 DE 5»
+          pelado deja sin sustantivo a quien mira la pantalla —«Los Panditas 3 DE 5»,
+          al lado de un botón «Marcar pagado», se puede leer como pagos o como partidos—
+          mientras el lector de pantalla sí se enteraba. Un `sr-only` que informa MEJOR
+          que lo visible está usado al revés.
+          Con la palabra a la vista, lo que se ve y lo que se oye vuelven a ser lo mismo y
+          el `sr-only` sobra. Dice «Roster» y no «Roster incompleto» por lo mismo que el
+          color dejó de ser rojo: es un avance, no una falta. */}
+      Roster {cantidad} de {MIN_JUGADORES}
     </span>
   )
 }
@@ -736,12 +743,23 @@ function TarjetaEquipo({
               <span className="truncate text-base font-semibold text-white md:text-lg">
                 {nombre}
               </span>
-              <span className="shrink-0 font-mono text-xs text-gray-400">
-                {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
-              </span>
-              {/* Avance del roster: se ve sin desplegar la tarjeta, que es donde el
-                  organizador está escaneando la lista. */}
-              {incompleto && <BadgeRosterIncompleto cantidad={cantidad} />}
+              {/* EXCLUYENTES, y por eso un ternario y no dos condiciones sueltas: así no
+                  puede volver a darse el caso de que aparezcan juntos. Con el badge en
+                  rojo se leían como cosas distintas y convivían; desde que es un contador
+                  azul quedaban pegados diciendo el mismo número dos veces —«3 jugadores
+                  3 DE 5»—. Con el roster corto gana el badge, que dice lo mismo y además
+                  contra cuánto: «3 jugadores» a secas no informa si 3 alcanza. */}
+              {incompleto ? (
+                /* Se ve sin desplegar la tarjeta, que es donde el organizador escanea. */
+                <BadgeRosterIncompleto cantidad={cantidad} />
+              ) : (
+                /* El plural es defensivo: acá `cantidad` siempre es ≥ MIN_JUGADORES, así
+                   que hoy el singular no se alcanza — pero se alcanzaría si el mínimo
+                   bajara, y el ternario cuesta menos que acordarse. */
+                <span className="shrink-0 font-mono text-xs text-gray-400">
+                  {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
+                </span>
+              )}
             </span>
             {/* `capitan_nombre` guarda el RIOT ID del capitán, no su nombre —es lo que
                 espera ATAK en ese campo—, así que la etiqueta lo dice y el valor va en
