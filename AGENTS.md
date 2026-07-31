@@ -55,13 +55,23 @@ Dos cosas tocan Supabase:
     un nombre nuevo, que la función crea. **`rol` y `orden` no se mandan**: los asigna
     la función —titular los 5 primeros, suplente del 6º— contando lo que ya hay.
     Devuelve `{ ok:true, equipo_id, orden }` o `{ ok:false, error }` con los códigos
-    `falta_gamertag`, `falta_equipo`, `equipo_lleno` y `gamertag_duplicado`.
+    `falta_gamertag`, `falta_equipo`, `equipo_lleno`, `gamertag_duplicado` y
+    `torneo_lleno` (ver el tope de 32 equipos más abajo).
 
   **La página lee `orden` como "cuántos jugadores tiene el equipo ahora"** para poder
-  decir «tu equipo tiene 3 de 5 jugadores mínimos» en la pantalla de éxito. O sea que
-  **asume que `orden` es 1-based**. Es la única suposición del cliente sobre el
-  interior de la RPC; si algún día fuera 0-based, esa pantalla diría un jugador de
-  menos siempre.
+  decir «tu equipo tiene 3 de 5 jugadores mínimos» en la pantalla de éxito. Eso exige
+  que `orden` sea **1-based**, y lo es: **verificado el 2026-07-30**, la función hace
+  `v_orden := v_total + 1`. (Estuvo un día documentado como suposición del cliente; ya
+  no lo es.)
+
+  **Hay un tope de 32 EQUIPOS en toda la liga**, el que fija el reglamento oficial
+  («Esta liga estará limitada a un máximo de 32 equipos»). Lo hace cumplir la RPC, que
+  rechaza con **`torneo_lleno`**. Lo importante de ese código, y lo que su mensaje en
+  `/registro` explica: **el tope bloquea CREAR equipos nuevos, no unirse a uno ya
+  inscrito.** Un `torneo_lleno` no significa que la persona no pueda participar —
+  significa que tiene que elegir su equipo de las sugerencias en vez de escribir un
+  nombre nuevo. Redactar ese mensaje como «el torneo está cerrado» hace que alguien
+  que sí podía inscribirse se vaya.
 
   **TRAMPA: `capitan_nombre` NO lleva un nombre, lleva el RIOT ID del capitán**
   (formato `nombre#tag`), porque es lo que ATAK espera en ese campo. Confirmado por
@@ -102,20 +112,24 @@ conservó, pero con otro propósito: comprobar que alcanzó una fila visible, o 
 Supabase que sincroniza con **ATAK.GG** vía `pg_net`, por **dos caminos y solo uno es
 un trigger** (verificado en producción el 2026-07-29):
 
-- **Alta: NO es un trigger.** La RPC `registrar_equipo` llamaba al final de su
-  transacción a `atak_enviar('/register-team', armar_roster_atak(id))`. Se hacía así a
-  propósito: un `AFTER INSERT` sobre `equipos` correría **antes** de que se inserte el
-  roster y mandaría un equipo con cero jugadores.
+- **Alta: NO es un trigger, y sigue sin serlo** (verificado en producción el
+  **2026-07-30**, con el modelo de registro individual ya desplegado).
+  `registrar_jugador` termina su cuerpo con
+  `perform public.atak_enviar('/register', <datos del jugador>)`. Lo verificado es
+  **qué** hace la función, no por qué se eligió así: el argumento viejo —un
+  `AFTER INSERT` sobre `equipos` mandaría el equipo antes de tener roster— ya no
+  aplica, porque acá cada INSERT de `jugadores` sí trae la fila entera. O sea que hoy
+  **sí podría** ser un trigger y no lo es; por qué, no está documentado.
 
-  ⚠ **SIN VERIFICAR desde el 2026-07-30.** Ese camino colgaba de `registrar_equipo`, y
-  el sitio **ya no la llama**: ahora registra con `registrar_jugador`, una persona por
-  vez. Si `registrar_jugador` no hace su propio `atak_enviar`, las altas dejaron de
-  sincronizarse con ATAK **en silencio** —las llamadas son fire-and-forget, así que no
-  hay error del lado local que lo delate— y si lo hace, manda un roster incompleto en
-  cada alta (el equipo va creciendo de a un jugador), lo cual es inofensivo solo
-  porque `/register-team` es idempotente y reemplaza el roster anterior. **Cuál de las
-  dos cosas pasa no se puede saber leyendo este repo:** hay que mirar el cuerpo de
-  `registrar_jugador` en Supabase y `net._http_response`.
+  Ojo con dos diferencias respecto del modelo anterior, que la doc vieja no cubre:
+  el endpoint es **`/register`** (jugador), no `/register-team` (roster entero), y se
+  llama **una vez por jugador**, no una por equipo. Del lado de ATAK eso se resuelve
+  solo: responde **`team_created`** con el primer jugador de un equipo y
+  **`player_added`** con los siguientes. Confirmado con respuestas reales.
+
+  (La RPC vieja `registrar_equipo` llamaba en cambio a
+  `atak_enviar('/register-team', armar_roster_atak(id))`. Ya no la llama nadie desde
+  el repo.)
 - **Baja y alta por archivado: sí es trigger.** `trg_atak_equipo`, `AFTER UPDATE OF
   archivado_en ON public.equipos`, con `WHEN (old IS DISTINCT FROM new)` para que
   marcar pago o guardar notas no disparen nada. Archivar llama a `/unregister`;
@@ -123,7 +137,9 @@ un trigger** (verificado en producción el 2026-07-29):
 
 `/register-team` es **atómico e idempotente** del lado de ATAK (lock de fila, y el
 roster enviado reemplaza al que hubiera), así que reenviarlo es la forma barata de
-reparar una llamada perdida.
+reparar una llamada perdida. Ojo: eso está comprobado de `/register-team`, que hoy usa
+**solo el trigger de archivado**. De `/register` —el del alta— **no se comprobó si es
+idempotente**, así que no des por hecho que reenviarlo sea inofensivo.
 
 **De nada de esto hay una sola línea en el repo** —ni webhook, ni edge function, ni
 carpeta `supabase/`—, así que grepear el código y no encontrar nada **no** prueba que

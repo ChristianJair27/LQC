@@ -1,23 +1,28 @@
 # Integración con ATAK.GG
 
-> ## ⚠ AVISO DEL 2026-07-30 — LEER ANTES QUE EL RESTO
+> ## AVISO DEL 2026-07-30 — LEER ANTES QUE EL RESTO
 >
-> **El camino de ALTA que documenta este archivo colgaba de la RPC
-> `registrar_equipo`, y el sitio ya no la llama.** `/registro` se reescribió: ahora
-> el registro es individual y entra por `registrar_jugador` (ver AGENTS.md). Todo lo
-> que este documento dice **en presente** sobre el alta —incluido «`/registro`
-> permite entre 5 y 7 tarjetas»— describe el modelo anterior.
+> **El camino de ALTA cambió, y la sincronización SIGUE FUNCIONANDO.** `/registro` se
+> reescribió: el registro es individual y entra por `registrar_jugador`, no por
+> `registrar_equipo` (ver AGENTS.md). Todo lo que este documento dice **en presente**
+> sobre el alta —incluido «`/registro` permite entre 5 y 7 tarjetas» y el uso de
+> `armar_roster_atak`— describe el modelo anterior.
+>
+> **Lo verificado en producción el 2026-07-30:** `registrar_jugador` cierra su cuerpo
+> con `perform public.atak_enviar('/register', <datos del jugador>)`. Dos diferencias
+> con lo documentado abajo: el endpoint es **`/register`** (un jugador) y no
+> `/register-team` (el roster entero), y se llama **una vez por jugador**. ATAK lo
+> resuelve solo: responde **`team_created`** con el primero de un equipo y
+> **`player_added`** con los siguientes — confirmado con respuestas reales.
 >
 > Lo que **no** cambió y sigue vigente tal cual está documentado: el trigger
-> `trg_atak_equipo` sobre `equipos.archivado_en` (baja y alta por archivado), el
-> contrato de `/register-team` y `/unregister`, el riesgo fire-and-forget y el
-> diagnóstico con `net._http_response`.
+> `trg_atak_equipo` sobre `equipos.archivado_en` (baja y alta por archivado), que
+> **sí** sigue usando `/register-team` y `/unregister`; el riesgo fire-and-forget; y
+> el diagnóstico con `net._http_response`.
 >
-> **Lo que hay que verificar en la base, no acá:** si `registrar_jugador` hace su
-> propio `atak_enviar`. Si no lo hace, las altas dejaron de sincronizarse **en
-> silencio**. Si lo hace, manda un roster incompleto en cada alta, lo cual es
-> inofensivo solo porque `/register-team` es idempotente. Este archivo se actualiza
-> cuando alguien lo compruebe.
+> Pendiente de este archivo: reescribir las secciones de abajo para el camino
+> `/register`. Mientras tanto, para el ALTA vale este aviso y no el cuerpo del
+> documento.
 
 **La sincronización con ATAK YA FUNCIONA en producción, pero no vive en este
 repo.** Está implementada **dentro de Supabase**, en PL/pgSQL: en parte como un
@@ -310,12 +315,28 @@ El cuerpo llega como `{"ok":true,"action":"…"}`, y en `/register-team` además
 | `team_created` | `/register-team` | se creó el equipo en ATAK con su roster. **Confirmada el 2026-07-29** (`{"ok":true,"action":"team_created","teamSize":5}`) |
 | `team_deleted` | `/unregister` | se dio de baja el equipo del torneo. **Confirmada el 2026-07-29** |
 
-Las respuestas a nivel JUGADOR que documentaba este archivo —`player_added`,
-`player_updated`, `player_removed`— eran del endpoint `/register` del modelo viejo,
-que daba de alta **de a un jugador por vez** porque cada fila de `inscripciones` era
-una persona. Con `/register-team` la unidad es el equipo entero, así que no
-aparecen. `already_absent` (baja idempotente, no había nada que quitar) se
-documentaba para `/unregister` y no se volvió a comprobar con el modelo nuevo.
+| `player_added` | `/register` | se agregó un jugador a un equipo que ya existía en ATAK. **Confirmada el 2026-07-30** |
+
+⚠ **El párrafo que seguía acá decía que `player_added` ya no podía aparecer. Es falso
+desde el 2026-07-30** y se conserva tachado abajo, porque entender por qué se creyó eso
+ayuda a leer el resto del archivo.
+
+Con el registro individual, `registrar_jugador` llama a **`/register` una vez por
+jugador**, así que las respuestas a nivel JUGADOR volvieron: ATAK responde
+`team_created` con el primero de un equipo —crea el equipo y lo agrega— y
+`player_added` con cada uno de los siguientes. Las dos están confirmadas con
+respuestas reales.
+
+~~«Las respuestas a nivel JUGADOR que documentaba este archivo —`player_added`,
+`player_updated`, `player_removed`— eran del endpoint `/register` del modelo viejo, que
+daba de alta de a un jugador por vez porque cada fila de `inscripciones` era una
+persona. Con `/register-team` la unidad es el equipo entero, así que no aparecen.»~~
+Eso valía mientras el alta iba por `registrar_equipo`, entre el 2026-07-29 y el
+2026-07-30.
+
+De `player_updated` y `player_removed` sigue sin haber confirmación con el modelo
+actual. `already_absent` (baja idempotente, no había nada que quitar) se documentaba
+para `/unregister` y tampoco se volvió a comprobar.
 
 ---
 

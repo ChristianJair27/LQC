@@ -305,14 +305,15 @@ type RegistroOk = { orden: number }
    'desconocido' y se trata como fallo genérico, que es lo único honesto que se
    puede decir de una respuesta que no se entiende.
 
-   OJO con `orden`: se lee como el número de jugadores que el equipo tiene AHORA,
-   porque la función lo calcula contando lo que ya había e insertando a
-   continuación. O sea que se asume 1-based (el primero en registrarse es el 1, y
-   por eso el suplente empieza «del 6º»). Si algún día devolviera 0-based, el primer
-   jugador de cada equipo recibiría `orden:0`, que el guard de abajo rechaza: vería el
-   banner de «no pudimos enviar» sobre un registro que sí entró. Del segundo en adelante
-   sí se pintaría un jugador de menos. Es la única suposición de esta página sobre el
-   interior de la RPC, y falla ruidosamente en el primer caso, que es lo que se quiere. */
+   `orden` se lee como el número de jugadores que el equipo tiene AHORA. Eso exige que
+   sea 1-based, y lo es: verificado el 2026-07-30, la función hace
+   `v_orden := v_total + 1` (por eso el suplente empieza «del 6º»). Estuvo un día
+   documentado acá como suposición del cliente; ya no lo es.
+   El guard de abajo se queda igual de estricto de todos modos, porque protege contra
+   otra cosa: una respuesta con `orden` ausente o con basura. Y si alguna vez la función
+   cambiara a 0-based, el primer jugador de cada equipo recibiría `orden:0` y caería en
+   'desconocido' —banner de fallo sobre un registro que sí entró—, que es ruidoso y
+   por lo tanto preferible a pintar un jugador de menos en silencio. */
 function leerRespuesta(
   cuerpo: unknown
 ): { tipo: 'ok'; datos: RegistroOk } | { tipo: CodigoRechazo | 'desconocido' } {
