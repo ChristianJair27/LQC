@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Twitch, Calendar, ChevronRight, ChevronLeft, ChevronRight as ChevronRightIcon, UserPlus } from 'lucide-react'
+import { Twitch, Calendar, ChevronRight, UserPlus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 /* Mismo parche que Footer.tsx: React Router en modo declarativo no resetea el scroll y el
@@ -39,6 +39,38 @@ const CLASE_CTA_SECUNDARIO =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
+/* Celda del muro de patrocinadores. El <a> ES la celda entera —no un enlace chico dentro
+   de una tarjeta—: es lo que se espera de un muro de logos y de paso da un área de toque
+   cómoda en móvil, donde cada celda mide media pantalla de ancho.
+   Tres cosas que la capa base de index.css obliga a desactivar o reponer en cualquier <a>
+   que no sea un enlace de texto: `after:hidden` mata la barra de gradiente que `a::after`
+   dibuja al 100% del ancho en hover —acá cruzaría la tarjeta por debajo—; el anillo de
+   foco va explícito porque index.css se lo da a <button> y no a <a>; y el color del texto
+   lo pone el <span> del nombre, que al ser una clase propia gana sobre el
+   `a { color: #66a3ff }` heredado.
+   El hover es deliberadamente chico: el marco se ilumina y el logo pasa de opacidad
+   reducida a plena. Nada de `scale` ni de saltos — son marcas, no llamados a la acción, y
+   con 10 o 20 celdas cualquier movimiento grande convierte la sección en un tembladeral. */
+const CLASE_CELDA_PATROCINADOR =
+  'group after:hidden flex flex-col items-center rounded-2xl border border-white/5 ' +
+  'bg-white/[0.02] p-5 md:p-6 transition-colors duration-300 ' +
+  'hover:border-blue-500/30 hover:bg-white/[0.04] ' +
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+
+/* Los logos vienen en proporciones muy distintas —hoy 8 de 10 son cuadrados y los otros dos
+   apaisados, hasta 3.5:1—, así que se normalizan por ALTURA: caja de alto fijo +
+   `object-contain`. Con eso ninguno se deforma, ninguno pasa de la franja vertical y todas
+   las filas alinean. Sin el alto fijo pasaría lo contrario de lo que uno teme: los que se
+   comerían la celda serían los CUADRADOS, que al escalar por ancho crecerían hasta el alto
+   de la columna, mientras el apaisado quedaría como el más chico.
+   Lo que la altura fija NO hace es igualar el área: un logo 3.5:1 llega al ancho completo
+   y el cuadrado no, así que sigue habiendo alguno más presente. Igualar eso de verdad
+   pediría recortar o normalizar los archivos, que es trabajo de diseño y no de layout.
+   La caja mantiene su alto aunque la <img> se oculte, que es lo que pasa cuando el archivo
+   no carga: así la fila no se desalinea y el nombre no salta hacia arriba. */
+const ALTO_LOGO_PATROCINADOR = 'h-14 md:h-16'
+
 const sponsors = [
   { id: 1, name: 'Yuri Japonesa', logo: '/sponsors/YuriJaponesa.png', url: 'https://example.com' },
   { id: 2, name: 'TableTop', logo: '/sponsors/5 Tabletop.png', url: 'https://example.com' },
@@ -55,10 +87,6 @@ const sponsors = [
 export default function Home() {
   const [streamStatus, setStreamStatus] = useState<'online' | 'offline'>('online')
   const [] = useState('1.2K')
-  const [currentSponsorIndex, setCurrentSponsorIndex] = useState(0)
-  const [isPlaying] = useState(true)
-  
-  
   const twitchChannel = "lqroc"
   
   const streamSchedule = [
@@ -66,17 +94,6 @@ export default function Home() {
     { day: 'Jueves', time: '21:00 - 22:00', type: 'Grupos' },
     
   ]
-
-  useEffect(() => {
-    if (!isPlaying) return
-    const interval = setInterval(() => {
-      setCurrentSponsorIndex((prev) => (prev + 1) % sponsors.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [isPlaying, sponsors.length])
-
-  const nextSponsor = () => setCurrentSponsorIndex((prev) => (prev + 1) % sponsors.length)
-  const prevSponsor = () => setCurrentSponsorIndex((prev) => (prev - 1 + sponsors.length) % sponsors.length)
 
   useEffect(() => {
     const checkStreamStatus = () => setStreamStatus('online')
@@ -333,7 +350,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Patrocinadores - versión más limpia */}
+        {/* Patrocinadores. Sin fondo tintado: el ritmo de la portada lo fija el comentario
+            de la sección CTA de más arriba (Hero → Transmisión → CTA tintado → esta). */}
         <section className="py-20">
           <div className="container mx-auto px-6 max-w-6xl">
             <div className="flex items-center gap-4 mb-12">
@@ -341,62 +359,73 @@ export default function Home() {
               <h2 className="text-3xl font-light">Nuestros Patrocinadores</h2>
             </div>
 
-            <div className="relative">
-              <button
-                onClick={prevSponsor}
-                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-20 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-gray-300 hover:text-white hover:border-blue-500/50 transition-all"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              
-              <button
-                onClick={nextSponsor}
-                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 z-20 w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-gray-300 hover:text-white hover:border-blue-500/50 transition-all"
-              >
-                <ChevronRightIcon className="w-6 h-6" />
-              </button>
-
-              <div className="overflow-hidden rounded-2xl">
-                <div 
-                  className="flex transition-transform duration-700 ease-out"
-                  style={{ transform: `translateX(-${currentSponsorIndex * 100}%)` }}
+            {/* Muro de logos, no una lista de fichas. Antes era un CARRUSEL que mostraba
+                un patrocinador por vez en una tarjeta enorme y rotaba solo cada 3 s: con
+                10 marcas, nueve de cada diez logos estaban siempre ocultos y ver uno en
+                particular exigía esperar el turno o navegar a mano. Una grilla los muestra
+                todos a la vez y escala sin tocar nada — con 6, con 10 o con 20 lo único
+                que cambia es la cantidad de filas.
+                (De paso se va un problema de accesibilidad: la rotación automática no
+                tenía forma de pausarse —`isPlaying` no tenía setter—, que es justo lo que
+                pide WCAG 2.2.2 para cualquier movimiento que arranque solo y dure más de
+                cinco segundos.)
+                Las columnas suben de 2 a 5 y la última fila queda alineada a la izquierda
+                cuando no completa: es lo normal en un muro de marcas y evita que agregar
+                un patrocinador reacomode toda la sección. */}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
+              {sponsors.map((sponsor) => (
+                <a
+                  key={sponsor.id}
+                  href={sponsor.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  /* Arranca con el texto visible EXACTO —el nombre, que está en el <span>
+                     de abajo— para no romper el control por voz (WCAG 2.5.3, "Label in
+                     Name") y recién después avisa lo que el texto no dice. Misma fórmula
+                     que los enlaces de comunidad de /registro. */
+                  aria-label={`${sponsor.name} (abre en pestaña nueva)`}
+                  className={CLASE_CELDA_PATROCINADOR}
                 >
-                  {sponsors.map((sponsor) => (
-                    <div key={sponsor.id} className="w-full flex-shrink-0 px-4">
-                      <div className="bg-gradient-to-br from-gray-900/30 to-gray-800/20 backdrop-blur-md border border-white/5 rounded-2xl p-10 hover:border-blue-500/30 transition-all duration-500 group max-w-2xl mx-auto">
-                        <div className="flex flex-col items-center space-y-8">
-                          <div className="w-56 h-56 rounded-xl bg-black/40 border border-white/5 p-6 group-hover:border-blue-500/20 transition-all overflow-hidden flex items-center justify-center">
-                            {/* Si el logo no carga se oculta la <img>: el nombre del
-                                patrocinador queda en el <h3> de abajo. El fallback no
-                                apunta a ningún archivo a propósito, así que no puede
-                                romperse él mismo. */}
-                            <img
-                              src={sponsor.logo}
-                              alt={sponsor.name}
-                              className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none'
-                              }}
-                            />
-                          </div>
-                          <div className="text-center space-y-3">
-                            <h3 className="text-2xl font-medium">{sponsor.name}</h3>
-                            <p className="text-gray-400">Patrocinador oficial LQC Otoño 2026</p>
-                          </div>
-                          <a
-                            href={sponsor.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-8 py-3 border border-white/10 hover:border-blue-500/50 text-gray-300 hover:text-white rounded-xl transition-all duration-300"
-                          >
-                            Visitar sitio web
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                  <span
+                    className={`flex w-full items-center justify-center px-2 ${ALTO_LOGO_PATROCINADOR}`}
+                  >
+                    {/* Si el logo no carga se oculta la <img> y el nombre de abajo queda
+                        como única identificación. El manejador NO apunta a un archivo de
+                        reserva a propósito: un fallback que a su vez no cargue vuelve a
+                        disparar onError y entra en bucle. Esto ya fue un bug; no lo
+                        "mejores" apuntándolo a una imagen.
+                        `alt=""` porque el nombre ya está en texto visible al lado y el
+                        nombre accesible del enlace lo da el aria-label: repetirlo haría
+                        que un lector de pantalla lo dijera dos veces. */}
+                    {/* La opacidad reducida es SOLO donde hay puntero, y por eso arranca
+                        en 100 y baja con `[@media(hover:hover)]` en vez de arrancar en 70.
+                        Tailwind 4 encierra todas las variantes `hover:`/`group-hover:` en
+                        `@media(hover:hover)`, así que con el reposo en 70 el
+                        `group-hover:opacity-100` NUNCA entra en un táctil y los logos
+                        quedan apagados de forma permanente — en la sección de quienes
+                        pagan por estar ahí, y en el dispositivo donde se ve la mayor parte
+                        del tráfico. El matiz es un adorno de escritorio; el estado bueno
+                        tiene que ser el que se ve sin puntero.
+                        `group-focus-visible` para que quien llega con teclado vea el logo
+                        pleno igual que quien pasa el mouse. */}
+                    <img
+                      src={sponsor.logo}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-contain opacity-100 transition-opacity duration-300 [@media(hover:hover)]:opacity-70 group-hover:opacity-100 group-focus-visible:opacity-100"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  </span>
+                  {/* `text-sm` y no `text-xs`: index.css baja la raíz a 14px por debajo de
+                      768px, así que ahí `text-xs` rinde 10.5px reales. Es el único texto de
+                      la celda y el que identifica a la marca cuando el logo no carga. */}
+                  <span className="mt-4 text-center text-sm leading-snug text-gray-400 transition-colors duration-300 group-hover:text-gray-200">
+                    {sponsor.name}
+                  </span>
+                </a>
+              ))}
             </div>
           </div>
         </section>
