@@ -88,7 +88,9 @@ const COL_ARCHIVADO_EN = 'archivado_en' as const
    mientras el resto se registra, y el badge va a estar encendido en casi todos los
    equipos nuevos.
    O sea: sigue siendo cierto que al equipo le faltan jugadores para competir, pero ya
-   no significa «acá pasó algo raro». No lo trates como una alerta. */
+   no significa «acá pasó algo raro». Por eso los tres lugares donde se pinta —el badge
+   del encabezado, la franja del panel expandido y la celda del resumen— están en azul y
+   no en `rose`: es un contador de progreso, no una alerta. */
 /* OJO: el mismo número vive en `src/pages/Registro.tsx` (MIN_JUGADORES), pero allá YA NO
    LO HACE CUMPLIR NADIE — con registro individual no hay un envío que traiga el roster
    entero, así que el mínimo sobrevive ahí solo como referencia de la pantalla de éxito
@@ -124,8 +126,9 @@ function estaArchivado(equipo: Equipo): boolean {
   return equipo[COL_ARCHIVADO_EN] != null
 }
 
-/* Un roster corto no puede competir. Se marca en el panel en vez de filtrarlo: el
-   organizador necesita verlo justamente para ir a buscar a ese equipo. */
+/* Un roster por debajo del mínimo no puede competir todavía. Se marca en el panel en vez
+   de filtrarlo, pero para ver el AVANCE de cada equipo mientras sus jugadores entran de a
+   uno, no para ir a buscar a nadie: es un contador, no una alerta — ver MIN_JUGADORES. */
 function rosterIncompleto(equipo: Equipo): boolean {
   return equipo.jugadores.length < MIN_JUGADORES
 }
@@ -455,8 +458,9 @@ function BadgePago({ pagado }: { pagado: boolean }) {
 }
 
 /* Rol del jugador. Titular en azul apagado (es lo esperable, no una alarma) y suplente
-   en gris: la diferencia tiene que leerse de un vistazo sin gritar. `rose` sigue
-   reservado a errores y a lo que no puede competir. */
+   en gris: la diferencia tiene que leerse de un vistazo sin gritar. `rose` queda
+   reservado a errores y a lo destructivo, y a nada más — el roster corto salió de esa
+   familia el 2026-07-30, justamente para que el rojo del panel signifique algo. */
 function BadgeRol({ rol }: { rol: Rol }) {
   return (
     <span
@@ -471,19 +475,27 @@ function BadgeRol({ rol }: { rol: Rol }) {
   )
 }
 
-/* Aviso de roster corto: se marca donde se ve el equipo y no se filtra de la lista.
-   Con registro individual esto dejó de ser una alerta y pasó a ser un CONTADOR de
-   progreso —ver el comentario de MIN_JUGADORES—: la mayoría de los equipos nuevos va a
-   tenerlo encendido mientras sus jugadores se registran de a uno. El tratamiento visual
-   sigue siendo el de la familia `rose`, o sea el de un problema, y eso quedó pendiente
-   de decidir a propósito, no por olvido. */
+/* Contador de roster: se marca donde se ve el equipo y no se filtra de la lista.
+   FAMILIA AZUL, NO `rose`, y sin icono de alerta. Estuvo en rojo con un AlertCircle
+   mientras el registro venía por equipo, y ahí tenía sentido: un equipo por debajo del
+   mínimo solo podía venir de una edición en la base, o sea una anomalía que había que ir
+   a mirar. Con registro individual es el estado NORMAL de casi todos los equipos nuevos
+   mientras sus jugadores entran de a uno, así que el rojo pintaba media lista y entrenaba
+   a ignorar la señal — justo lo que arruina que sirva el día que marque algo real. (Y
+   siguió en rojo unos días después del cambio de modelo, anotado como pendiente de
+   decidir; esto cierra esa deuda.)
+   El «3 de 5» ya dice todo lo que hay que saber; el icono solo agregaba alarma.
+   Sigue apareciendo únicamente por debajo del mínimo, o sea que sigue siendo información
+   y no decoración: un equipo completo no lo lleva.
+   Sin `gap`: con el icono fuera queda un solo ítem de flexbox —el `sr-only` está fuera de
+   flujo— y no había nada que separar. */
 function BadgeRosterIncompleto({ cantidad }: { cantidad: number }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-rose-700/50 bg-rose-950/30 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-rose-300">
-      <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+    <span className="inline-flex shrink-0 items-center rounded-full border border-blue-800/50 bg-blue-950/30 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-blue-300">
       {/* Sin esto se oye "3 jugadores, 3 de 5": el número se repite y el badge llega sin
-          sustantivo. Es el único indicador de que el equipo no puede competir. */}
-      <span className="sr-only">Roster incompleto: </span>
+          sustantivo. Dice «jugadores registrados» y no «roster incompleto» por lo mismo
+          que el color dejó de ser rojo: lo que se anuncia es un avance, no una falta. */}
+      <span className="sr-only">Jugadores registrados: </span>
       {cantidad} de {MIN_JUGADORES}
     </span>
   )
@@ -727,8 +739,8 @@ function TarjetaEquipo({
               <span className="shrink-0 font-mono text-xs text-gray-400">
                 {cantidad} {cantidad === 1 ? 'jugador' : 'jugadores'}
               </span>
-              {/* Roster corto: el equipo no puede competir y hay que verlo sin desplegar
-                  la tarjeta, que es donde el organizador está escaneando la lista. */}
+              {/* Avance del roster: se ve sin desplegar la tarjeta, que es donde el
+                  organizador está escaneando la lista. */}
               {incompleto && <BadgeRosterIncompleto cantidad={cantidad} />}
             </span>
             {/* `capitan_nombre` guarda el RIOT ID del capitán, no su nombre —es lo que
@@ -836,13 +848,18 @@ function TarjetaEquipo({
           `aria-controls` existe también colapsado (un aria-controls a un id ausente es
           ARIA inválido). */}
       <div id={panelId} hidden={!expandido} className="border-t border-white/10">
+        {/* Misma franja, otro registro: informativa y no de error, en la familia azul
+            como el badge del encabezado. El texto también cambió de tono — decía «hay
+            que avisarle al equipo que le faltan integrantes», que con el registro
+            individual suena a reproche por algo que está pasando solo y a su ritmo.
+            Dice lo que falta y cuál es el mecanismo, sin pedir nada. */}
         {incompleto && (
-          <p className="border-b border-rose-900/30 bg-rose-950/10 px-4 py-3 text-xs leading-snug text-rose-200 md:px-6">
+          <p className="border-b border-blue-900/30 bg-blue-950/10 px-4 py-3 text-xs leading-snug text-blue-200 md:px-6">
             Este equipo tiene {cantidad}{' '}
             {cantidad === 1 ? 'jugador' : 'jugadores'} y el mínimo para competir es{' '}
-            {MIN_JUGADORES}. Los jugadores no se editan desde el panel: cada uno se
-            registra por su cuenta, así que hay que avisarle al equipo que le faltan
-            integrantes por registrarse.
+            {MIN_JUGADORES}. Cada quien se registra por su cuenta, así que el roster se
+            completa a medida que entran los demás. Los jugadores no se editan desde el
+            panel.
           </p>
         )}
 
@@ -1162,13 +1179,18 @@ function Resumen({
   totalJugadores: number
 }) {
   const incompletos = equipos.filter(rosterIncompleto).length
+  /* Sin campo `alerta`: lo llevaba solo «Incompletos», para pintar su número en `rose`.
+     Con registro individual esa cifra es la normal —va a ser alta casi siempre mientras
+     la gente se inscribe— y en rojo convertía el resumen en un tablero de alarmas que
+     no señalaba nada. Ahora es una cifra más, en el mismo azul que las otras tres, y
+     como la bandera quedaba en `false` en todas se quita entera junto con su ternario.
+     Lo que NO cambia: la celda sigue apareciendo solo cuando hay alguno, así que sigue
+     informando y no ocupa lugar fijo. */
   const celdas = [
-    { etiqueta: 'Equipos', valor: equipos.length, alerta: false },
-    { etiqueta: 'Jugadores', valor: totalJugadores, alerta: false },
-    { etiqueta: 'Confirmados', valor: equipos.filter(estaPagado).length, alerta: false },
-    ...(incompletos > 0
-      ? [{ etiqueta: 'Incompletos', valor: incompletos, alerta: true }]
-      : [])
+    { etiqueta: 'Equipos', valor: equipos.length },
+    { etiqueta: 'Jugadores', valor: totalJugadores },
+    { etiqueta: 'Confirmados', valor: equipos.filter(estaPagado).length },
+    ...(incompletos > 0 ? [{ etiqueta: 'Incompletos', valor: incompletos }] : [])
   ]
   return (
     <div className={`grid gap-3 md:gap-4 ${celdas.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
@@ -1177,11 +1199,7 @@ function Resumen({
           key={c.etiqueta}
           className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5"
         >
-          <p
-            className={`font-sans text-3xl font-semibold leading-none md:text-4xl ${
-              c.alerta ? 'text-rose-300' : 'text-blue-400'
-            }`}
-          >
+          <p className="font-sans text-3xl font-semibold leading-none text-blue-400 md:text-4xl">
             {c.valor}
           </p>
           <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-gray-400 md:text-xs">
