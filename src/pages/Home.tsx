@@ -39,21 +39,70 @@ const CLASE_CTA_SECUNDARIO =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
-/* Celda del muro de patrocinadores. El <a> ES la celda entera —no un enlace chico dentro
-   de una tarjeta—: es lo que se espera de un muro de logos y de paso da un área de toque
-   cómoda en móvil, donde cada celda mide media pantalla de ancho.
-   Tres cosas que la capa base de index.css obliga a desactivar o reponer en cualquier <a>
+/* Dominio que la IANA reserva para ejemplos y documentación (RFC 2606). Acá es el relleno
+   de los patrocinadores cuyo sitio todavía no se decidió: 7 de los 10 lo tienen. */
+const DOMINIO_PLACEHOLDER = 'example.com'
+
+/* Si una celda navega o no se decide por el VALOR de la url, no por una bandera en el
+   array ni editando los datos. Es a propósito: el día que alguien reemplace un
+   example.com por el sitio real, esa celda se vuelve enlace sola, sin tocar esta lógica
+   ni acordarse de que existe.
+   Se compara por HOSTNAME y no por cadena exacta para que no se escape una variante
+   —`http://`, una barra final, `www.`, un subdominio—: cualquiera de esas seguiría siendo
+   el placeholder y la celda igual llevaría al sitio de la IANA. Y se compara con
+   `endsWith('.example.com')` y no con `includes`, para no confundir a un
+   `notexample.com` o a un `example.com.mx`, que son dominios distintos y reales.
+   El filtro de protocolo es un guardarraíl, no una formalidad. Hoy no hace falta: las
+   diez urls del array son https. Pero esta función es una REGLA sobre datos que se van a
+   editar —ese es todo su propósito—, y `new URL('javascript:alert(1)')` no lanza y
+   devuelve hostname vacío, así que sin el filtro pasaría el control y ese valor terminaría
+   como `href` renderizado. Aceptar solo http/https cuesta dos líneas y cierra la puerta
+   antes de que alguien pegue lo que le mandaron por WhatsApp.
+   Una url vacía, con otro esquema o que el parser no entienda tampoco enlaza: un href
+   roto es peor que ninguno, y la celda igual muestra el logo y el nombre. */
+function tieneSitioReal(url: string): boolean {
+  try {
+    const destino = new URL(url)
+    if (destino.protocol !== 'https:' && destino.protocol !== 'http:') return false
+    const host = destino.hostname.toLowerCase().replace(/^www\./, '')
+    if (!host) return false
+    return host !== DOMINIO_PLACEHOLDER && !host.endsWith(`.${DOMINIO_PLACEHOLDER}`)
+  } catch {
+    return false
+  }
+}
+
+/* Celda del muro de patrocinadores, en dos capas.
+   BASE es todo lo que define cómo se ve la celda EN REPOSO, y la comparten las dos formas
+   —la que navega y la que no— para que sean indistinguibles hasta que alguien interactúe.
+   Sin `group`: esa clase es lo que engancha los `group-hover:` del logo y del nombre, que
+   viven en el contenido compartido y no acá. Dejarla afuera de la base es lo que hace que
+   una celda sin sitio no se ilumine al pasar el mouse. No alcanza con quitarle las clases
+   `hover:` a este contenedor: mientras siga siendo `.group`, el logo y el nombre se
+   encienden igual. */
+const CLASE_CELDA_PATROCINADOR_BASE =
+  'flex flex-col items-center rounded-2xl border border-white/5 ' +
+  'bg-white/[0.02] p-5 md:p-6 transition-colors duration-300'
+
+/* ENLACE agrega lo que solo tiene sentido si la celda navega: el `group` que enciende los
+   hover de adentro, el hover del propio marco y el anillo de foco.
+   El <a> ES la celda entera —no un enlace chico dentro de una tarjeta—: es lo que se
+   espera de un muro de logos y de paso da un área de toque cómoda en móvil, donde cada
+   celda mide media pantalla de ancho.
+   Dos cosas que la capa base de index.css obliga a desactivar o reponer en cualquier <a>
    que no sea un enlace de texto: `after:hidden` mata la barra de gradiente que `a::after`
-   dibuja al 100% del ancho en hover —acá cruzaría la tarjeta por debajo—; el anillo de
-   foco va explícito porque index.css se lo da a <button> y no a <a>; y el color del texto
-   lo pone el <span> del nombre, que al ser una clase propia gana sobre el
-   `a { color: #66a3ff }` heredado.
+   dibuja al 100% del ancho en hover —acá cruzaría la tarjeta por debajo— y el anillo de
+   foco va explícito porque index.css se lo da a <button> y no a <a>.
+   Hay una tercera, y no está en ninguna de estas dos constantes: la regla `a` también
+   trae `color: #66a3ff` y `font-weight: 500`, que se HEREDAN al texto de adentro. Las dos
+   las neutraliza el <span> del nombre, en `contenido`, con `text-gray-400 font-medium`.
+   Vive ahí y no acá porque tiene que aplicarse igual a las celdas que NO son <a>: es lo
+   que las hace indistinguibles en reposo.
    El hover es deliberadamente chico: el marco se ilumina y el logo pasa de opacidad
    reducida a plena. Nada de `scale` ni de saltos — son marcas, no llamados a la acción, y
    con 10 o 20 celdas cualquier movimiento grande convierte la sección en un tembladeral. */
-const CLASE_CELDA_PATROCINADOR =
-  'group after:hidden flex flex-col items-center rounded-2xl border border-white/5 ' +
-  'bg-white/[0.02] p-5 md:p-6 transition-colors duration-300 ' +
+const CLASE_CELDA_PATROCINADOR_ENLACE =
+  `group after:hidden ${CLASE_CELDA_PATROCINADOR_BASE} ` +
   'hover:border-blue-500/30 hover:bg-white/[0.04] ' +
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
@@ -373,59 +422,106 @@ export default function Home() {
                 cuando no completa: es lo normal en un muro de marcas y evita que agregar
                 un patrocinador reacomode toda la sección. */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
-              {sponsors.map((sponsor) => (
-                <a
-                  key={sponsor.id}
-                  href={sponsor.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  /* Arranca con el texto visible EXACTO —el nombre, que está en el <span>
-                     de abajo— para no romper el control por voz (WCAG 2.5.3, "Label in
-                     Name") y recién después avisa lo que el texto no dice. Misma fórmula
-                     que los enlaces de comunidad de /registro. */
-                  aria-label={`${sponsor.name} (abre en pestaña nueva)`}
-                  className={CLASE_CELDA_PATROCINADOR}
-                >
-                  <span
-                    className={`flex w-full items-center justify-center px-2 ${ALTO_LOGO_PATROCINADOR}`}
+              {sponsors.map((sponsor) => {
+                /* 7 de los 10 patrocinadores todavía apuntan al placeholder. Con la celda
+                   entera convertida en enlace, eso serían siete áreas de toque grandes
+                   llevando al sitio de la IANA en una pestaña nueva — peor que en el
+                   diseño anterior, donde el destino falso estaba detrás de un botón chico
+                   y solo del patrocinador que el carrusel tuviera a la vista.
+                   Los que no tienen sitio se pintan igual pero como <div>: sin href, así
+                   que no navegan; sin ser tabulables, así que quien usa teclado no tropieza
+                   con siete paradas muertas; y sin aria-label, así que a nadie se le
+                   anuncia una pestaña nueva que no va a abrirse. Lo que sí conservan es el
+                   nombre en texto visible, que es toda la información que la celda tenía
+                   para dar. */
+                const navega = tieneSitioReal(sponsor.url)
+
+                /* El contenido se escribe UNA vez y lo envuelve una u otra caja: si se
+                   duplicara en las dos ramas, el próximo retoque del logo o del nombre se
+                   haría en una sola y las celdas dejarían de verse idénticas — que es
+                   justo lo que este cambio tiene que garantizar. */
+                const contenido = (
+                  <>
+                    <span
+                      className={`flex w-full items-center justify-center px-2 ${ALTO_LOGO_PATROCINADOR}`}
+                    >
+                      {/* Si el logo no carga se oculta la <img> y el nombre de abajo queda
+                          como única identificación. El manejador NO apunta a un archivo de
+                          reserva a propósito: un fallback que a su vez no cargue vuelve a
+                          disparar onError y entra en bucle. Esto ya fue un bug; no lo
+                          "mejores" apuntándolo a una imagen.
+                          `alt=""` porque el nombre ya está en texto visible justo abajo:
+                          repetirlo haría que un lector de pantalla lo dijera dos veces. En
+                          las celdas que enlazan, además, el nombre accesible ya lo fija el
+                          aria-label del <a>. */}
+                      {/* La opacidad reducida es SOLO donde hay puntero, y por eso arranca
+                          en 100 y baja con `[@media(hover:hover)]` en vez de arrancar en
+                          70. Tailwind 4 encierra todas las variantes
+                          `hover:`/`group-hover:` en `@media(hover:hover)`, así que con el
+                          reposo en 70 el `group-hover:opacity-100` NUNCA entra en un táctil
+                          y los logos quedan apagados de forma permanente — en la sección de
+                          quienes pagan por estar ahí, y en el dispositivo donde se ve la
+                          mayor parte del tráfico. El matiz es un adorno de escritorio; el
+                          estado bueno tiene que ser el que se ve sin puntero.
+                          Ojo: `[@media(hover:hover)]:opacity-70` es una media query pura,
+                          SIN pseudoclase, así que aplica por igual a las celdas que enlazan
+                          y a las que no. Eso es lo que las mantiene idénticas en reposo: la
+                          diferencia aparece solo al pasar el mouse, que es lo pedido.
+                          `group-focus-visible` para que quien llega con teclado vea el logo
+                          pleno igual que quien pasa el mouse. */}
+                      <img
+                        src={sponsor.logo}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-contain opacity-100 transition-opacity duration-300 [@media(hover:hover)]:opacity-70 group-hover:opacity-100 group-focus-visible:opacity-100"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    </span>
+                    {/* `text-sm` y no `text-xs`: index.css baja la raíz a 14px por debajo
+                        de 768px, así que ahí `text-xs` rinde 10.5px reales. Es el único
+                        texto de la celda y el que identifica a la marca cuando el logo no
+                        carga — y, en las celdas sin sitio, todo lo que la celda comunica.
+                        `font-medium` NO es decorativo: sin él, este texto HEREDA el peso
+                        de su contenedor, y la regla base `a { font-weight: 500 }` de
+                        index.css hace que las celdas enlazadas lo pinten en 500 y las que
+                        no, en el 400 de `:root`. Con `font-synthesis: none` no hay nada que
+                        lo disimule, y en una fila mezclada se ven dos pesos distintos lado
+                        a lado sin que nadie haya interactuado — justo lo que este cambio
+                        tiene que evitar. Va en 500 y no en 400 porque es el peso que las
+                        diez celdas ya tenían. */}
+                    <span className="mt-4 text-center text-sm font-medium leading-snug text-gray-400 transition-colors duration-300 group-hover:text-gray-200">
+                      {sponsor.name}
+                    </span>
+                  </>
+                )
+
+                if (!navega) {
+                  return (
+                    <div key={sponsor.id} className={CLASE_CELDA_PATROCINADOR_BASE}>
+                      {contenido}
+                    </div>
+                  )
+                }
+
+                return (
+                  <a
+                    key={sponsor.id}
+                    href={sponsor.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    /* Arranca con el texto visible EXACTO —el nombre, que está en el <span>
+                       de abajo— para no romper el control por voz (WCAG 2.5.3, "Label in
+                       Name") y recién después avisa lo que el texto no dice. Misma fórmula
+                       que los enlaces de comunidad de /registro. */
+                    aria-label={`${sponsor.name} (abre en pestaña nueva)`}
+                    className={CLASE_CELDA_PATROCINADOR_ENLACE}
                   >
-                    {/* Si el logo no carga se oculta la <img> y el nombre de abajo queda
-                        como única identificación. El manejador NO apunta a un archivo de
-                        reserva a propósito: un fallback que a su vez no cargue vuelve a
-                        disparar onError y entra en bucle. Esto ya fue un bug; no lo
-                        "mejores" apuntándolo a una imagen.
-                        `alt=""` porque el nombre ya está en texto visible al lado y el
-                        nombre accesible del enlace lo da el aria-label: repetirlo haría
-                        que un lector de pantalla lo dijera dos veces. */}
-                    {/* La opacidad reducida es SOLO donde hay puntero, y por eso arranca
-                        en 100 y baja con `[@media(hover:hover)]` en vez de arrancar en 70.
-                        Tailwind 4 encierra todas las variantes `hover:`/`group-hover:` en
-                        `@media(hover:hover)`, así que con el reposo en 70 el
-                        `group-hover:opacity-100` NUNCA entra en un táctil y los logos
-                        quedan apagados de forma permanente — en la sección de quienes
-                        pagan por estar ahí, y en el dispositivo donde se ve la mayor parte
-                        del tráfico. El matiz es un adorno de escritorio; el estado bueno
-                        tiene que ser el que se ve sin puntero.
-                        `group-focus-visible` para que quien llega con teclado vea el logo
-                        pleno igual que quien pasa el mouse. */}
-                    <img
-                      src={sponsor.logo}
-                      alt=""
-                      loading="lazy"
-                      className="h-full w-full object-contain opacity-100 transition-opacity duration-300 [@media(hover:hover)]:opacity-70 group-hover:opacity-100 group-focus-visible:opacity-100"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                      }}
-                    />
-                  </span>
-                  {/* `text-sm` y no `text-xs`: index.css baja la raíz a 14px por debajo de
-                      768px, así que ahí `text-xs` rinde 10.5px reales. Es el único texto de
-                      la celda y el que identifica a la marca cuando el logo no carga. */}
-                  <span className="mt-4 text-center text-sm leading-snug text-gray-400 transition-colors duration-300 group-hover:text-gray-200">
-                    {sponsor.name}
-                  </span>
-                </a>
-              ))}
+                    {contenido}
+                  </a>
+                )
+              })}
             </div>
           </div>
         </section>
