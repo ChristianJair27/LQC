@@ -34,8 +34,10 @@ import { obtenerSupabase } from '../../lib/supabase'
 type Rol = 'titular' | 'suplente'
 
 /* Una fila de `public.jugadores`. `orden` es la posición dentro del roster y es lo
-   que determinó el rol al registrarse; se conserva para poder mostrar el roster
-   exactamente como lo mandó el capitán. */
+   que determinó el rol al registrarse; se conserva para poder mostrar el roster en ese
+   mismo orden. Desde el registro individual (2026-07-30) ese orden ya no es «como lo
+   mandó el capitán» sino el ORDEN EN QUE CADA UNO SE REGISTRÓ: lo asigna la RPC
+   contando lo que ya había. */
 type Jugador = {
   id: string | number
   orden: number
@@ -77,12 +79,22 @@ const COL_PAGADO_EN = 'pagado_en' as const
 const COL_NOTAS = 'notas' as const
 const COL_ARCHIVADO_EN = 'archivado_en' as const
 
-/* Roster mínimo para competir. El formulario de /registro ya no deja mandar menos,
-   pero un equipo puede quedar corto por una edición posterior en la base, así que el
-   panel lo comprueba igual en vez de confiar en que el origen sea correcto. */
-/* OJO: el mismo número vive en `src/pages/Registro.tsx` (MIN_JUGADORES), que es quien lo
-   hace cumplir al registrar. Las páginas son autocontenidas por diseño, así que no se
-   comparte la constante — pero si cambia el mínimo hay que tocar los dos lugares. */
+/* Roster mínimo para competir.
+   OJO, esto cambió el 2026-07-30 y cambia cómo hay que LEER el badge de roster
+   incompleto: antes /registro exigía las 5 tarjetas en un solo envío, así que un equipo
+   por debajo del mínimo era una anomalía —solo podía venir de una edición posterior en
+   la base— y el badge señalaba algo que había que investigar. Ahora cada jugador se
+   registra por su cuenta, así que un equipo con 1 o 2 jugadores es el estado NORMAL
+   mientras el resto se registra, y el badge va a estar encendido en casi todos los
+   equipos nuevos.
+   O sea: sigue siendo cierto que al equipo le faltan jugadores para competir, pero ya
+   no significa «acá pasó algo raro». No lo trates como una alerta. */
+/* OJO: el mismo número vive en `src/pages/Registro.tsx` (MIN_JUGADORES), pero allá YA NO
+   LO HACE CUMPLIR NADIE — con registro individual no hay un envío que traiga el roster
+   entero, así que el mínimo sobrevive ahí solo como referencia de la pantalla de éxito
+   («tu equipo tiene 3 de 5»). Ninguno de los dos lugares lo valida hoy. Las páginas son
+   autocontenidas por diseño, así que no se comparte la constante — pero si cambia el
+   mínimo hay que tocar los dos lugares. */
 const MIN_JUGADORES = 5
 
 /* Techo de las escrituras (pago, notas, archivado): pasado ese tiempo la query se
@@ -459,8 +471,12 @@ function BadgeRol({ rol }: { rol: Rol }) {
   )
 }
 
-/* Aviso de roster corto. Es información operativa —hay que ir a buscar a ese equipo—,
-   así que se marca donde se ve el equipo y no se filtra de la lista. */
+/* Aviso de roster corto: se marca donde se ve el equipo y no se filtra de la lista.
+   Con registro individual esto dejó de ser una alerta y pasó a ser un CONTADOR de
+   progreso —ver el comentario de MIN_JUGADORES—: la mayoría de los equipos nuevos va a
+   tenerlo encendido mientras sus jugadores se registran de a uno. El tratamiento visual
+   sigue siendo el de la familia `rose`, o sea el de un problema, y eso quedó pendiente
+   de decidir a propósito, no por olvido. */
 function BadgeRosterIncompleto({ cantidad }: { cantidad: number }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-rose-700/50 bg-rose-950/30 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide text-rose-300">
@@ -824,8 +840,9 @@ function TarjetaEquipo({
           <p className="border-b border-rose-900/30 bg-rose-950/10 px-4 py-3 text-xs leading-snug text-rose-200 md:px-6">
             Este equipo tiene {cantidad}{' '}
             {cantidad === 1 ? 'jugador' : 'jugadores'} y el mínimo para competir es{' '}
-            {MIN_JUGADORES}. Los jugadores no se editan desde el panel: hay que
-            contactar al capitán para completar el roster.
+            {MIN_JUGADORES}. Los jugadores no se editan desde el panel: cada uno se
+            registra por su cuenta, así que hay que avisarle al equipo que le faltan
+            integrantes por registrarse.
           </p>
         )}
 
@@ -1245,8 +1262,12 @@ function VacioEquipos() {
       <p className="font-sans text-lg text-white md:text-xl">
         Todavía no hay equipos registrados.
       </p>
+      {/* Antes decía «cuando un capitán complete el registro»: describía el modelo por
+          equipo, en el que un solo envío traía el roster entero. Desde el 2026-07-30
+          cada jugador se registra por su cuenta, así que un equipo aparece acá con su
+          PRIMER jugador y va creciendo de a uno. */}
       <p className="mx-auto mt-2 max-w-md font-sans leading-relaxed text-gray-400">
-        Cuando un capitán complete el registro, su equipo aparecerá aquí.
+        En cuanto alguien se registre, su equipo aparecerá aquí.
       </p>
     </div>
   )
