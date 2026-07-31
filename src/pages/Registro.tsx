@@ -82,6 +82,14 @@ const MIN_JUGADORES = 5
 const MAX_JUGADORES = 7
 const TITULARES = 5
 
+/* Tope de equipos de toda la liga, no de este formulario. Sale del reglamento
+   oficial —«Esta liga estará limitada a un máximo de 32 equipos»— y quien lo hace
+   cumplir es la RPC, que rechaza con 'torneo_lleno'. Acá el número existe solo para
+   poder decirlo en el mensaje: esta página no lo comprueba ni podría (no lee las
+   tablas). Si cambia en el reglamento, cambia en la base; esto es una copia y hay
+   que actualizarla a mano. */
+const MAX_EQUIPOS = 32
+
 /* Orden VISUAL de las claves de error, para llevar el foco al primer campo con
    problema. Vuelve a ser una constante y no una función: sin roster de tamaño
    variable, la lista de campos no depende del estado. */
@@ -217,26 +225,43 @@ type CodigoRechazo =
   | 'falta_equipo'
   | 'equipo_lleno'
   | 'gamertag_duplicado'
-
-const CODIGOS_RECHAZO: CodigoRechazo[] = [
-  'falta_gamertag',
-  'falta_equipo',
-  'equipo_lleno',
-  'gamertag_duplicado'
-]
+  | 'torneo_lleno'
 
 /* Mensajes accionables: cada uno dice QUÉ pasó y QUÉ hacer.
-   Los dos que más contexto necesitan son los que la persona no puede anticipar:
+   Los tres que más contexto necesitan son los que la persona no puede anticipar:
    `equipo_lleno` describe una carrera (el equipo se llenó entre que salió en las
-   sugerencias y que se pulsó enviar) y `gamertag_duplicado` suele significar que
-   ya se registró antes, no que haya hecho algo mal. */
+   sugerencias y que se pulsó enviar), `gamertag_duplicado` suele significar que
+   ya se registró antes —no que haya hecho algo mal— y `torneo_lleno` es el único
+   que NO es un problema del formulario sino un límite de la liga.
+
+   `torneo_lleno` es además el que más fácil se malinterpreta, y por eso su mensaje
+   es el más largo: el tope de MAX_EQUIPOS bloquea CREAR equipos nuevos, pero
+   unirse a uno ya inscrito sigue permitido. Sin decirlo, quien lo lea va a
+   entender «el torneo está cerrado, no puedo participar» y se va — cuando en
+   realidad si sus compañeros ya registraron el equipo, le basta con elegirlo de las
+   sugerencias. Es la diferencia entre perder a una persona y perder nada. */
 const MENSAJE_RECHAZO: Record<CodigoRechazo, string> = {
   falta_gamertag: 'Falta tu Riot ID. Escríbelo arriba y vuelve a enviar.',
   falta_equipo: 'Falta el equipo. Elígelo de las sugerencias o escribe un nombre nuevo.',
   equipo_lleno: `Ese equipo ya llegó a ${MAX_JUGADORES} jugadores y no admite más. Si acaba de llenarse mientras llenabas el formulario, habla con tu capitán: puede que te toque otro equipo.`,
   gamertag_duplicado:
-    'Ese Riot ID ya está registrado en ese equipo. Si fuiste tú, ya estás dentro y no hace falta registrarte de nuevo.'
+    'Ese Riot ID ya está registrado en ese equipo. Si fuiste tú, ya estás dentro y no hace falta registrarte de nuevo.',
+  /* Las instrucciones son las del combobox REAL, no las que uno supondría. «Borra el
+     nombre y vuelve a escribirlo» era lo primero que se me ocurrió y es justo lo
+     contrario de lo que hay que hacer: por debajo de MIN_TERMINO_BUSQUEDA el combobox
+     vacía las sugerencias y cierra la lista, o sea que borrar el nombre destruye
+     exactamente lo que se quiere ver. Un carácter menos relanza la búsqueda. */
+  torneo_lleno: `El torneo ya llegó a su máximo de ${MAX_EQUIPOS} equipos, así que no se pueden crear equipos nuevos. Pero todavía puedes unirte a un equipo ya inscrito: borra la última letra del nombre para que vuelvan a aparecer las sugerencias y elige tu equipo ahí. Si tus compañeros ya lo registraron, va a estar en la lista.`
 }
+
+/* Los códigos que `leerRespuesta` sabe reconocer, DERIVADOS del mapa de mensajes en vez
+   de escritos a mano. La lista a mano fue exactamente el bug que trajo hasta acá:
+   'torneo_lleno' se sumó al backend, no se agregó a este arreglo, y como un
+   `CodigoRechazo[]` incompleto compila sin una queja, el rechazo caía en 'desconocido'
+   y salía el banner de fallo técnico. Los tres `Record<CodigoRechazo, …>` sí obligan a
+   cubrirlos todos; colgando el arreglo de uno de ellos, un código nuevo ya no puede
+   quedar reconocido a medias. */
+const CODIGOS_RECHAZO = Object.keys(MENSAJE_RECHAZO) as CodigoRechazo[]
 
 /* Versión corta para el error del CAMPO. Los rechazos se pintan en dos lugares
    —el banner y el propio control, que además recibe el foco—, así que con un solo
@@ -247,7 +272,15 @@ const MENSAJE_RECHAZO_CAMPO: Record<CodigoRechazo, string> = {
   falta_gamertag: 'Escribe tu Riot ID.',
   falta_equipo: 'Elige o escribe tu equipo.',
   equipo_lleno: 'Ese equipo está lleno. Lee el detalle en el aviso de abajo.',
-  gamertag_duplicado: 'Ese Riot ID ya está en ese equipo. Lee el detalle abajo.'
+  gamertag_duplicado: 'Ese Riot ID ya está en ese equipo. Lee el detalle abajo.',
+  /* Dice el camino que SIGUE abierto y no el que se cerró, porque es lo accionable. Y
+     cierra apuntando al banner, como los otros dos: el detalle largo —incluido el
+     correo de contacto para quien no encuentre a su equipo— vive solo ahí.
+     Lo que se lee al recibir el foco no es solo esto: el input tiene en su
+     `aria-describedby` la ayuda ANTES que el error, y esa ayuda también cambia con la
+     creación bloqueada. Las dos cosas tienen que decir lo mismo. */
+  torneo_lleno:
+    'No se pueden crear equipos nuevos. Elige tu equipo de la lista o lee el detalle en el aviso de abajo.'
 }
 
 /* A qué control lleva el foco cada rechazo. Es el mapa que hace que un rechazo
@@ -257,7 +290,10 @@ const CAMPO_DE_RECHAZO: Record<CodigoRechazo, 'equipo' | 'gamertag'> = {
   falta_gamertag: 'gamertag',
   gamertag_duplicado: 'gamertag',
   falta_equipo: 'equipo',
-  equipo_lleno: 'equipo'
+  equipo_lleno: 'equipo',
+  /* Al campo de equipo, que es donde está la salida: el tope solo bloquea crear, y
+     elegir uno existente se hace ahí mismo. */
+  torneo_lleno: 'equipo'
 }
 
 /* Lo que devuelve un registro exitoso, ya leído. `equipo_id` no se usa en la
@@ -667,6 +703,7 @@ function ComboboxEquipo({
   valor,
   elegido,
   error,
+  creacionBloqueada,
   onTexto,
   onElegir,
   onDeshacer
@@ -674,6 +711,14 @@ function ComboboxEquipo({
   valor: string
   elegido: EquipoSugerido | null
   error?: string
+  /* Se levanta con un rechazo 'torneo_lleno': la liga llegó a su tope de equipos, así
+     que crear uno nuevo dejó de ser una salida y unirse a uno existente es la única
+     que queda. Cambia los DOS textos que prometen lo contrario —la ayuda del campo y
+     el mensaje de «no hay resultados»—, que si no quedan contradiciendo al error a dos
+     líneas de distancia, y encima dentro del mismo `aria-describedby`: quien recibe el
+     foco tras el rechazo escuchaba «no se pueden crear equipos nuevos» seguido de
+     «escribe el nombre y lo creamos con tu inscripción». */
+  creacionBloqueada: boolean
   onTexto: (valor: string) => void
   onElegir: (equipo: EquipoSugerido) => void
   onDeshacer: () => void
@@ -1093,9 +1138,26 @@ function ComboboxEquipo({
 
       {error && <MensajeError id={idError} texto={error} />}
 
+      {/* La ayuda es lo que de verdad se lee tras un rechazo: el foco cae en este campo,
+          que está al principio del formulario, mientras que el banner con la explicación
+          larga vive junto al botón de envío, a una pantalla o más de distancia. Por eso
+          acá va lo accionable completo cuando la creación está bloqueada, en vez de
+          confiar en que alguien baje a leer el banner. */}
       <p id={idAyuda} className="mt-2 text-sm text-gray-400">
-        Escribe y elige tu equipo de la lista para no crear uno repetido. Si todavía no
-        está registrado, escribe el nombre y lo creamos con tu inscripción.
+        {creacionBloqueada ? (
+          <>
+            El torneo llegó a su máximo de {MAX_EQUIPOS} equipos, así que por ahora no se
+            pueden crear equipos nuevos.{' '}
+            <span className="text-white font-medium">Unirte a uno ya inscrito sí:</span>{' '}
+            borra la última letra del nombre para que vuelvan a aparecer las sugerencias
+            y elige tu equipo ahí.
+          </>
+        ) : (
+          <>
+            Escribe y elige tu equipo de la lista para no crear uno repetido. Si todavía
+            no está registrado, escribe el nombre y lo creamos con tu inscripción.
+          </>
+        )}
       </p>
 
       {/* Región viva del estado de la búsqueda. Va aparte de la ayuda porque es lo
@@ -1116,18 +1178,23 @@ function ComboboxEquipo({
                 sugerencias.length === 1 ? 'equipo encontrado' : 'equipos encontrados'
               }. Usa las flechas para elegir.`
             : sinResultados
-              ? 'No hay equipos con ese nombre. Puedes escribirlo y lo creamos.'
+              ? creacionBloqueada
+                ? 'No hay equipos con ese nombre, y con el torneo completo no se puede crear uno nuevo.'
+                : 'No hay equipos con ese nombre. Puedes escribirlo y lo creamos.'
               : estado === 'fallida'
                 ? 'No pudimos buscar equipos. Escribe el nombre completo y sigue adelante.'
                 : '')}
       </span>
 
-      {/* Los dos mensajes visibles equivalentes. Ninguno bloquea ni pinta el campo
-          como error: en los dos casos escribir el nombre a mano es una salida
-          válida y completa. */}
+      {/* Los dos mensajes visibles equivalentes. El de búsqueda fallida no bloquea ni
+          pinta el campo como error: escribir el nombre a mano sigue siendo una salida
+          válida y completa. El de «sin resultados» sí cambia de sentido con la liga
+          llena, porque ahí esa salida dejó de existir. */}
       {sinResultados && (
         <p className="mt-2 text-sm text-gray-400">
-          No hay ningún equipo con ese nombre. Se creará al enviar tu registro.
+          {creacionBloqueada
+            ? 'No hay ningún equipo con ese nombre, y con el torneo completo no se puede crear uno nuevo. Revisa cómo se escribe el nombre de tu equipo.'
+            : 'No hay ningún equipo con ese nombre. Se creará al enviar tu registro.'}
         </p>
       )}
       {estado === 'fallida' && (
@@ -1779,6 +1846,7 @@ export default function Registro() {
                       valor={form.equipo}
                       elegido={equipoElegido}
                       error={errores.equipo ?? errorEquipoServidor}
+                      creacionBloqueada={rechazo === 'torneo_lleno'}
                       onTexto={setTextoEquipo}
                       onElegir={elegirEquipo}
                       onDeshacer={deshacerEquipo}
@@ -2363,6 +2431,22 @@ export default function Registro() {
                               contactolqc@revolution505.com
                             </a>{' '}
                             y lo verificamos.
+                          </>
+                        )}
+                        {/* En 'torneo_lleno' el correo es la ÚNICA salida para quien
+                            no encuentra a su equipo en las sugerencias: no puede crear
+                            uno y no hay nada más que pueda hacer desde acá. */}
+                        {rechazo === 'torneo_lleno' && (
+                          <>
+                            {' '}
+                            Si no encuentras a tu equipo en la lista, escríbenos a{' '}
+                            <a
+                              href="mailto:contactolqc@revolution505.com"
+                              className="after:hidden text-lqc-accent font-medium underline underline-offset-4 decoration-lqc-accent/40 hover:decoration-lqc-accent"
+                            >
+                              contactolqc@revolution505.com
+                            </a>{' '}
+                            antes de darlo por perdido.
                           </>
                         )}
                       </p>
