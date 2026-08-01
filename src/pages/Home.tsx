@@ -75,17 +75,16 @@ function tieneSitioReal(url: string): boolean {
 /* Celda del muro de patrocinadores, en dos capas.
    BASE es todo lo que define cómo se ve la celda EN REPOSO, y la comparten las dos formas
    —la que navega y la que no— para que sean indistinguibles hasta que alguien interactúe.
-   Sin `group`: esa clase es lo que engancha los `group-hover:` del logo y del nombre, que
-   viven en el contenido compartido y no acá. Dejarla afuera de la base es lo que hace que
-   una celda sin sitio no se ilumine al pasar el mouse. No alcanza con quitarle las clases
-   `hover:` a este contenedor: mientras siga siendo `.group`, el logo y el nombre se
-   encienden igual. */
+   Sin `group`: esa clase es lo que engancha el `group-hover:` del nombre, que vive en el
+   contenido compartido y no acá. Dejarla afuera de la base es lo que hace que una celda
+   sin sitio no reaccione al pasar el mouse. No alcanza con quitarle las clases `hover:` a
+   este contenedor: mientras siga siendo `.group`, el nombre se aclara igual. */
 const CLASE_CELDA_PATROCINADOR_BASE =
   'flex flex-col items-center rounded-2xl border border-white/5 ' +
   'bg-white/[0.02] p-5 md:p-6 transition-colors duration-300'
 
-/* ENLACE agrega lo que solo tiene sentido si la celda navega: el `group` que enciende los
-   hover de adentro, el hover del propio marco y el anillo de foco.
+/* ENLACE agrega lo que solo tiene sentido si la celda navega: el `group` que enciende el
+   hover del nombre, el hover del propio marco y el anillo de foco.
    El <a> ES la celda entera —no un enlace chico dentro de una tarjeta—: es lo que se
    espera de un muro de logos y de paso da un área de toque cómoda en móvil, donde cada
    celda mide media pantalla de ancho.
@@ -98,9 +97,11 @@ const CLASE_CELDA_PATROCINADOR_BASE =
    las neutraliza el <span> del nombre, en `contenido`, con `text-gray-400 font-medium`.
    Vive ahí y no acá porque tiene que aplicarse igual a las celdas que NO son <a>: es lo
    que las hace indistinguibles en reposo.
-   El hover es deliberadamente chico: el marco se ilumina y el logo pasa de opacidad
-   reducida a plena. Nada de `scale` ni de saltos — son marcas, no llamados a la acción, y
-   con 10 o 20 celdas cualquier movimiento grande convierte la sección en un tembladeral. */
+   El hover es deliberadamente chico: se ilumina el marco (borde y fondo) y se aclara el
+   nombre. El LOGO no participa —ver el comentario de la <img>—: quedaría atenuado de
+   forma permanente en las celdas que no enlazan. Nada de `scale` ni de saltos: son marcas,
+   no llamados a la acción, y con 10 o 20 celdas cualquier movimiento grande convierte la
+   sección en un tembladeral. */
 const CLASE_CELDA_PATROCINADOR_ENLACE =
   `group after:hidden ${CLASE_CELDA_PATROCINADOR_BASE} ` +
   'hover:border-blue-500/30 hover:bg-white/[0.04] ' +
@@ -454,26 +455,22 @@ export default function Home() {
                           repetirlo haría que un lector de pantalla lo dijera dos veces. En
                           las celdas que enlazan, además, el nombre accesible ya lo fija el
                           aria-label del <a>. */}
-                      {/* La opacidad reducida es SOLO donde hay puntero, y por eso arranca
-                          en 100 y baja con `[@media(hover:hover)]` en vez de arrancar en
-                          70. Tailwind 4 encierra todas las variantes
-                          `hover:`/`group-hover:` en `@media(hover:hover)`, así que con el
-                          reposo en 70 el `group-hover:opacity-100` NUNCA entra en un táctil
-                          y los logos quedan apagados de forma permanente — en la sección de
-                          quienes pagan por estar ahí, y en el dispositivo donde se ve la
-                          mayor parte del tráfico. El matiz es un adorno de escritorio; el
-                          estado bueno tiene que ser el que se ve sin puntero.
-                          Ojo: `[@media(hover:hover)]:opacity-70` es una media query pura,
-                          SIN pseudoclase, así que aplica por igual a las celdas que enlazan
-                          y a las que no. Eso es lo que las mantiene idénticas en reposo: la
-                          diferencia aparece solo al pasar el mouse, que es lo pedido.
-                          `group-focus-visible` para que quien llega con teclado vea el logo
-                          pleno igual que quien pasa el mouse. */}
+                      {/* El logo va SIEMPRE al 100%, sin atenuar, en todos los dispositivos.
+                          Tuvo una atenuación al 70 % que se aplicaba solo donde hay puntero
+                          —vía media query, para no apagar los logos en táctil— y volvía a
+                          100 en hover. El problema no era el efecto sino a quién le tocaba:
+                          el hover lo enciende la celda vía `group`, y solo las celdas con
+                          sitio real son `.group`, así que en escritorio los siete logos sin
+                          sitio se quedaban atenuados para siempre. Atenuar de forma
+                          permanente el logo de quien paga por estar ahí, y encima solo a
+                          algunos, no se arregla con más CSS condicional.
+                          La celda que navega ya se distingue por el marco (borde y fondo) y
+                          por el nombre, que sí cambian en hover. */}
                       <img
                         src={sponsor.logo}
                         alt=""
                         loading="lazy"
-                        className="h-full w-full object-contain opacity-100 transition-opacity duration-300 [@media(hover:hover)]:opacity-70 group-hover:opacity-100 group-focus-visible:opacity-100"
+                        className="h-full w-full object-contain"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none'
                         }}
