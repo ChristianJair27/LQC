@@ -40,7 +40,8 @@ const CLASE_CTA_SECUNDARIO =
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
 /* Dominio que la IANA reserva para ejemplos y documentación (RFC 2606). Acá es el relleno
-   de los patrocinadores cuyo sitio todavía no se decidió: 7 de los 9 lo tienen. */
+   de los patrocinadores cuyo sitio todavía no se consiguió. Hoy lo lleva 1 de los 9
+   (Space Riders); llegó a ser 7 de 10, así que el número se mueve — no lo hardcodees. */
 const DOMINIO_PLACEHOLDER = 'example.com'
 
 /* Si una celda navega o no se decide por el VALOR de la url, no por una bandera en el
@@ -122,12 +123,17 @@ const CLASE_CELDA_PATROCINADOR_ENLACE =
 const ALTO_LOGO_PATROCINADOR = 'h-14 md:h-16'
 
 const sponsors = [
-  { id: 1, name: 'Yuri Japonesa', logo: '/sponsors/YuriJaponesa.png', url: 'https://example.com' },
-  { id: 2, name: 'TableTop', logo: '/sponsors/5 Tabletop.png', url: 'https://example.com' },
-  { id: 3, name: 'Los Arcos CQ', logo: '/sponsors/6 Los Arcos CQ.png', url: 'https://example.com' },
-  { id: 4, name: 'Ser Sejuve', logo: '/sponsors/10 Ser Sejuve.png', url: 'https://example.com' },
-  { id: 5, name: 'La Forja', logo: '/sponsors/8 La Forja.png', url: 'https://example.com' },
-  { id: 6, name: 'Queretaro Con Futuro', logo: '/sponsors/9 Queretaro Con Futuro.png', url: 'https://example.com' },
+  /* Las redes sociales van sin parámetros de sesión: el `?hl=es` que Instagram agrega a
+     los perfiles es el idioma de QUIEN copió el enlace, no parte de la dirección. */
+  { id: 1, name: 'Yuri Japonesa', logo: '/sponsors/YuriJaponesa.png', url: 'https://www.instagram.com/yurijaponesa/' },
+  { id: 2, name: 'TableTop', logo: '/sponsors/5 Tabletop.png', url: 'https://www.facebook.com/tabletop.academy.tcg/' },
+  { id: 3, name: 'Los Arcos CQ', logo: '/sponsors/6 Los Arcos CQ.png', url: 'https://cqarcos.com/' },
+  { id: 4, name: 'Ser Sejuve', logo: '/sponsors/10 Ser Sejuve.png', url: 'https://queretaro.gob.mx/web/sejuve' },
+  { id: 5, name: 'La Forja', logo: '/sponsors/8 La Forja.png', url: 'https://www.facebook.com/p/La-Forja-100087039951910/' },
+  { id: 6, name: 'Queretaro Con Futuro', logo: '/sponsors/9 Queretaro Con Futuro.png', url: 'https://www.queretaro.gob.mx/' },
+  /* El ÚNICO que sigue en el placeholder: Space Riders todavía no tiene sitio. Su celda se
+     renderiza como <div> y no como <a> — ver `tieneSitioReal`. No la borres ni le pongas
+     una url de relleno "que se parezca": el placeholder es la señal de que falta el dato. */
   { id: 7, name: 'Space Riders', logo: '/sponsors/7 Space Riders.png', url: 'https://example.com' },
   { id: 8, name: 'Revolution 505', logo: '/sponsors/LOGONUEVOREV.png', url: 'https://revolution505.com' },
   /* La url va con la ñ y NO en punycode (`xn--lapeadesantiago-1qb.com`). Son la misma
@@ -429,17 +435,17 @@ export default function Home() {
                 un patrocinador reacomode toda la sección. */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
               {sponsors.map((sponsor) => {
-                /* 7 de los 9 patrocinadores todavía apuntan al placeholder. Con la celda
-                   entera convertida en enlace, eso serían siete áreas de toque grandes
-                   llevando al sitio de la IANA en una pestaña nueva — peor que en el
-                   diseño anterior, donde el destino falso estaba detrás de un botón chico
-                   y solo del patrocinador que el carrusel tuviera a la vista.
-                   Los que no tienen sitio se pintan igual pero como <div>: sin href, así
-                   que no navegan; sin ser tabulables, así que quien usa teclado no tropieza
-                   con siete paradas muertas; y sin aria-label, así que a nadie se le
-                   anuncia una pestaña nueva que no va a abrirse. Lo que sí conservan es el
-                   nombre en texto visible, que es toda la información que la celda tenía
-                   para dar. */
+                /* Quién apunta al placeholder se mueve cada vez que un patrocinador
+                   consigue o pierde su sitio —ver el comentario de DOMINIO_PLACEHOLDER, que
+                   es el único lugar donde ese conteo está escrito—, así que acá no va
+                   ningún número: la rama se decide por el valor de la url, no por una lista.
+                   Con la celda entera convertida en enlace, cada placeholder sería un área
+                   de toque grande que lleva al sitio de la IANA en una pestaña nueva.
+                   El que no tiene sitio se pinta igual pero como <div>: sin href, así que
+                   no navega; sin ser tabulable, así que quien usa teclado no tropieza con
+                   una parada muerta; y sin aria-label, así que a nadie se le anuncia una
+                   pestaña nueva que no va a abrirse. Lo que sí conserva es el nombre en
+                   texto visible, que es toda la información que la celda tenía para dar. */
                 const navega = tieneSitioReal(sponsor.url)
 
                 /* El contenido se escribe UNA vez y lo envuelve una u otra caja: si se
@@ -465,10 +471,10 @@ export default function Home() {
                           —vía media query, para no apagar los logos en táctil— y volvía a
                           100 en hover. El problema no era el efecto sino a quién le tocaba:
                           el hover lo enciende la celda vía `group`, y solo las celdas con
-                          sitio real son `.group`, así que en escritorio los siete logos sin
-                          sitio se quedaban atenuados para siempre. Atenuar de forma
-                          permanente el logo de quien paga por estar ahí, y encima solo a
-                          algunos, no se arregla con más CSS condicional.
+                          sitio real son `.group`, así que en escritorio los logos sin sitio
+                          se quedaban atenuados para siempre. Atenuar de forma permanente el
+                          logo de quien paga por estar ahí, y encima solo a algunos, no se
+                          arregla con más CSS condicional.
                           La celda que navega ya se distingue por el marco (borde y fondo) y
                           por el nombre, que sí cambian en hover. */}
                       <img
