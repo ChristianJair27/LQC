@@ -40,7 +40,7 @@ const CLASE_CTA_SECUNDARIO =
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
 /* Dominio que la IANA reserva para ejemplos y documentación (RFC 2606). Acá es el relleno
-   de los patrocinadores cuyo sitio todavía no se decidió: 7 de los 10 lo tienen. */
+   de los patrocinadores cuyo sitio todavía no se decidió: 7 de los 9 lo tienen. */
 const DOMINIO_PLACEHOLDER = 'example.com'
 
 /* Si una celda navega o no se decide por el VALOR de la url, no por una bandera en el
@@ -52,8 +52,8 @@ const DOMINIO_PLACEHOLDER = 'example.com'
    el placeholder y la celda igual llevaría al sitio de la IANA. Y se compara con
    `endsWith('.example.com')` y no con `includes`, para no confundir a un
    `notexample.com` o a un `example.com.mx`, que son dominios distintos y reales.
-   El filtro de protocolo es un guardarraíl, no una formalidad. Hoy no hace falta: las
-   diez urls del array son https. Pero esta función es una REGLA sobre datos que se van a
+   El filtro de protocolo es un guardarraíl, no una formalidad. Hoy no hace falta: todas
+   las urls del array son https. Pero esta función es una REGLA sobre datos que se van a
    editar —ese es todo su propósito—, y `new URL('javascript:alert(1)')` no lanza y
    devuelve hostname vacío, así que sin el filtro pasaría el control y ese valor terminaría
    como `href` renderizado. Aceptar solo http/https cuesta dos líneas y cierra la puerta
@@ -108,7 +108,7 @@ const CLASE_CELDA_PATROCINADOR_ENLACE =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
-/* Los logos vienen en proporciones muy distintas —hoy 8 de 10 son cuadrados y los otros dos
+/* Los logos vienen en proporciones muy distintas —hoy 7 de 9 son cuadrados y los otros dos
    apaisados, hasta 3.5:1—, así que se normalizan por ALTURA: caja de alto fijo +
    `object-contain`. Con eso ninguno se deforma, ninguno pasa de la franja vertical y todas
    las filas alinean. Sin el alto fijo pasaría lo contrario de lo que uno teme: los que se
@@ -130,8 +130,13 @@ const sponsors = [
   { id: 6, name: 'Queretaro Con Futuro', logo: '/sponsors/9 Queretaro Con Futuro.png', url: 'https://example.com' },
   { id: 7, name: 'Space Riders', logo: '/sponsors/7 Space Riders.png', url: 'https://example.com' },
   { id: 8, name: 'Revolution 505', logo: '/sponsors/LOGONUEVOREV.png', url: 'https://revolution505.com' },
-  { id: 9, name: 'LQC', logo: '/sponsors/2 LQC.png', url: 'https://lqc.revolution505.com' },
-  { id: 10, name: 'La Peña de Santiago', logo: '/sponsors/penaLogoNaran.jpeg', url: 'https://lqc.revolution505.com' },
+  /* La url va con la ñ y NO en punycode (`xn--lapeadesantiago-1qb.com`). Son la misma
+     dirección —el navegador codifica el hostname al navegar— pero esta es la que alguien
+     puede leer y verificar de un vistazo. Ojo si algún día se toca: `new URL()` normaliza
+     el hostname a punycode al parsear, así que `tieneSitioReal` compara contra la forma
+     codificada. Da `true` igual: lo que se compara contra el placeholder es el hostname, y
+     `xn--lapeadesantiago-1qb.com` tampoco lo es. */
+  { id: 10, name: 'La Peña de Santiago', logo: '/sponsors/penaLogoNaran.jpeg', url: 'https://lapeñadesantiago.com/' },
 ]
 
 export default function Home() {
@@ -424,7 +429,7 @@ export default function Home() {
                 un patrocinador reacomode toda la sección. */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
               {sponsors.map((sponsor) => {
-                /* 7 de los 10 patrocinadores todavía apuntan al placeholder. Con la celda
+                /* 7 de los 9 patrocinadores todavía apuntan al placeholder. Con la celda
                    entera convertida en enlace, eso serían siete áreas de toque grandes
                    llevando al sitio de la IANA en una pestaña nueva — peor que en el
                    diseño anterior, donde el destino falso estaba detrás de un botón chico
@@ -487,7 +492,7 @@ export default function Home() {
                         lo disimule, y en una fila mezclada se ven dos pesos distintos lado
                         a lado sin que nadie haya interactuado — justo lo que este cambio
                         tiene que evitar. Va en 500 y no en 400 porque es el peso que las
-                        diez celdas ya tenían. */}
+                        celdas ya tenían cuando todas eran enlaces. */}
                     <span className="mt-4 text-center text-sm font-medium leading-snug text-gray-400 transition-colors duration-300 group-hover:text-gray-200">
                       {sponsor.name}
                     </span>
