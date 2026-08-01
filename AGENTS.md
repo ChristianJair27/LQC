@@ -211,6 +211,19 @@ tarjeta del reglamento de `/registro`—, y por eso su ruta, su nombre de descar
 **peso escrito a mano** viven en `src/lib/reglamento.ts` y no en una de las dos. Al
 reemplazar el PDF hay que actualizar `PESO_REGLAMENTO` ahí: no se calcula solo.
 
+**Iconos y favicon.** `index.html` declara **solo** `/LOGO-COPA.ico`: no existen los PNG
+de 16/32/180/192/512 y `site.webmanifest` **no tiene bloque `icons`**, así que no hay
+icono de "agregar a pantalla de inicio". Si se completan, hay que tocar los dos lugares.
+Queda además un huérfano conocido: **`public/images/Logorevazul.ico` no lo referencia
+nadie** —ni ahora ni en ningún commit de la historia— y sobrevivió a la limpieza de
+assets del 2026-07-31 solo porque es un archivo único, no un duplicado, y podría estar
+puesto para un cambio de favicon. Si nadie lo usa, se borra sin más análisis.
+
+**No hay duplicados en `public/`.** Los había —el mismo logo en `assets/` y en
+`sponsors/`, o en `images/` y en `sponsors/`— y se barrieron. Antes de agregar una imagen,
+comprobá que no esté ya en otra carpeta: la copia sin usar se publica igual a `dist/` y se
+sirve por nginx sin que nadie la pida.
+
 Las páginas se cargan con `lazy()` + `<Suspense>`. Cada página es un archivo
 autocontenido con su markup y sus clases de Tailwind inline.
 
