@@ -202,10 +202,37 @@ export default function Footer() {
             © {new Date().getFullYear()} League Querétaro Championship
           </div>
           
-          <div className="text-center">
+          {/* ACCESO AL PANEL. Va en esta franja y no en «Recursos» —ni en el header, que es
+              público y siempre visible— por dos razones. Una, de contenido: es una puerta para
+              el staff, no un recurso para los equipos; entre Reglamento y Registro habría
+              quedado como un tercer destino más para el capitán que viene a inscribirse. Dos,
+              de forma: acá la tipografía chica (text-xs) ya existe, así que el enlace queda
+              visible para quien lo busca sin llamar la atención de quien no. En «Recursos»
+              habría heredado el text-sm de CLASE_ENLACE y pesado igual que ellos, que es justo
+              lo contrario de lo que se pide.
+              El color NO acompaña a la franja (gray-600): el enlace sube a gray-400 porque ahí
+              daba ~2.8:1, bajo el mínimo AA, y compensa con text-xs para no pesar más que ellos.
+              Apunta a /admin y NO a /admin/login: RutaProtegida ya decide —panel si hay sesión,
+              login si no (ver App.tsx)—, y saltar directo al login mandaría a rehacer el
+              trámite a quien ya está dentro.
+              Dice «administradores» y no «Iniciar sesión»: el sitio no tiene cuentas de
+              jugador, así que un «Iniciar sesión» a secas le prometería una al capitán y lo
+              haría buscar la suya.
+              Conserva a propósito la barra de hover que index.css le pone a todo <a> —nada de
+              `after:hidden` como en CLASE_ICONO—: en un enlace tan tenue es la señal de que es
+              pulsable. El anillo de foco es el mismo patrón del resto del sitio (Home.tsx,
+              Registro.tsx) porque index.css solo le da outline propio a los <button>. */}
+          <div className="text-center space-y-1">
             <div className="text-xs text-gray-600">
               Design by Revolution505
             </div>
+            <Link
+              to="/admin"
+              onClick={irAlTope}
+              className="inline-block rounded-sm text-xs text-gray-400 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
+              Acceso administradores
+            </Link>
           </div>
           
           {/* Acá había tres enlaces —Términos, Privacidad y Cookies— apuntando a '#'. En
