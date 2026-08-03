@@ -102,14 +102,53 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white flex items-center justify-center px-6 py-16">
+    /* `relative` para colgar el logo de la esquina; no toca el centrado del formulario
+       porque un hijo absoluto sale del flujo del flex. Se prefiere a `fixed` para que el
+       logo scrollee con la página en pantallas bajas en vez de quedar flotando sobre el
+       formulario. */
+    <div className="relative min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white flex items-center justify-center px-6 py-16">
+      {/* Logo de esquina, estilo navbar: es el ÚNICO de los dos que cuenta como navegación
+          para un lector de pantalla. El nombre accesible vive en el <Link> (`aria-label`) y
+          la imagen va con `alt=""` para no decir lo mismo dos veces.
+          `-ml-2`/`-mt-2` compensan ópticamente el lienzo del PNG: «2 LQC.png» es cuadrado
+          (2000×2000) pero su arte mide 1498×506 —ratio 2.96, apenas el 25% del alto—, así que
+          la caja del <img> llega bastante antes que las letras y sin esto el logo se ve
+          hundido y despegado del borde. Por lo mismo la altura es mayor que la del Header:
+          `h-14 md:h-16` deja letras de ~14/16px, que es el tamaño al que el Header las
+          muestra en su lockup junto a la copa. Ver AGENTS.md si algún día llega un PNG
+          recortado: con arte a sangre esto vuelve a `h-9 md:h-11` y sin márgenes negativos. */}
+      <Link
+        to="/"
+        aria-label="LQC, ir al inicio"
+        className="absolute left-6 top-6 -ml-2 -mt-2 inline-block rounded-lg transition-transform duration-300 hover:scale-105 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+      >
+        <img
+          src="/assets/2 LQC.png"
+          alt=""
+          className="h-14 md:h-16 w-auto object-contain drop-shadow-lg"
+        />
+      </Link>
+
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img
-            src="/assets/LOGO COPA.png"
-            alt="LQC"
-            className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-5 object-contain drop-shadow-lg"
-          />
+          {/* La copa también lleva a la home con el mouse, pero es DECORATIVA para lectores
+              de pantalla: el logo de la esquina ya cubre esa navegación y repetirla dejaría
+              tres enlaces al mismo destino en la lista.
+              `tabIndex={-1}` no es opcional: un elemento enfocable dentro de un subárbol
+              `aria-hidden` es una violación de ARIA. Los dos atributos van juntos o no va
+              ninguno. */}
+          <Link
+            to="/"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="inline-block transition-transform duration-300 hover:scale-105"
+          >
+            <img
+              src="/assets/LOGO COPA.png"
+              alt=""
+              className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-5 object-contain drop-shadow-lg"
+            />
+          </Link>
           <h1 className="text-3xl md:text-4xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
             Panel de administración
           </h1>
