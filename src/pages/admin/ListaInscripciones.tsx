@@ -1210,17 +1210,42 @@ function Resumen({
     { etiqueta: 'Confirmados', valor: equipos.filter(estaPagado).length },
     ...(incompletos > 0 ? [{ etiqueta: 'Incompletos', valor: incompletos }] : [])
   ]
+  /* Columnas por escalón, medido sobre el ancho REAL de la columna de contenido (el
+     `max-w-4xl` de Panel.tsx dentro de `.container`; ojo que index.css baja `:root` a 14px
+     hasta 768px, así que abajo de ahí TODO lo que esté en rem encoge y la cuenta a 16px no
+     sirve):
+       viewport   320  360  640..767  768  960  1024+
+       columna    278  318    518     630  720   896
+     Con 4 celdas, 4 columnas recién respiran en `md`: a 640px darían ~121px por celda contra
+     los ~107px que ocupa la etiqueta más larga (CONFIRMADOS) con su padding —15px de aire—,
+     y en `md` pasan a 147px. Con 3 celdas ese mismo ancho da ~166px por celda, así que ahí
+     `sm` alcanza y no hace falta esperar a `md`.
+     Debajo de eso, 2 columnas: con 4 celdas es un 2×2 exacto; con 3, la última queda sola en
+     la segunda fila.
+     `md` es además donde ya cambian gap, padding y tipografía de las cajas, así que el salto
+     de columnas cae en un escalón que ya existía y no agrega uno nuevo. */
   return (
-    <div className={`grid gap-3 md:gap-4 ${celdas.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+    <div
+      className={`grid gap-3 md:gap-4 ${
+        celdas.length === 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3'
+      }`}
+    >
       {celdas.map((c) => (
+        /* `min-w-0` en la celda + `truncate` en la etiqueta: las columnas son
+           `minmax(0,1fr)`, o sea que PUEDEN encogerse por debajo de su contenido, y la
+           etiqueta es una palabra sin espacios en mono —CONFIRMADOS, INCOMPLETOS— que sin
+           esto se desbordaba de la caja y se montaba sobre lo que tuviera al lado. Con los
+           anchos de arriba nunca llega a recortarse; es la red que garantiza que el texto
+           quede adentro pase lo que pase. El número no se recorta a propósito: una cifra
+           cortada miente, y con el conteo de una liga no se acerca al borde. */
         <div
           key={c.etiqueta}
-          className="rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5"
+          className="min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-4 md:p-5"
         >
           <p className="font-sans text-3xl font-semibold leading-none text-blue-400 md:text-4xl">
             {c.valor}
           </p>
-          <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-gray-400 md:text-xs">
+          <p className="mt-2 truncate font-mono text-[11px] uppercase tracking-wider text-gray-400 md:text-xs">
             {c.etiqueta}
           </p>
         </div>
@@ -1235,7 +1260,10 @@ function Esqueleto() {
   return (
     <div role="status" className="space-y-6 md:space-y-8">
       <span className="sr-only">Cargando equipos…</span>
-      <div className="grid grid-cols-3 gap-3 md:gap-4" aria-hidden="true">
+      {/* Mismas columnas que la rama de 3 celdas de Resumen (`grid-cols-2 sm:grid-cols-3`):
+          si el esqueleto usara 3 fijas, en móvil la carga mostraría una fila de tres y al
+          llegar los datos saltaría a 2+1. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4" aria-hidden="true">
         {[0, 1, 2].map((i) => (
           <div
             key={i}
@@ -1540,21 +1568,34 @@ export default function ListaInscripciones() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Encabezado: resumen a la izquierda + acción de exportar a la derecha; en móvil se
-          apilan (botón debajo de los contadores, alineado a la izquierda). Exportar es una
+      {/* Encabezado: resumen + acciones de panel en una fila que ENVUELVE. Exportar es una
           acción a NIVEL DE PANEL (todo el listado), no de una tarjeta, así que usa el estilo
           BTN_PANEL —el mismo tratamiento sobrio de "Cerrar sesión"— en vez del BTN_SECUNDARIO
           del nivel tarjeta; el azul solo en borde y hover para no competir con el CTA
-          primario de cada equipo. */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1">
+          primario de cada equipo.
+          El reparto lo decide `flex-wrap`, no un breakpoint: el grupo de botones baja ENTERO
+          a su propia línea apenas no entra al lado del resumen. El umbral lo fija
+          `basis-[34rem]` —el ancho con el que el resumen sostiene sus 4 columnas holgadas— y
+          `grow` hace que, ya solo en su línea, ocupe todo el ancho. Hoy bajan siempre: la
+          columna de contenido llega a 896px como techo (`max-w-4xl`) y el grupo de botones
+          mide ~355-370px según el contador de archivados, así que 544 + 16 + 368 no entra.
+          Si el contenedor creciera, suben solos al lado del resumen sin tocar nada acá.
+          `grow`/`basis-*` sueltos y no `flex-1`: el atajo fija basis en 0% y cuál de los dos
+          gana depende del orden del CSS generado, no del orden de las clases.
+          Los botones ya NO llevan `shrink-0`. Con él su `flex-wrap` era código muerto —nunca
+          se comprimían, así que nunca envolvían— y todo el ajuste se lo comía el resumen: ese
+          era el bug. Sin él, en móvil el grupo se parte en dos líneas y aguanta un contador de
+          archivados de 2 o 3 dígitos. `sm:ml-auto` conserva la intención original: botones a
+          la izquierda en móvil, a la derecha de ahí para arriba. */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="min-w-0 grow basis-[34rem]">
           <Resumen equipos={activos} totalJugadores={totalJugadores} />
         </div>
         {/* Acciones de nivel panel. El interruptor es un botón de alternancia con
             `aria-pressed`, que es lo que hace que un lector de pantalla lo lea como
             activado/desactivado; el conteo en la etiqueta evita encenderlo para descubrir
             que no hay nada. */}
-        <div className="flex shrink-0 flex-wrap gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap gap-2 sm:ml-auto">
           <button
             ref={botonVerArchivadosRef}
             type="button"
