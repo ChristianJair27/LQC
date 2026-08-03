@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Mail, Lock, LogIn, Loader2, AlertCircle } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Mail, Lock, LogIn, Loader2, AlertCircle, ArrowLeft } from 'lucide-react'
 import { obtenerSupabase } from '../../lib/supabase'
 
 /* Mismo criterio de formato de correo que /registro: descarta correos claramente
@@ -200,6 +200,35 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        {/* Salida hacia el sitio público. `/admin/login` vive FUERA de LayoutPublico (ver
+            App.tsx), así que esta pantalla no tiene Header ni Footer: sin este enlace, quien
+            llegó desde el pie del sitio y no es admin no tiene más vuelta que el botón atrás
+            del navegador.
+            Enlace de TEXTO y no botón: el CTA de la tarjeta es el gradiente de «Entrar» a todo
+            el ancho, y una segunda caja con fondo debajo le pelearía la jerarquía. Es el mismo
+            par «acción primaria + escape» que ya resuelve ErrorBoundary.tsx, con su mismo
+            tratamiento (gray-400 → lqc-accent en hover). Discreto no quiere decir tenue: sobre
+            este fondo casi negro, gray-400 da ~8:1 de contraste, bastante por encima del
+            mínimo AA, que es lo que hace falta para quien se equivocó de puerta.
+            <Link> y no <a href>: acá la SPA está sana y una recarga completa volvería a bajar
+            el bundle solo para ir a la home. Es el primer enlace declarativo del área de admin;
+            lo demás usa navigate(), pero eso son REDIRECCIONES, no navegación del usuario.
+            El color se pisa a propósito: index.css pinta todo <a> en #66a3ff. El anillo de foco
+            es el patrón del resto del sitio porque index.css solo se lo da a los <button>.
+            La flecha va como ícono y no como «←» literal: un lector de pantalla leería ese
+            carácter como «flecha hacia la izquierda» antes del texto que ya lo dice.
+            Fuera del <form> para no entrar en su `space-y-6` ni parecer un control más, y solo
+            en esta rama: la de `verificando` es un spinner transitorio que redirige solo. */}
+        <div className="mt-6 text-center">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 rounded-sm text-sm text-gray-400 hover:text-lqc-accent transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver al inicio
+          </Link>
+        </div>
       </div>
     </div>
   )
