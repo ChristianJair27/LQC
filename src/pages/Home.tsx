@@ -167,11 +167,107 @@ const URL_ESTADO_STREAM = URL_SUPABASE
    petición colgada hasta que el navegador se aburra, encimándose con la del minuto siguiente. */
 const CORTE_MS = 8000
 
+/* Lo que ocupa el hueco del player cuando el canal NO está al aire.
+   Reemplaza al iframe de Twitch, que en offline pinta su propio cartel gris —ajeno a la marca,
+   en inglés y con la carátula del último VOD— justo debajo de un encabezado que dice
+   «Transmisión en Vivo».
+   Deliberadamente NO repite los horarios ni el botón «Ir al canal»: los dos ya están en la
+   columna de la derecha, a la altura de este bloque en escritorio y a un scroll corto en
+   móvil. Duplicarlos daría dos botones idénticos en la misma pantalla, y el día que se toque
+   uno el otro queda distinto. Si algún día el sidebar se va, esto hay que revisarlo.
+   Va como componente y no en línea porque la rama entera son ~35 líneas de decorado: dentro
+   del ternario del player tapaba las otras dos ramas, que son las que hay que poder leer de un
+   vistazo. Sin props: no depende de `twitchChannel` justamente porque no lleva el botón.
+   Las cuatro capas de textura van con `aria-hidden`: son fondo, no contenido. El único texto
+   real es el título y su línea de apoyo. */
+function BloqueSinTransmision() {
+  return (
+    <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-lqc-900/60 via-black to-black">
+      {/* Trama de puntos: el mismo motivo del fondo de la portada (más arriba en este archivo),
+          para que el bloque se lea como parte del sitio y no como un cuadro pegado. */}
+      <div
+        className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:22px_22px]"
+        aria-hidden="true"
+      />
+      {/* Franjas diagonales, el recurso de cualquier gráfica de esports. Al 8 % de un azul de
+          la paleta: tiene que leerse como textura al pasar, no competir con el título. */}
+      <div
+        className="absolute inset-0 bg-[repeating-linear-gradient(115deg,transparent_0px,transparent_28px,rgba(0,102,255,0.08)_28px,rgba(0,102,255,0.08)_30px)]"
+        aria-hidden="true"
+      />
+      {/* Halo azul detrás del texto: es lo que despega el título del fondo y da el volumen que
+          un rectángulo plano no tiene. Sobredimensionado y centrado para que el degradado
+          muera antes de llegar a los bordes y no se vea el corte. */}
+      <div
+        className="absolute left-1/2 top-1/2 h-[140%] w-[140%] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,rgba(0,102,255,0.25),transparent_65%)]"
+        aria-hidden="true"
+      />
+      {/* Filo superior en degradado, el mismo gesto que la barra vertical del encabezado. */}
+      <div
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-lqc-accent/40 to-transparent"
+        aria-hidden="true"
+      />
+
+      <div className="relative flex h-full flex-col items-center justify-center gap-3 px-6 text-center sm:gap-4">
+        <span className="relative flex h-11 w-11 items-center justify-center rounded-full border border-lqc-accent/30 bg-lqc-900/60 shadow-lg shadow-lqc-500/20 sm:h-14 sm:w-14">
+          {/* Anillo que respira. `animate-pulse-slow` es la utilidad del propio proyecto
+              (index.css) y no el `animate-pulse` de Tailwind: 3 s en vez de 2 y sin bajar de
+              0.7 de opacidad — acá es una señal de vida discreta, no un elemento cargando.
+              La regla global de `prefers-reduced-motion` de index.css ya la desactiva sola. */}
+          <span
+            className="absolute inset-0 rounded-full border border-lqc-accent/20 animate-pulse-slow"
+            aria-hidden="true"
+          />
+          <Twitch className="h-5 w-5 text-lqc-accent sm:h-7 sm:w-7" aria-hidden="true" />
+        </span>
+
+        {/* El <h3> toma Orbitron y el peso 700 de la regla base de index.css (h1–h6), que es la
+            tipografía de títulos de la marca. NO subir a `font-extrabold` ni `font-black`: el
+            index.html carga Orbitron hasta el 700 y `:root` tiene `font-synthesis: none`, así
+            que un peso mayor no engrosaría nada — se pintaría igual y quedaría la clase
+            mintiendo. El volumen sale del tamaño, las mayúsculas y el `tracking`.
+            El texto va en minúsculas en el JSX y lo pone en caja alta el `uppercase`: así un
+            lector de pantalla lee «Fuera de línea» y no deletrea las mayúsculas.
+            `tracking` explícito porque la regla base de h1–h6 trae `-0.025em`, que en un título
+            corto en caja alta apelmaza las letras — acá tiene que abrirse, no cerrarse.
+            Escala verificada contra el caso más angosto: en 375 px la caja 16:9 mide 184 px de
+            alto y ~279 px útiles de ancho, y con `text-2xl` el título entra en UNA línea. */}
+        <h3 className="text-2xl uppercase tracking-[0.08em] bg-gradient-to-b from-white via-blue-100 to-lqc-accent bg-clip-text text-transparent sm:text-4xl sm:tracking-[0.14em] md:text-5xl">
+          Fuera de línea
+        </h3>
+
+        <span
+          className="h-px w-24 bg-gradient-to-r from-transparent via-lqc-accent/70 to-transparent sm:w-32"
+          aria-hidden="true"
+        />
+
+        {/* Los días SÍ salen de `streamSchedule` (Martes y Jueves) — están escritos acá y no
+            leídos del array porque esto es una frase, no una tabla: el sidebar ya muestra el
+            dato completo con horarios. Si algún día cambian los días de transmisión, esta línea
+            hay que tocarla a mano; es la razón de este comentario.
+            No promete fecha, rival ni hora: nada de eso está confirmado en el repo. */}
+        <p className="max-w-md text-xs text-gray-400 sm:text-sm">
+          Transmitimos martes y jueves. Nos vemos en la próxima fecha.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
-  /* Arranca en 'offline', NO en 'online'. Mientras vuelve el primer fetch la portada no puede
-     afirmar que hay transmisión: el costo de equivocarse es un badge apagado de más, contra
-     un «EN VIVO» falso que manda a la gente a un canal que no está transmitiendo. */
-  const [streamStatus, setStreamStatus] = useState<'online' | 'offline'>('offline')
+  /* Tres estados, no dos. 'cargando' es el INICIAL y significa «todavía no sé».
+     Existe desde que la sección renderiza cosas DISTINTAS según el estado: antes el player se
+     pintaba igual estuviera al aire o no, así que arrancar en 'offline' no se notaba; ahora
+     arrancar ahí mostraría el bloque de «fuera de línea» en cada carga de la portada, durante
+     todo el viaje de ida y vuelta del fetch, para después saltar al player.
+     Lo que NO cambia es la regla de fondo, que sigue siendo la de antes: ante la duda se cae a
+     'offline' y nunca a 'online'. 'cargando' no la relaja porque no afirma nada —no dice «EN
+     VIVO» ni «FUERA DE LÍNEA», solo pinta un esqueleto neutro— y el único camino a 'online'
+     sigue siendo una respuesta explícita con `online === true`.
+     Es un estado de arranque, no un ciclo: ninguna rama vuelve a 'cargando'. Las consultas
+     siguientes del intervalo reemplazan un estado ya resuelto por otro, sin pasar por el
+     esqueleto, así que el player no parpadea una vez por minuto. */
+  const [streamStatus, setStreamStatus] = useState<'online' | 'offline' | 'cargando'>('cargando')
   const [] = useState('1.2K')
   const twitchChannel = "lqroc"
   
@@ -188,9 +284,16 @@ export default function Home() {
     let enVuelo: AbortController | null = null
 
     const consultarEstado = async () => {
-      /* Build sin credenciales: no hay a quién preguntarle. Se queda en 'offline' sin
-         disparar un fetch a `undefined/functions/...` que solo ensuciaría la consola de red. */
-      if (!URL_ESTADO_STREAM || !CLAVE_ANON) return
+      /* Build sin credenciales: no hay a quién preguntarle. No se dispara un fetch a
+         `undefined/functions/...` que solo ensuciaría la consola de red.
+         El setState SÍ hace falta desde que existe 'cargando', y es la única línea que este
+         camino gana: sin él nadie resolvería el estado inicial y la portada se quedaría con el
+         esqueleto girando para siempre —el preview local sin `.env` es exactamente ese caso—.
+         Cae en 'offline', que es el mismo lado seguro que ya elegía antes por omisión. */
+      if (!URL_ESTADO_STREAM || !CLAVE_ANON) {
+        if (montado) setStreamStatus('offline')
+        return
+      }
 
       /* Aborta la anterior antes de lanzar la nueva: si una respuesta se demora más que el
          intervalo, no se apilan ni pueden resolverse fuera de orden y pisarse entre sí. */
@@ -321,31 +424,83 @@ export default function Home() {
                   ? 'bg-green-950/50 text-green-300 border border-green-800/40' 
                   : 'bg-gray-900/50 text-gray-400 border border-gray-800/40'
               }`}>
-                <div className={`w-3 h-3 rounded-full ${streamStatus === 'online' ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-                {streamStatus === 'online' ? 'EN VIVO' : 'OFFLINE'}
+                {/* El fondo del badge no distingue 'cargando' de 'offline' —los dos caen en la
+                    rama gris de arriba— y está bien: lo que cambia entre esos dos estados es el
+                    puntito, que en 'cargando' late, y la etiqueta, que en 'cargando' no está.
+                    El latido va con `animate-pulse-slow` (la utilidad del proyecto, 3 s) y no
+                    con el `animate-pulse` de Tailwind que usa 'online': el verde tiene que
+                    llamar la atención, este gris solo indica que algo está pasando. */}
+                <div className={`w-3 h-3 rounded-full ${
+                  streamStatus === 'online'
+                    ? 'bg-green-400 animate-pulse'
+                    : streamStatus === 'cargando'
+                      ? 'bg-gray-500 animate-pulse-slow'
+                      : 'bg-gray-500'
+                }`} />
+                {/* 'cargando' va SIN etiqueta, a propósito. Cualquier palabra acá dura los
+                    milisegundos del fetch y se lee como un parpadeo, que es justo lo que el
+                    tercer estado vino a sacar. Y una palabra tiene que ser falsa o vaga: el
+                    badge todavía no sabe nada que decir.
+                    Tampoco lleva `sr-only`: el esqueleto del player ya anuncia «Consultando el
+                    estado de la transmisión», y repetirlo acá lo haría sonar dos veces.
+                    Sin segundo hijo el `gap-2` del contenedor no aplica —solo separa elementos
+                    existentes—, así que el puntito no queda con un hueco colgando al lado. */}
+                {streamStatus === 'cargando' ? null : streamStatus === 'online' ? 'EN VIVO' : 'OFFLINE'}
               </div>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-10">
               <div className="lg:col-span-2 space-y-10">
                 <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/60 backdrop-blur-md border border-white/5">
-                  <div className="relative aspect-video">
-                    <iframe
-                      src={`https://player.twitch.tv/?channel=${twitchChannel}&parent=${window.location.hostname}&autoplay=true`}
-                      height="100%"
-                      width="100%"
-                      allowFullScreen
-                      className="border-0"
-                      title="Twitch Stream"
-                    />
-                    <div className="absolute top-4 left-4">
-                      <div className={`px-4 py-1.5 rounded-full text-sm font-medium shadow-lg ${
-                        streamStatus === 'online' ? 'bg-red-600 text-white' : 'bg-gray-800/80 text-gray-200'
-                      }`}>
-                        {streamStatus === 'online' ? '🔴 EN VIVO' : '⚪ OFFLINE'}
+                  {/* Tres ramas para el MISMO hueco 16:9, y por eso las tres llevan
+                      `aspect-video`: así la columna mide igual en los tres estados y resolver
+                      el estado no empuja el resto de la página.
+                      El pie de la tarjeta (LQROC / Canal oficial / Idioma) queda AFUERA del
+                      condicional a propósito: identifica al canal, y el canal existe transmita
+                      o no. */}
+                  {streamStatus === 'online' ? (
+                    <div className="relative aspect-video">
+                      <iframe
+                        src={`https://player.twitch.tv/?channel=${twitchChannel}&parent=${window.location.hostname}&autoplay=true`}
+                        height="100%"
+                        width="100%"
+                        allowFullScreen
+                        className="border-0"
+                        title="Twitch Stream"
+                      />
+                      {/* Este badge perdió su ternario, no su apariencia: la rama entera solo se
+                          pinta con el canal al aire, así que la variante gris «⚪ OFFLINE» era
+                          código muerto —nunca podría verse—. Lo que se ve en pantalla es
+                          idéntico a lo que se veía antes en estado 'online'. */}
+                      <div className="absolute top-4 left-4">
+                        <div className="px-4 py-1.5 rounded-full text-sm font-medium shadow-lg bg-red-600 text-white">
+                          🔴 EN VIVO
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : streamStatus === 'cargando' ? (
+                    /* Esqueleto NEUTRO. No dice «EN VIVO» ni «FUERA DE LÍNEA» porque en este
+                       punto todavía no se sabe: cualquiera de las dos sería una afirmación que
+                       la respuesta puede desmentir medio segundo después.
+                       Sin texto visible —un cartel de "cargando" que dura 300 ms es ruido—;
+                       lo que hay para un lector de pantalla va en el `sr-only`, y el resto es
+                       decoración con `aria-hidden`. */
+                    <div className="relative aspect-video bg-black/70">
+                      <div
+                        className="absolute inset-0 animate-pulse bg-gradient-to-br from-white/5 via-white/2 to-transparent"
+                        aria-hidden="true"
+                      />
+                      <div className="relative flex h-full items-center justify-center">
+                        <span
+                          className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-lqc-accent/70 sm:h-11 sm:w-11"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Consultando el estado de la transmisión</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <BloqueSinTransmision />
+                  )}
                   <div className="p-5 bg-gradient-to-t from-black/80 to-transparent">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -364,20 +519,37 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/40 backdrop-blur-md border border-white/5">
-                  <div className="bg-gradient-to-r from-gray-900/60 to-gray-800/40 px-5 py-4">
-                    <div className="font-medium">Chat de Twitch</div>
+                {/* El chat desaparece ENTERO en offline —marco y encabezado incluidos—, no solo
+                    el iframe: un cuadro rotulado «Chat de Twitch» con un panel vacío adentro es
+                    peor que no tener la caja, el mismo criterio con el que se fueron los embeds
+                    de Battlefy (ver el comentario más abajo).
+                    En 'cargando' sí se conserva el marco, con un esqueleto en lugar del iframe.
+                    Es a propósito: la mayoría de las visitas terminan en un estado u otro, y
+                    dejando la caja puesta la transición a 'online' cambia el contenido sin mover
+                    nada de lugar. Si termina en offline, la caja se va una sola vez. */}
+                {streamStatus !== 'offline' && (
+                  <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/40 backdrop-blur-md border border-white/5">
+                    <div className="bg-gradient-to-r from-gray-900/60 to-gray-800/40 px-5 py-4">
+                      <div className="font-medium">Chat de Twitch</div>
+                    </div>
+                    <div className="h-64 sm:h-80">
+                      {streamStatus === 'online' ? (
+                        <iframe
+                          src={`https://www.twitch.tv/embed/${twitchChannel}/chat?parent=${window.location.hostname}&darkpopout`}
+                          height="100%"
+                          width="100%"
+                          className="border-0"
+                          title="Twitch Chat"
+                        />
+                      ) : (
+                        <div
+                          className="h-full animate-pulse bg-gradient-to-b from-white/4 to-transparent"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </div>
                   </div>
-                  <div className="h-64 sm:h-80">
-                    <iframe
-                      src={`https://www.twitch.tv/embed/${twitchChannel}/chat?parent=${window.location.hostname}&darkpopout`}
-                      height="100%"
-                      width="100%"
-                      className="border-0"
-                      title="Twitch Chat"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Sidebar sigue similar pero más limpio */}
