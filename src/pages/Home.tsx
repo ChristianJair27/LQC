@@ -145,8 +145,33 @@ const sponsors = [
   { id: 10, name: 'La Peña de Santiago', logo: '/sponsors/penaLogoNaran.jpeg', url: 'https://lapeñadesantiago.com/' },
 ]
 
+/* Estado real del stream: lo responde la Edge Function `twitch-status`, que consulta la API
+   de Twitch del lado del servidor y devuelve `{ online: boolean }`. Tiene que ser server-side
+   porque la API de Twitch pide un token de app, y un token en el bundle es un token público.
+
+   La URL se ARMA desde `VITE_SUPABASE_URL` en vez de escribir el host acá: es la misma
+   variable que ya lee `src/lib/supabase.ts`, así que no hay dos lugares donde apunta el
+   backend y un cambio de entorno no deja este fetch apuntando al viejo. La anon key sale de
+   la misma variable que el cliente; es pública por diseño (ver el comentario de seguridad de
+   `lib/supabase.ts`), lo que la contiene es RLS y la propia función.
+
+   Sin credenciales en el build las dos quedan `undefined`: entonces `URL_ESTADO_STREAM` es
+   null y no se consulta nada, igual que `obtenerSupabase()` devuelve null. El badge se queda
+   apagado, que es el lado seguro. */
+const URL_SUPABASE = import.meta.env.VITE_SUPABASE_URL
+const CLAVE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY
+const URL_ESTADO_STREAM = URL_SUPABASE
+  ? `${URL_SUPABASE.replace(/\/+$/, '')}/functions/v1/twitch-status`
+  : null
+/* Corte propio: `fetch` no trae timeout, y sin esto una función que no responde deja la
+   petición colgada hasta que el navegador se aburra, encimándose con la del minuto siguiente. */
+const CORTE_MS = 8000
+
 export default function Home() {
-  const [streamStatus, setStreamStatus] = useState<'online' | 'offline'>('online')
+  /* Arranca en 'offline', NO en 'online'. Mientras vuelve el primer fetch la portada no puede
+     afirmar que hay transmisión: el costo de equivocarse es un badge apagado de más, contra
+     un «EN VIVO» falso que manda a la gente a un canal que no está transmitiendo. */
+  const [streamStatus, setStreamStatus] = useState<'online' | 'offline'>('offline')
   const [] = useState('1.2K')
   const twitchChannel = "lqroc"
   
@@ -157,10 +182,52 @@ export default function Home() {
   ]
 
   useEffect(() => {
-    const checkStreamStatus = () => setStreamStatus('online')
-    checkStreamStatus()
-    const interval = setInterval(checkStreamStatus, 60000)
-    return () => clearInterval(interval)
+    /* `montado` antes de cada setState —el mismo patrón de Login.tsx y RutaProtegida.tsx—:
+       la respuesta puede llegar después de que alguien se fue de la portada. */
+    let montado = true
+    let enVuelo: AbortController | null = null
+
+    const consultarEstado = async () => {
+      /* Build sin credenciales: no hay a quién preguntarle. Se queda en 'offline' sin
+         disparar un fetch a `undefined/functions/...` que solo ensuciaría la consola de red. */
+      if (!URL_ESTADO_STREAM || !CLAVE_ANON) return
+
+      /* Aborta la anterior antes de lanzar la nueva: si una respuesta se demora más que el
+         intervalo, no se apilan ni pueden resolverse fuera de orden y pisarse entre sí. */
+      enVuelo?.abort()
+      const propio = new AbortController()
+      enVuelo = propio
+      const corte = setTimeout(() => propio.abort(), CORTE_MS)
+
+      try {
+        const respuesta = await fetch(URL_ESTADO_STREAM, {
+          headers: { Authorization: `Bearer ${CLAVE_ANON}` },
+          signal: propio.signal
+        })
+        /* `fetch` NO rechaza por 4xx/5xx: sin este guard, un 500 con cuerpo HTML seguiría a
+           .json(), y peor, un 200 vacío se leería como "sin online" en vez de como fallo. */
+        if (!respuesta.ok) throw new Error(String(respuesta.status))
+        const datos = (await respuesta.json()) as { online?: unknown }
+        /* `=== true` y no un truthy: cualquier cosa que no sea exactamente el booleano true
+           —undefined, null, la cadena "true", un JSON con otra forma— cae en 'offline'. */
+        if (montado) setStreamStatus(datos?.online === true ? 'online' : 'offline')
+      } catch {
+        /* Todo lo que salga mal termina acá y siempre en el mismo lado: red caída, timeout,
+           4xx/5xx, JSON inválido y el propio abort. Nunca deja el badge en 'online'.
+           Sin logs: el invariante de cero salida por consola vale para todo `src/`. */
+        if (montado) setStreamStatus('offline')
+      } finally {
+        clearTimeout(corte)
+      }
+    }
+
+    consultarEstado()
+    const interval = setInterval(consultarEstado, 60000)
+    return () => {
+      montado = false
+      enVuelo?.abort()
+      clearInterval(interval)
+    }
   }, [])
 
   return (
