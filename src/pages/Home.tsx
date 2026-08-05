@@ -646,6 +646,41 @@ export default function Home() {
                 Registrarme
                 <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
               </Link>
+
+              {/* El QR va DEBAJO del botón y centrado, no a su lado. Al lado —un `flex-row` con
+                  `justify-center`— lo que queda centrado es el CONJUNTO, así que el botón se
+                  corre a la izquierda del eje de la tarjeta y deja de alinear con el <h2> y el
+                  párrafo de arriba, que son `text-center`. Abajo, el botón no se mueve ni un
+                  píxel y el orden de lectura queda en el orden de importancia: primero la
+                  acción, después el atajo.
+                  El texto va ANTES del QR y no después: es lo que explica para qué sirve el
+                  cuadro que viene, y sin él un código pegado bajo un botón no dice nada. */}
+              <div className="mt-10 flex flex-col items-center gap-3">
+                <p className="text-sm text-gray-400">o escanea para registrarte</p>
+                {/* Cuadro blanco. El SVG ya trae su propio `<rect fill="white">` de fondo, así
+                    que este `bg-white` no está tapando ninguna transparencia: lo que hace es
+                    extender ese blanco por detrás del `p-2` para que el borde redondeado se vea
+                    limpio y el código no termine en un canto duro contra la tarjeta oscura.
+                    El `ring` retoma el `border-blue-800/20` de la tarjeta que lo contiene —es lo
+                    que evita que el blanco se lea como un parche— y la sombra lo apoya sobre el
+                    fondo en vez de dejarlo flotando. */}
+                <div className="rounded-xl bg-white p-2 shadow-lg shadow-black/40 ring-1 ring-blue-800/30">
+                  {/* `width`/`height` además de las clases: el SVG declara `width="45mm"`, o sea
+                      ~170px intrínsecos, y sin medidas explícitas se pintaría a ese tamaño.
+                      Los atributos le dan al navegador la proporción antes de que aplique el
+                      CSS; las clases son las que mandan. `block` mata el hueco que el navegador
+                      deja bajo una imagen `inline` por la línea base, que acá se vería como un
+                      borde blanco más grueso abajo que arriba. */}
+                  <img
+                    src="/assets/qr_lqc_azul.svg"
+                    alt="Código QR para registrarse en LQC"
+                    width={104}
+                    height={104}
+                    loading="lazy"
+                    className="block h-26 w-26"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>

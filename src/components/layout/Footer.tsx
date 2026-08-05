@@ -62,18 +62,28 @@ export default function Footer() {
   return (
     <footer className="bg-black border-t border-gray-900">
       <div className="container mx-auto px-4 py-12">
-        {/* Cuatro columnas otra vez, al volver "Recursos" — pero con un escalón intermedio
-            que la versión de 4 columnas anterior a f18aa5b no tenía (el estado inmediatamente
-            anterior a este cambio era de 3 columnas, sin "Recursos").
-            Aquella saltaba de 1 a 4 en `md` (768px), y ahí cada columna mide 160px:
-            (768 − 32 de px-4 − 3 huecos de 32) / 4. La botonera de "Conectar" mide 188px
-            —4 botones de 38px (icono w-5 de 20 + p-2 de 16 + borde de 2) y 3 huecos de 12—,
-            así que no entraba y se partía en dos filas.
-            Con `md:grid-cols-2 lg:grid-cols-4` la tablet va a 2×2 (352px por columna) y las
-            4 en línea entran recién en `lg` (1024px), donde dan 224px: 36px de margen sobre
-            los 188px de la botonera, que es el elemento más ancho que no se puede envolver.
+        {/* Cinco bloques, pero NO cinco columnas iguales — y esa distinción es todo el
+            comentario. La restricción de siempre: la botonera de "Conectar" mide 188px
+            —4 botones de 38px (icono w-5 de 20 + p-2 de 16 + borde de 2) y 3 huecos de 12— y
+            es el elemento más ancho que no se puede envolver sin que se parta en dos filas.
+            Eso ya pasó una vez: la versión anterior a f18aa5b saltaba de 1 a 4 columnas en
+            `md` (768px), donde cada una da 160px, y la botonera se partía. De ahí el escalón
+            `md:grid-cols-2 lg:grid-cols-4` que la tablet resuelve en 2×2 (352px por columna).
+
+            Al sumar el QR, `lg:grid-cols-5` habría repetido el mismo error: en `lg` el
+            contenedor mide 1024px y quedan 992 útiles tras el px-4, así que cinco columnas
+            iguales con `gap-8` dan (992 − 4 huecos de 32) / 5 = 172.8px. Otra vez por debajo
+            de 188 y otra vez la botonera en dos filas.
+            La salida es que el QR NO sea una columna igual: `[1fr_1fr_1fr_1fr_7rem]` le da
+            una pista fija de 112px —lo que mide su cuadro y nada más— y reparte el resto
+            entre las cuatro de contenido. Con `lg:gap-x-6` (24px) eso deja
+            (992 − 4 huecos de 24 − 112) / 4 = 196px por columna: 8px de margen sobre los 188
+            de la botonera. El gap horizontal baja de 32 a 24 solo en `lg` y solo en el eje x,
+            que es de donde salen esos 8px; el vertical sigue en 32 para no tocar el ritmo de
+            `md`, donde las columnas se apilan de a dos.
+            En `xl` el contenedor pasa a 1280px y sobra de todo: 260px por columna.
             Anchos calculados desde el CSS compilado, no medidos en un navegador. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_7rem] gap-8 lg:gap-x-6">
           {/* Logo y descripción */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -189,6 +199,69 @@ export default function Footer() {
               >
                 <Mail className="w-5 h-5" />
               </a>
+            </div>
+          </div>
+
+          {/* QR al registro, como bloque propio y último de la grilla — o sea la columna de la
+              derecha en `lg`. Antes colgaba del final de «Conectar», que lo dejaba leyéndose
+              como un apéndice de las redes sociales y no como lo que es: un quinto destino.
+              Con encabezado propio, en el mismo `<h4>` uppercase que los otros tres, ya es un
+              par de ellos y no algo pegado abajo.
+              La otra ubicación posible —la franja legal del final— sigue descartada: es un
+              `grid ... items-center` de texto `text-xs`, y un bloque de 108px le triplicaba el
+              alto a la fila y descolocaba el aviso de Riot.
+              Cómo se acomoda en cada tamaño:
+              · `lg`: pista fija de 112px (ver el comentario de la grilla). El cuadro mide 108,
+                así que el contenido pasa a vertical —`lg:flex-col`— y el texto cae DEBAJO del
+                código, envolviendo en dos o tres líneas. De lado no entraría.
+              · `md` (2×2): quedan cinco bloques en dos columnas, así que este cae solo en la
+                tercera fila, en la celda izquierda de 352px. Para que no se lea huérfano el
+                contenido va en horizontal: cuadro y texto uno al lado del otro ocupan ~265px
+                de esos 352 y llenan la celda en vez de dejar un cuadradito suelto.
+              · móvil (1 columna): mismo horizontal, a lo ancho de la pantalla.
+              Mismo tratamiento que el QR de «¿Vas a competir?» en Home.tsx: si se toca uno,
+              mirar el otro. No están extraídos a un componente compartido porque son dos cajas
+              de cinco líneas con tamaños y textos distintos, y el envoltorio costaría más de lo
+              que ahorra. */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-white uppercase tracking-wider">Regístrate</h4>
+            <div className="flex items-center gap-3 lg:flex-col lg:items-start">
+              {/* El SVG ya trae su propio `<rect fill="white">`, así que este `bg-white` no tapa
+                  transparencia: extiende ese blanco por detrás del `p-1.5` para que la esquina
+                  redondeada quede limpia y el código no corte a filo contra el negro del pie.
+                  El `ring` en gris es el mismo registro de los bordes de acá (`border-gray-800`
+                  de CLASE_ICONO): sin él, un cuadrado blanco puro sobre `bg-black` se lee como
+                  una imagen que no cargó bien. */}
+              <div className="rounded-lg bg-white p-1.5 shadow-lg shadow-black/50 ring-1 ring-gray-800">
+                {/* 96px es el TECHO que impone la pista de 112px, no una preferencia: 96 + los
+                    12 del `p-1.5` dan los 108 del cuadro. Sirve como marca visual y escanea de
+                    cerca, pero no es un QR "de cartel": son 37 módulos (versión 5) en 96px, o
+                    sea 2.1px por módulo. Para que escanee con holgura harían falta ~144px, y
+                    ese ancho en `lg` deja las otras columnas en 185px — por debajo de los 188
+                    de la botonera. O sea que el pie NO puede alojar un QR grande sin reacomodar
+                    «Conectar»; el grande es el de Home, que tiene la tarjeta entera para él.
+                    `width`/`height` además de las clases porque el SVG declara `width="45mm"`
+                    —unos 170px intrínsecos— y sin medidas explícitas se pintaría a ese tamaño.
+                    `block` evita el hueco de línea base de una imagen `inline`, que acá se
+                    vería como más blanco abajo que arriba. */}
+                <img
+                  src="/assets/qr_lqc_azul.svg"
+                  alt="Código QR para registrarse en LQC"
+                  width={96}
+                  height={96}
+                  loading="lazy"
+                  className="block h-24 w-24"
+                />
+              </div>
+              {/* Sin `<br />`: el texto tiene que poder acomodarse solo, porque cambia de forma
+                  según el tamaño —una línea al lado del cuadro en móvil y `md`, dos o tres
+                  debajo en `lg`— y un salto fijo lo rompería en alguno de los dos.
+                  `text-gray-400` y no `gray-500`: a `text-xs` sobre negro, gray-500 da ~4.3:1 y
+                  queda por debajo del 4.5:1 que pide AA para texto normal. Es el mismo ajuste
+                  —y la misma razón— que el enlace de «Acceso administradores» de más abajo. */}
+              <span className="text-xs text-gray-400 leading-snug">
+                Escanéame para registrarte
+              </span>
             </div>
           </div>
         </div>
