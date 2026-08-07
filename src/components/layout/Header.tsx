@@ -177,7 +177,7 @@ export default function Header() {
                 que los enlaces del footer. Además cubre la franja md, donde el rótulo está
                 oculto y el enlace se queda sin nombre accesible propio. */}
             <a
-              href="https://atakgg.revolution505.com/"
+              href="https://atakgg.revolution505.com/tournaments"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="ATAK.GG (abre en pestaña nueva)"
@@ -262,7 +262,7 @@ export default function Header() {
                   cajón va en los dos: sin él, volver atrás desde la pestaña nueva encuentra el
                   menú todavía abierto. */}
               <a
-                href="https://atakgg.revolution505.com/"
+                href="https://atakgg.revolution505.com/tournaments"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
