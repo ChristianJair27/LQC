@@ -25,9 +25,34 @@ const navItems = [
    y `gap-2` en vez de `gap-3`. */
 const CLASE_BOTON_EXTERNO =
   'after:hidden hidden sm:flex items-center gap-2 xl:gap-3 px-3 xl:px-4 py-2.5 ' +
-  'bg-gray-900 border border-gray-700 hover:border-blue-600 ' +
-  'text-gray-200 hover:text-white rounded-lg transition-all duration-300 ' +
-  'shadow-md hover:shadow-blue-900/40 text-sm font-medium'
+  'bg-gray-900 border text-gray-200 hover:text-white rounded-lg ' +
+  'transition-all duration-300 shadow-md hover:shadow-lg text-sm font-medium'
+
+/* ACENTO DE MARCA. Es lo único que distingue a un botón del otro, y por eso las dos constantes
+   son idénticas salvo el nombre del color: mismo grosor de borde (el `border` de 1px vive en la
+   base), mismas opacidades y mismas dos sombras. Si alguna vez hay que retocar el nivel, se
+   retocan LAS DOS o dejan de ser pareja.
+   El fondo NO participa: se queda en el `bg-gray-900` de la base en reposo y en hover. Lo que
+   cambia al pasar el mouse es el borde (de 50% a 90% de opacidad, y un tono más claro) y la
+   sombra (de `shadow-md` al 20% a `shadow-lg` al 40%). Es un realce, no un relleno.
+
+   Por qué estos dos tonos y no otros, que es la parte que importa:
+   Los colores salen de los logos. Muestreados, el de Revolution505 es cian/turquesa —hue 173°
+   a 180°, saturación 100%— y el de ATAK es rojo puro, hue 0°.
+   El cian de la casa, `lqc-accent` (#00d4ff), sería el calce literal para Revolution505 y es un
+   token del proyecto, pero se descartó por un motivo medible: su luminancia relativa es 0.543
+   contra 0.225 del rojo, o sea 2.4 veces más brillante. A la misma opacidad, ese botón habría
+   gritado al lado del otro — justo lo contrario del requisito de que se vean parejos.
+   `blue-500` y `red-500` sí son pareja: la paleta de Tailwind 4 los coloca en la MISMA
+   luminosidad de oklch (L≈0.637), y sus luminancias relativas quedan en 0.229 y 0.225. Lo
+   mismo vale para el par de hover, `blue-400`/`red-400` (L≈0.705 los dos). Por eso el azul del
+   botón tira más a azul que a cian: es el precio de que las dos marcas pesen igual.
+   Nota de paleta: el rojo es la única excepción a la regla azul/negro de CLAUDE.md, y es
+   deliberada — es el color de una marca ajena, acotado a su propio botón. Nada de `purple-*`. */
+const ACENTO_REVOLUTION =
+  'border-blue-500/50 shadow-blue-500/20 hover:border-blue-400/90 hover:shadow-blue-500/40'
+const ACENTO_ATAK =
+  'border-red-500/50 shadow-red-500/20 hover:border-red-400/90 hover:shadow-red-500/40'
 
 /* Los logos se normalizan por ALTURA y no por caja cuadrada, que es lo que hacía el botón
    original con su `w-7 h-7`. El de Revolution505 es casi cuadrado (755×796) y llenaba esa caja;
@@ -53,8 +78,8 @@ const CLASE_CHEVRON_BOTON = 'w-4 h-4 hidden xl:block'
    navegación; entre ellos dos ya separa el `gap-3` del <nav> que los contiene. */
 const CLASE_BOTON_EXTERNO_MOVIL =
   'after:hidden flex items-center justify-between px-6 py-4 text-xl font-medium ' +
-  'bg-gray-900 border border-gray-700 hover:border-blue-600 rounded-xl ' +
-  'transition-all duration-300 text-gray-200 hover:text-white shadow-md'
+  'bg-gray-900 border rounded-xl transition-all duration-300 ' +
+  'text-gray-200 hover:text-white shadow-md hover:shadow-lg'
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -156,7 +181,7 @@ export default function Header() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="ATAK.GG (abre en pestaña nueva)"
-              className={CLASE_BOTON_EXTERNO}
+              className={`${CLASE_BOTON_EXTERNO} ${ACENTO_ATAK}`}
             >
               {/* El `alt` se conserva aunque el aria-label ya fije el nombre accesible: si el
                   PNG no carga, es el texto que se pinta en su lugar. */}
@@ -175,7 +200,7 @@ export default function Header() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Revolution505 (abre en pestaña nueva)"
-              className={CLASE_BOTON_EXTERNO}
+              className={`${CLASE_BOTON_EXTERNO} ${ACENTO_REVOLUTION}`}
             >
               <img
                 src="/images/revolution505-logo.png"
@@ -242,7 +267,7 @@ export default function Header() {
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="ATAK.GG (abre en pestaña nueva)"
-                className={`mt-4 ${CLASE_BOTON_EXTERNO_MOVIL}`}
+                className={`mt-4 ${CLASE_BOTON_EXTERNO_MOVIL} ${ACENTO_ATAK}`}
               >
                 <div className="flex items-center gap-4">
                   {/* Alto fijo y ancho automático, igual que en la barra: el logo es apaisado
@@ -264,7 +289,7 @@ export default function Header() {
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="Revolution505 (abre en pestaña nueva)"
-                className={CLASE_BOTON_EXTERNO_MOVIL}
+                className={`${CLASE_BOTON_EXTERNO_MOVIL} ${ACENTO_REVOLUTION}`}
               >
                 <div className="flex items-center gap-4">
                   <img
