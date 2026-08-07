@@ -11,6 +11,51 @@ const navItems = [
   { to: '/registro', label: 'Registro' },
 ]
 
+/* Los dos enlaces externos del extremo derecho —ATAK.GG y Revolution505— comparten caja. En
+   constantes y no repetidas inline porque ahora son DOS: con la cadena duplicada, el próximo
+   retoque de padding o de hover se haría en una sola y quedarían despareados en la misma
+   franja de 20px de alto, que es donde más se nota.
+   `after:hidden` es lo ÚNICO que no venía del botón original, y arregla un defecto que este
+   header arrastraba: la regla base `a::after` de index.css le dibuja a todo <a> una barra de
+   gradiente al 100% del ancho en hover, y en una caja con borde queda colgando 2px por debajo.
+   Es el mismo parche —y la misma razón— que CLASE_ICONO en Footer.tsx y CLASE_CTA_SECUNDARIO
+   en Home.tsx. Se aplica a los dos para que no se comporten distinto al pasar el mouse.
+   El resto es el estilo del botón de Revolution505 tal cual, con dos ajustes de ancho que el
+   segundo botón obliga (ver el comentario de la navegación): `px-3` en vez de `px-5` hasta xl,
+   y `gap-2` en vez de `gap-3`. */
+const CLASE_BOTON_EXTERNO =
+  'after:hidden hidden sm:flex items-center gap-2 xl:gap-3 px-3 xl:px-4 py-2.5 ' +
+  'bg-gray-900 border border-gray-700 hover:border-blue-600 ' +
+  'text-gray-200 hover:text-white rounded-lg transition-all duration-300 ' +
+  'shadow-md hover:shadow-blue-900/40 text-sm font-medium'
+
+/* Los logos se normalizan por ALTURA y no por caja cuadrada, que es lo que hacía el botón
+   original con su `w-7 h-7`. El de Revolution505 es casi cuadrado (755×796) y llenaba esa caja;
+   el de ATAK es APAISADO 3:2 (1264×843), así que dentro de una caja cuadrada `object-contain`
+   lo habría encajado a 28 de ancho por 18.7 de alto, dejándolo con aire arriba y abajo y
+   visiblemente más chico que su vecino. Con alto fijo los dos miden 28 de alto y cada uno el
+   ancho que le toca —27 y 42— que es como se ven parejos.
+   Es la misma regla, y por el mismo motivo, que ALTO_LOGO_PATROCINADOR en Home.tsx. */
+const CLASE_LOGO_BOTON = 'h-7 w-auto object-contain'
+
+/* El texto se esconde SOLO en la franja md (768–1023px), donde el header no tiene ancho para
+   los 6 ítems del menú más dos botones rotulados: ahí quedan los logos, que siguen siendo
+   clickeables. Es el mismo `md:hidden lg:inline` que ya usaba Revolution505. */
+const CLASE_TEXTO_BOTON = 'md:hidden lg:inline'
+
+/* El chevron sube de `lg` a `xl`. Cuesta 24px por botón —icono más su gap— y en `lg` esos 48px
+   son la diferencia entre entrar holgado y entrar raspando. Es decoración, así que es lo
+   primero que se va cuando falta ancho. */
+const CLASE_CHEVRON_BOTON = 'w-4 h-4 hidden xl:block'
+
+/* Los mismos dos enlaces dentro del cajón móvil, donde no hay problema de ancho y la caja es
+   más grande. Sin `mt-4`: lo lleva solo el primero, para despegarse de los enlaces de
+   navegación; entre ellos dos ya separa el `gap-3` del <nav> que los contiene. */
+const CLASE_BOTON_EXTERNO_MOVIL =
+  'after:hidden flex items-center justify-between px-6 py-4 text-xl font-medium ' +
+  'bg-gray-900 border border-gray-700 hover:border-blue-600 rounded-xl ' +
+  'transition-all duration-300 text-gray-200 hover:text-white shadow-md'
+
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
@@ -42,18 +87,38 @@ export default function Header() {
             />
           </Link>
 
-          {/* Navegación Desktop.
-              En la franja md (768–1023px) el header queda sin ancho con 6 ítems,
-              así que se compacta: gap menor, enlaces con menos padding y texto más
-              chico, y el promo de Revolution505 reducido a su logo (más abajo).
-              En lg+ todo vuelve a los valores espaciosos de siempre. */}
-          <nav className="hidden md:flex items-center gap-1 lg:gap-8">
+          {/* Navegación Desktop, en TRES escalones y no en dos.
+              El de siempre: en la franja md (768–1023px) el header no tiene ancho para 6 ítems,
+              así que ahí se compacta —gap chico, poco padding, texto chico— y los botones de la
+              derecha se reducen a sus logos.
+              El nuevo: `lg` (1024–1279px) era el escalón que ya venía justo y que el segundo
+              botón termina de romper. Con el contenedor topado en 1024 y `lg:px-8`, ahí hay
+              960px útiles, repartidos así con los valores viejos —hueco de 32, padding lateral
+              de 20 y texto de 18px—: logo de LQC 116 + menú ~772 + botón 214 = ~1102.
+              (Los nombres de esas clases viejas NO se escriben acá: Tailwind escanea los .tsx
+              como texto plano y no distingue un comentario del código, así que mencionarlas
+              reviviría las tres reglas en el CSS de producción sin que nadie las use. Es la
+              misma trampa que el `@source not` de index.css tapa para los .md.)
+              Ya se pasaba de
+              largo ANTES de agregar nada, y como `body` lleva `overflow-x: hidden`, en vez de
+              verse la barra se recortaba el botón contra el borde.
+              Los valores de `lg` de ahora —`gap-2`, el `px-2.5` de md y `text-base`— lo dejan
+              en 116 + 486 + 295 = ~897 de 960: 63px de aire con los DOS botones puestos. El
+              texto baja un escalón (18px → 16px) solo en esa franja; entre dos rótulos quedan
+              10 + 8 + 10 = 28px, que es espaciado de navbar normal, no apretado.
+              En `xl` (≥1280px) el contenedor pasa a 1280 y sobran 1216px útiles, así que todo
+              vuelve a lo espacioso: `px-4`, `gap-4` y el `text-lg` original. Ojo que 1280 y
+              1440 son el MISMO caso —el contenedor se topa en 1280 hasta `2xl`— y solo cambian
+              los márgenes de afuera.
+              Anchos calculados desde el CSS compilado y las dimensiones reales de los PNG; el
+              ancho del texto del menú es el único estimado. */}
+          <nav className="hidden md:flex items-center gap-1 lg:gap-2 xl:gap-4">
             {navItems.map(item => (
               <Link
                 key={item.to}
                 to={item.to}
                 className={`
-                  relative px-2.5 lg:px-5 py-2.5 text-sm lg:text-lg font-medium transition-all duration-300 group
+                  relative px-2.5 xl:px-4 py-2.5 text-sm lg:text-base xl:text-lg font-medium transition-all duration-300 group
                   ${isActive(item.to)
                     ? 'text-white'
                     : 'text-gray-300 hover:text-white'
@@ -63,7 +128,7 @@ export default function Header() {
                 {item.label}
                 <span
                   className={`
-                    absolute bottom-1.5 left-2.5 right-2.5 lg:left-4 lg:right-4 h-0.5 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full
+                    absolute bottom-1.5 left-2.5 right-2.5 xl:left-4 xl:right-4 h-0.5 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full
                     transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-center
                     ${isActive(item.to) ? 'scale-x-100' : ''}
                   `}
@@ -72,24 +137,53 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Acciones derecha */}
-          <div className="flex items-center gap-4 md:gap-6">
+          {/* Acciones derecha. El `gap` baja de 24 a 8 en la franja `lg`, que es donde el ancho
+              está contado; en `xl` vuelve a 12. Abajo de `md` los dos enlaces no se renderizan
+              —se recogen al cajón— y el único hijo es la hamburguesa, así que ahí el gap no
+              separa nada. */}
+          <div className="flex items-center gap-3 lg:gap-2 xl:gap-3">
+            {/* ATAK.GG va a la IZQUIERDA de Revolution505 y no al revés: Revolution505 es quien
+                organiza la liga y ya vivía pegado al borde derecho, que es donde la gente lo
+                busca. Mover el ancla conocida para hacerle lugar a la nueva sería el cambio más
+                ruidoso de los dos.
+                El aria-label no está en el botón original y se agrega en los dos: el enlace
+                abre una pestaña nueva y sin esto nadie lo anuncia. Arranca con el texto visible
+                EXACTO para no romper el control por voz (WCAG 2.5.3, «Label in Name»), igual
+                que los enlaces del footer. Además cubre la franja md, donde el rótulo está
+                oculto y el enlace se queda sin nombre accesible propio. */}
+            <a
+              href="https://atakgg.revolution505.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="ATAK.GG (abre en pestaña nueva)"
+              className={CLASE_BOTON_EXTERNO}
+            >
+              {/* El `alt` se conserva aunque el aria-label ya fije el nombre accesible: si el
+                  PNG no carga, es el texto que se pinta en su lugar. */}
+              <img
+                src="/assets/logo-atakkgg.png"
+                alt="ATAK.GG"
+                className={CLASE_LOGO_BOTON}
+              />
+              <span className={CLASE_TEXTO_BOTON}>ATAK.GG</span>
+              <ChevronRight className={CLASE_CHEVRON_BOTON} />
+            </a>
+
             {/* Promo Revolution505 */}
             <a
               href="https://revolution505.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-3 px-5 py-2.5 bg-gray-900 border border-gray-700 hover:border-blue-600 text-gray-200 hover:text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-blue-900/40 text-sm font-medium"
+              aria-label="Revolution505 (abre en pestaña nueva)"
+              className={CLASE_BOTON_EXTERNO}
             >
               <img
                 src="/images/revolution505-logo.png"
                 alt="Revolution505"
-                className="w-7 h-7 object-contain rounded"
+                className={`${CLASE_LOGO_BOTON} rounded`}
               />
-              {/* Texto y chevron ocultos solo en md (768–1023px) para liberar ancho;
-                  el logo del patrocinador sigue visible y el enlace clickeable. */}
-              <span className="md:hidden lg:inline">Revolution505</span>
-              <ChevronRight className="w-4 h-4 md:hidden lg:block" />
+              <span className={CLASE_TEXTO_BOTON}>Revolution505</span>
+              <ChevronRight className={CLASE_CHEVRON_BOTON} />
             </a>
 
             {/* Menú móvil - siempre visible en móvil */}
@@ -135,19 +229,48 @@ export default function Header() {
                 </Link>
               ))}
 
-              {/* Promo en móvil */}
+              {/* Los dos enlaces externos en móvil, en el mismo orden que arriba. El `mt-4` lo
+                  lleva solo el primero, para despegar el par de los enlaces de navegación;
+                  entre ellos ya separa el `gap-3` de este <nav>.
+                  Acá no hay problema de ancho —cada uno ocupa una fila entera— así que los dos
+                  van con logo, rótulo y chevron, sin nada oculto. El `onClick` que cierra el
+                  cajón va en los dos: sin él, volver atrás desde la pestaña nueva encuentra el
+                  menú todavía abierto. */}
+              <a
+                href="https://atakgg.revolution505.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="ATAK.GG (abre en pestaña nueva)"
+                className={`mt-4 ${CLASE_BOTON_EXTERNO_MOVIL}`}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Alto fijo y ancho automático, igual que en la barra: el logo es apaisado
+                      3:2 y en la caja cuadrada `w-9 h-9` del original habría quedado con aire
+                      arriba y abajo, más chico que el de Revolution505. */}
+                  <img
+                    src="/assets/logo-atakkgg.png"
+                    alt="ATAK.GG"
+                    className="h-9 w-auto object-contain"
+                  />
+                  <span>ATAK.GG</span>
+                </div>
+                <ChevronRight className="w-6 h-6" />
+              </a>
+
               <a
                 href="https://revolution505.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
-                className="mt-4 flex items-center justify-between px-6 py-4 text-xl font-medium bg-gray-900 border border-gray-700 hover:border-blue-600 rounded-xl transition-all duration-300 text-gray-200 hover:text-white shadow-md"
+                aria-label="Revolution505 (abre en pestaña nueva)"
+                className={CLASE_BOTON_EXTERNO_MOVIL}
               >
                 <div className="flex items-center gap-4">
                   <img
                     src="/images/revolution505-logo.png"
                     alt="Revolution505"
-                    className="w-9 h-9 object-contain rounded"
+                    className="h-9 w-auto object-contain rounded"
                   />
                   <span>Revolution505</span>
                 </div>
