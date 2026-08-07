@@ -211,10 +211,24 @@ export default function Header() {
               <ChevronRight className={CLASE_CHEVRON_BOTON} />
             </a>
 
-            {/* Menú móvil - siempre visible en móvil */}
+            {/* Menú móvil - siempre visible en móvil.
+                Su className NO tenía ni una clase de fondo: el cuadrado azul brillante salía
+                entero de `index.css:152`, que le pone a TODO <button> `background:
+                var(--gradient-primary)` (#0066ff → #00d4ff). `bg-none` lo apaga, y con él van
+                el salto de -2px y el halo azul que `button:hover` (index.css:166) disparaba
+                —`hover:[transform:none]` y `hover:shadow-none`—, que es la receta de BTN_BASE
+                en ListaInscripciones.tsx. No hacen falta `font-sans` ni `tracking-normal` de
+                esa receta: el botón solo contiene un icono, así que la Orbitron y el
+                letter-spacing de la capa base no pintan nada.
+                Pero apagado no significa invisible: es la ÚNICA navegación en móvil, así que
+                en vez de quedar como un icono suelto sobre negro se queda con caja propia
+                —`bg-gray-900` con borde— que es exactamente la de los dos botones externos de
+                al lado. Así el extremo derecho del header se lee como tres controles de la
+                misma familia en vez de dos cajas y un icono flotando.
+                Los 48px de área táctil (p-2 + icono w-8) no cambian. */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-200 hover:text-white focus:outline-none transition-colors"
+              className="md:hidden inline-flex items-center justify-center rounded-lg p-2 bg-none bg-gray-900 border border-gray-700 text-gray-200 hover:text-white hover:border-blue-600/60 hover:bg-gray-800 transition-colors duration-300 hover:[transform:none] hover:shadow-none focus:outline-none"
               aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
             >
               {mobileMenuOpen ? <X className="w-8 h-8" /> : <Menu className="w-8 h-8" />}

@@ -42,6 +42,43 @@ const CLASE_CTA_SECUNDARIO =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
+/* Botones del selector de temporada. Antes se veían satinados por una razón que no estaba en
+   sus clases: `index.css:152` le pone a TODO <button> `background: var(--gradient-primary)`
+   —el azul eléctrico a cian— y `background` es la abreviada, o sea que setea
+   `background-image`. Las utilidades de color con opacidad de Tailwind solo setean
+   `background-color`, así que el `bg-blue-900/30` del activo y el `bg-black/30` de los
+   inactivos quedaban DETRÁS de un gradiente opaco y no se veían nunca. Efecto secundario: el
+   estado activo era prácticamente invisible, porque los tres botones se pintaban igual.
+   `bg-none` (background-image: none) es lo que lo apaga. Y con él van las otras tres
+   herencias de esa misma regla base, con la receta de BTN_BASE en ListaInscripciones.tsx:
+   `font-sans` mata el Orbitron, `tracking-normal` el letter-spacing de 0.5px, y
+   `hover:[transform:none]` + `hover:shadow-none` matan el salto de -2px y el halo azul que
+   `button:hover` (index.css:166) dispara — que era la otra mitad del aspecto "plástico".
+
+   Por qué BASE no lleva ningún color y las dos variantes se escriben COMPLETAS: apilar
+   `border-blue-500/70` encima de una base con `border-blue-800/40` NO funciona. Dos
+   utilidades del mismo grupo se resuelven por su orden en el CSS generado, no por el orden en
+   el atributo class, y ahí el borde apagado le gana al activo. Es la trampa que documenta el
+   comentario de BTN_PANEL_BASE en ListaInscripciones.tsx; acá se evita igual.
+
+   El activo se distingue en TRES ejes a la vez —fondo, borde y texto— y el hover del inactivo
+   se queda deliberadamente por debajo del activo en los tres, para que pasar el mouse nunca
+   haga que un botón se confunda con el seleccionado. Nada de glow: el peso lo da el contraste,
+   no el brillo.
+   El anillo de foco cian de la capa base se conserva: estos botones no llevan
+   `focus:outline-none`, así que `button:focus-visible` (index.css:171) sigue aplicando. */
+const BTN_TEMPORADA_BASE =
+  'inline-flex items-center justify-center rounded-full px-6 py-3 ' +
+  'text-sm font-sans font-medium tracking-normal backdrop-blur-sm bg-none ' +
+  'transition-colors duration-300 hover:[transform:none] hover:shadow-none'
+
+const BTN_TEMPORADA =
+  `${BTN_TEMPORADA_BASE} bg-black/40 border border-blue-800/40 text-gray-400 ` +
+  'hover:bg-blue-950/30 hover:border-blue-700/60 hover:text-gray-200'
+
+const BTN_TEMPORADA_ACTIVA =
+  `${BTN_TEMPORADA_BASE} bg-blue-950/60 border border-blue-500/70 text-white`
+
 export default function Torneos() {
   const [activeSeason, setActiveSeason] = useState("Otoño 2025")
 
@@ -242,18 +279,21 @@ export default function Torneos() {
                 <h2 className="text-2xl font-light">Seleccionar Temporada</h2>
               </div>
 
+              {/* `aria-pressed` porque el estado seleccionado ahora se comunica SOLO con color
+                  —fondo, borde y texto— y eso deja afuera a quien no lo percibe (WCAG 1.4.1).
+                  Con el gradiente de la capa base encima ni siquiera había un estado visible
+                  que anunciar; ahora que lo hay, hace falta decirlo también en el árbol de
+                  accesibilidad. No cambia nada en pantalla.
+                  Va acá y no dentro del `.map()`: un comentario entre llaves solo es comentario
+                  JSX en posición de HIJO, y pegado antes del elemento raíz de un `=> ( … )` el
+                  parser lo lee como código y descarrila el resto del archivo. */}
               <div className="flex flex-wrap justify-center gap-4">
                 {tournaments.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setActiveSeason(t.season)}
-                    className={`
-                      px-6 py-3 text-sm font-medium rounded-full transition-all duration-300 backdrop-blur-sm border
-                      ${activeSeason === t.season
-                        ? 'bg-blue-900/30 border-blue-600 text-white shadow-lg shadow-blue-900/30'
-                        : 'bg-black/30 border-white/10 text-gray-300 hover:border-blue-500/50 hover:text-white'
-                      }
-                    `}
+                    aria-pressed={activeSeason === t.season}
+                    className={activeSeason === t.season ? BTN_TEMPORADA_ACTIVA : BTN_TEMPORADA}
                   >
                     {t.season}
                   </button>
