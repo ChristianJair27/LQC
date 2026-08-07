@@ -269,12 +269,83 @@ export default function Footer() {
         {/* Separador */}
         <div className="my-8 border-t border-gray-900"></div>
 
-        {/* Información legal y copyright */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          <div className="text-xs text-gray-600">
+        {/* CRÉDITO DE REVOLUTION505, en franja propia entre la grilla y lo legal.
+            Va acá y no como sexta columna porque la grilla de arriba tiene su ancho contado al
+            píxel —la botonera de «Conectar» mide 188px y no se puede envolver, ver el
+            comentario de la grilla—: una columna más la rompía. Y tampoco dentro de la franja
+            legal, que es tipografía chica y un logo la desbalancea, el mismo motivo por el que
+            el QR terminó arriba y no ahí.
+            Reemplaza al «Design by Revolution505» que vivía suelto en el centro de la franja
+            legal, en gray-600 y sin enlace. No conviven: era el mismo crédito, y dejar los dos
+            habría puesto a Revolution505 tres veces en el mismo pie (con el correo de contacto).
+            «Diseñado y desarrollado» —no solo «diseñado»— y en español, confirmado al pedir
+            este cambio. El texto viejo estaba en inglés, único caso en un sitio cuya regla es
+            que la UI va toda en español.
+
+            Presencia, no anuncio: una sola caja centrada, del ancho de su contenido, con el
+            fondo apenas levantado del negro (el mismo `bg-white/[0.02]` de las celdas de
+            patrocinadores de Home). El logo mide 32px, menos que el bloque de marca de LQC
+            arriba a la izquierda, para que el pie siga siendo de LQC.
+            El bloque ENTERO es el enlace, no solo el nombre: da un área de toque cómoda en
+            móvil y evita el patrón de «clic acá» minúsculo. `group` engancha el hover del texto
+            al marco, así que todo se ilumina junto.
+            `after:hidden` mata la barra de gradiente que la regla base de index.css le dibuja a
+            todo enlace al 100% del ancho en hover, que en una caja con borde queda colgando por
+            debajo. El anillo de foco va explícito porque index.css solo se lo da a los botones.
+            El aria-label arranca con el texto visible EXACTO —la suma de las dos líneas— para
+            no romper el control por voz (WCAG 2.5.3), y el logo va con alt vacío porque ese
+            nombre accesible ya lo cubre: repetirlo lo haría sonar dos veces. */}
+        <div className="flex justify-center">
+          <a
+            href="https://revolution505.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Diseñado y desarrollado por Revolution505 (abre en pestaña nueva)"
+            className="after:hidden group inline-flex items-center gap-3.5 rounded-xl border border-gray-800 bg-white/[0.02] px-5 py-3 transition-all duration-300 hover:border-blue-700/50 hover:bg-white/[0.04] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+          >
+            <img
+              src="/images/revolution505-logo.png"
+              alt=""
+              width={32}
+              height={32}
+              loading="lazy"
+              className="h-8 w-8 shrink-0 rounded object-contain"
+            />
+            {/* Bloque de dos líneas en vez de una sola frase: en una línea, «Diseñado y
+                desarrollado por Revolution505» mide más que el ancho útil de un teléfono de
+                320px y parte por cualquier lado. Partido a propósito, el nombre queda entero en
+                su renglón y con el peso visual que le toca.
+                Las dos líneas van en gray-400 y gray-200 —ninguna en gray-500— porque a este
+                tamaño gray-500 sobre negro da ~4.3:1 y no llega al 4.5:1 que pide AA. La
+                jerarquía la dan el tamaño, el peso y el `tracking`, no el contraste. */}
+            <span className="text-left">
+              <span className="block text-xs uppercase tracking-[0.1em] text-gray-400 transition-colors duration-300 group-hover:text-gray-300">
+                Diseñado y desarrollado por
+              </span>
+              <span className="block text-sm font-medium leading-tight text-gray-200 transition-colors duration-300 group-hover:text-white">
+                Revolution505
+              </span>
+            </span>
+          </a>
+        </div>
+
+        <div className="my-8 border-t border-gray-900"></div>
+
+        {/* Información legal y copyright.
+            Antes eran tres celdas con tres alineaciones distintas —izquierda, centro, derecha—
+            y en móvil el `grid-cols-1` las apilaba conservando cada una la suya, así que
+            quedaban tres bloques desalineados entre sí. De ahí el aspecto de texto suelto.
+            Ahora el `text-center` vive en el CONTENEDOR, así que en móvil las tres comparten
+            eje, y recién en `md` cada celda recupera su alineación con `md:text-left` y
+            `md:text-right`. El centro no necesita nada: hereda el centrado en los dos tamaños.
+            Contraste: el copyright y el aviso de Riot pasan de gray-600 a gray-400. Sobre negro
+            gray-600 da ~2.8:1, muy por debajo del 4.5:1 de AA, y son texto legal — justo lo que
+            alguien puede necesitar leer de verdad. gray-400 da ~7.6:1. */}
+        <div className="grid grid-cols-1 gap-4 text-center md:grid-cols-3 md:gap-6 md:items-center">
+          <div className="text-xs text-gray-400 md:text-left">
             © {new Date().getFullYear()} League Querétaro Championship
           </div>
-          
+
           {/* ACCESO AL PANEL. Va en esta franja y no en «Recursos» —ni en el header, que es
               público y siempre visible— por dos razones. Una, de contenido: es una puerta para
               el staff, no un recurso para los equipos; entre Reglamento y Registro habría
@@ -283,8 +354,13 @@ export default function Footer() {
               visible para quien lo busca sin llamar la atención de quien no. En «Recursos»
               habría heredado el text-sm de CLASE_ENLACE y pesado igual que ellos, que es justo
               lo contrario de lo que se pide.
-              El color NO acompaña a la franja (gray-600): el enlace sube a gray-400 porque ahí
-              daba ~2.8:1, bajo el mínimo AA, y compensa con text-xs para no pesar más que ellos.
+              Sobre el color: este enlace ya estaba en gray-400 cuando el resto de la franja iba
+              en gray-600, porque ahí daba ~2.8:1 y no llegaba al mínimo AA. Ahora los otros dos
+              subieron al mismo gray-400 por esa misma razón, así que el enlace dejó de
+              distinguirse por color y se distingue por ser enlace: el cursor, el hover a blanco
+              y la barra de `a::after`. Si alguna vez hace falta que resalte en reposo, el
+              camino es subirlo a gray-300 —no bajar a los otros dos, que son texto legal—.
+              Sigue en text-xs para no pesar más que ellos.
               Apunta a /admin y NO a /admin/login: RutaProtegida ya decide —panel si hay sesión,
               login si no (ver App.tsx)—, y saltar directo al login mandaría a rehacer el
               trámite a quien ya está dentro.
@@ -295,10 +371,7 @@ export default function Footer() {
               `after:hidden` como en CLASE_ICONO—: en un enlace tan tenue es la señal de que es
               pulsable. El anillo de foco es el mismo patrón del resto del sitio (Home.tsx,
               Registro.tsx) porque index.css solo le da outline propio a los <button>. */}
-          <div className="text-center space-y-1">
-            <div className="text-xs text-gray-600">
-              Design by Revolution505
-            </div>
+          <div>
             <Link
               to="/admin"
               onClick={irAlTope}
@@ -315,10 +388,8 @@ export default function Footer() {
               El aviso de privacidad SÍ está escrito: vive dentro de /registro. Cuando se
               extraiga a su propia página, este enlace vuelve apuntando a esa ruta. Los otros
               dos documentos todavía no existen ni redactados. */}
-          <div className="text-right">
-            <div className="text-xs text-gray-600">
-              Este evento no está afiliado con Riot Games ni League of Legends.
-            </div>
+          <div className="text-xs text-gray-400 md:text-right">
+            Este evento no está afiliado con Riot Games ni League of Legends.
           </div>
         </div>
       </div>
