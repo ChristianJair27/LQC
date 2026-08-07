@@ -1,5 +1,46 @@
-import { Trophy, Calendar, Star } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Trophy, Calendar, Star, Users, UserPlus, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
+
+/* TERCERA copia de este helper (las otras están en Home.tsx y Footer.tsx). React Router en
+   modo declarativo no resetea el scroll y el proyecto no tiene <ScrollRestoration>, así que
+   un <Link> pulsado con la página scrolleada aterriza en mitad del destino. Hace falta acá
+   porque el bloque destacado vive DEBAJO de un hero de `py-32 md:py-40`: quien pulsa
+   «Registrarme» ya está ~500px abajo, y sin esto /registro abre a esa misma altura, con el
+   formulario empezado.
+   El comentario de Home.tsx dice que al aparecer un tercer lugar conviene extraerlo a un
+   módulo compartido. Este ES el tercero, pero el cambio se limitó a Torneos.tsx, así que
+   queda anotado en vez de hecho. */
+const irAlTope = () => window.scrollTo({ top: 0 })
+
+/* Los dos CTA del bloque destacado, con el canon de AGENTS.md. Son copia de las constantes
+   homónimas de Home.tsx —no están exportadas allá y el cambio no podía tocar ese archivo—,
+   así que si se retoca una hay que mirar la otra.
+   Lo que un <a>/<Link> necesita y un <button> no: `text-white` explícito, porque la regla base
+   `a { color: #66a3ff }` de index.css le pisaría el texto y el contraste sobre azul se caería;
+   el anillo de foco, que index.css solo le da a <button>; y `after:hidden`, que mata la barra
+   de gradiente de `a::after` —pensada para enlaces de texto— que en un botón queda colgando.
+   `outline-hidden` y no `outline-none`: en Tailwind 4 este último compila a `outline-style:
+   none` a secas, y como el anillo es un `box-shadow` que el modo de alto contraste de Windows
+   no pinta, el foco desaparecería del todo ahí. */
+const CLASE_CTA_PRIMARIO =
+  'after:hidden inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl ' +
+  'bg-gradient-to-r from-lqc-700 to-lqc-500 hover:from-lqc-600 hover:to-lqc-400 ' +
+  'font-medium text-white transition-all duration-300 shadow-lg shadow-blue-900/30 ' +
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
+
+/* Secundario. `bg-none` en un <a> no hace nada —el gradiente que AGENTS.md manda desactivar en
+   los secundarios vive en `button { background: var(--gradient-primary) }`— pero va puesto por
+   si alguien pega esta constante en un <button>, que es el caso que el documento describe.
+   Lo que sí hace falta en un <a> es `text-gray-200`, que pisa el color base de los enlaces. */
+const CLASE_CTA_SECUNDARIO =
+  'after:hidden inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl ' +
+  'bg-none bg-black/40 border border-blue-800/40 text-gray-200 ' +
+  'hover:bg-blue-950/40 hover:border-blue-600/60 hover:text-white ' +
+  'font-medium transition-all duration-300 ' +
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 ' +
+  'focus-visible:ring-offset-2 focus-visible:ring-offset-black'
 
 export default function Torneos() {
   const [activeSeason, setActiveSeason] = useState("Otoño 2025")
@@ -104,6 +145,89 @@ export default function Torneos() {
                 <span className="px-6 py-2.5 text-base bg-blue-950/40 text-blue-300 backdrop-blur-sm border border-blue-800/30 rounded-full shadow-lg">
                   Histórico Completo
                 </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SPLIT ACTUAL. Va acá, pegado al hero y ANTES de todo lo demás, porque es el único
+            torneo del presente: el selector, el podio y el historial que siguen son archivo.
+            Sin `py` propio arriba —el hero ya trae `py-32 md:py-40` de sobra— y con `pb-20`
+            abajo para despegarse de la banda tintada del selector.
+            Reusa la tarjeta de gradiente que AGENTS.md marca como canon, que es la misma que
+            llevaba la sección «Próxima Temporada» del final: esa se eliminó y su tratamiento
+            se muda acá, así que la página no pierde el bloque destacado, lo asciende.
+            Sin campeón ni subcampeón, a diferencia de las tarjetas del historial: el torneo
+            está en curso y todavía no hay podio que mostrar. */}
+        <section className="pb-20">
+          <div className="container mx-auto px-6 max-w-4xl">
+            <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-8 md:p-12 shadow-2xl shadow-black/50 text-center">
+              {/* El badge tiene que leerse como lo OPUESTO al «Finalizado» gris de las tarjetas
+                  del historial (`bg-gray-800/80`, sin movimiento). Va en verde y no en azul por
+                  dos razones: el verde es el código que el sitio YA usa para «pasando ahora»
+                  —es el mismo `bg-green-950/50 / text-green-300 / border-green-800/40` del
+                  badge «EN VIVO» de la portada— y porque un azul más en esta página, que es
+                  azul de arriba a abajo, no se distinguiría de nada.
+                  El punto lleva dos capas: una fija y otra que se expande con `animate-ping`.
+                  Eso es lo que da la sensación de latido; la regla global de
+                  `prefers-reduced-motion` de index.css ya la desactiva sola.
+                  El texto va en minúsculas en el JSX y lo pone en caja alta el `uppercase`, así
+                  un lector de pantalla lee la frase y no deletrea las mayúsculas.
+                  OJO: «Inscripciones abiertas» no sale de ningún dato del repo —nada acá
+                  registra el estado de la convocatoria—, es el mensaje de la campaña. Ya está
+                  escrito a mano en la portada (Home.tsx, bajo el CTA del hero); ahora son DOS
+                  lugares que hay que borrar a mano el día que las inscripciones cierren. */}
+              <div className="inline-flex items-center gap-2.5 rounded-full border border-green-800/40 bg-green-950/50 px-4 py-1.5 text-sm font-medium uppercase tracking-wide text-green-300 shadow-lg shadow-green-900/20">
+                <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-400" />
+                </span>
+                Inscripciones abiertas
+              </div>
+
+              <h2 className="mt-6 text-3xl md:text-5xl font-light">LQC Split Otoño 2026</h2>
+
+              {/* Los dos datos duros, con el mismo separador «•» que ya usan las filas de
+                  metadatos de esta página. El punto va con `aria-hidden`: es decoración, y sin
+                  eso un lector de pantalla lo lee como «bala» entre dos frases.
+                  «Hasta 32 equipos» dice el TECHO y no un conteo: no hay nada en el repo que
+                  sepa cuántos equipos van inscritos, y un número en vivo pediría una fuente. */}
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-gray-300">
+                <span className="inline-flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
+                  25 de agosto — 28 de noviembre 2026
+                </span>
+                <span className="text-gray-600" aria-hidden="true">•</span>
+                <span className="inline-flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
+                  Hasta 32 equipos
+                </span>
+              </div>
+
+              {/* Apilados en móvil y en fila desde `sm`. `w-full sm:w-auto` para que apilados
+                  midan lo mismo: con el ancho por contenido, «Registrarme» y «Ver en ATAK»
+                  quedarían de anchos distintos, uno debajo del otro y centrados, que se lee
+                  como un error de maquetación. */}
+              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link to="/registro" onClick={irAlTope} className={`${CLASE_CTA_PRIMARIO} w-full sm:w-auto`}>
+                  <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  Registrarme
+                  <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                </Link>
+                {/* El aria-label arranca con el texto visible EXACTO para no romper el control
+                    por voz (WCAG 2.5.3, «Label in Name») y recién después avisa lo que el texto
+                    no dice. Misma fórmula que los enlaces externos del footer y del header. */}
+                <a
+                  href="https://atakgg.revolution505.com/tournaments/lqc-2026"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Ver en ATAK (abre en pestaña nueva)"
+                  className={`${CLASE_CTA_SECUNDARIO} w-full sm:w-auto`}
+                >
+                  <Trophy className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  Ver en ATAK
+                  <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                </a>
               </div>
             </div>
           </div>
@@ -267,41 +391,31 @@ export default function Torneos() {
           </div>
         </section>
 
-        {/* Próxima temporada CTA */}
-        <section className="py-20">
-          <div className="container mx-auto px-6 max-w-4xl text-center">
-            <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-md border border-blue-800/20 rounded-3xl p-12 shadow-2xl shadow-black/50">
-              <h2 className="text-3xl font-light mb-6">Próxima Temporada</h2>
-              {/* Decía «Invierno 2026», que no era la temporada siguiente sino ESTA misma con
-                  otro nombre, según confirmaron los organizadores.
-                  El encabezado «Próxima» es correcto mientras la temporada no arranque, pero
-                  CADUCA SOLO: los organizadores dicen que la liga empieza el 25/08/2026, así
-                  que a partir de esa fecha hay que cambiarlo a mano por «Temporada Actual».
-                  Nada en el código avisa cuando eso pase. */}
-              <p className="text-xl text-gray-300 mb-10">Otoño 2026 • ¡Prepárate!</p>
-
-              {/* En ESTA tarjeta ya no hay cifras (el historial de arriba sí tiene, y son de
-                  temporadas cerradas). Las tres que había acá se fueron por lo mismo: eran
-                  datos hardcodeados sin fuente, anunciando una temporada que no arrancó.
-                  «Enero / Inicio» se fue primero, y ese sí se sabía FALSO: la liga empieza el
-                  25/08/2026 según los organizadores, así que una temporada de otoño que
-                  arrancaba en enero se contradecía con su propio nombre.
-                  «$50K+ Premios» contradecía al reglamento publicado, que dice «Premiación:
-                  Por definir»: el sitio prometía un monto que el documento oficial no promete.
-                  «20+ Equipos» no se sabe falso, pero tampoco tiene de dónde salir.
-                  Se borró el contenedor entero y no solo los números: una caja de stats vacía
-                  es peor que no tenerla. Vuelve con cifras que tengan fuente, y anotándola. */}
-              <div className="flex flex-wrap justify-center gap-6">
-                <button className="px-10 py-4 bg-black/50 border border-blue-800/40 text-gray-200 rounded-xl hover:bg-blue-900/30 transition-all duration-300">
-                  Notificarme
-                </button>
-                <button className="px-10 py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 rounded-xl hover:from-lqc-600 hover:to-lqc-400 transition-all duration-300 shadow-lg shadow-blue-900/30">
-                  Ver detalles
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* ACÁ NO HAY UNA SECCIÓN «PRÓXIMA TEMPORADA». Se fue entera, y la reemplaza el bloque
+            del split actual que ahora abre la página, arriba del selector. Tres razones:
+            1. Anunciaba «Otoño 2026 • ¡Prepárate!», que es EXACTAMENTE el mismo torneo que el
+               bloque de arriba. Dejar las dos era la misma temporada contada dos veces y con
+               distinto estado —una «próxima», la otra con inscripciones abiertas—, que es una
+               contradicción a la vista del mismo scroll.
+            2. Su encabezado caducaba solo. El comentario que vivía acá lo decía: la liga
+               empieza el 25/08/2026 según los organizadores, así que a partir de esa fecha
+               «Próxima» pasaba a ser falso y había que cambiarlo a mano. El bloque nuevo no
+               tiene ese problema porque no se llama «próxima» ni «actual»: se llama por su
+               nombre y muestra sus fechas.
+            3. Sus dos botones no llevaban a ningún lado. Eran <button> sin `onClick`:
+               «Notificarme» no notificaba nada —no hay lista de correo en el proyecto— y «Ver
+               detalles» no tenía detalles que abrir. Los dos del bloque nuevo sí navegan: uno
+               a /registro y el otro al torneo en ATAK.
+            Lo que NO hay que perder de lo que decía su comentario, porque sigue vigente para
+            cualquier cifra que alguien quiera reponer en esta página: acá hubo tres stats
+            hardcodeadas sin fuente y se borraron. «Enero / Inicio» era falsa de plano (una
+            temporada de otoño que arrancaba en enero se contradecía con su propio nombre).
+            «$50K+ Premios» contradecía al reglamento publicado, que dice «Premiación: Por
+            definir» — el sitio prometía un monto que el documento oficial no promete. «20+
+            Equipos» no se sabía falsa, pero tampoco tenía de dónde salir. La regla que dejaron:
+            vuelven con cifras que tengan fuente, y anotándola. Es la misma razón por la que el
+            bloque de arriba dice «Hasta 32 equipos» —el techo, que es un dato de reglamento— y
+            no un conteo de inscritos, que nadie en el repo sabe. */}
       </div>
 
       <style>{`
