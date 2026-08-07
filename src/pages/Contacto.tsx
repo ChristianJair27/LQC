@@ -1,5 +1,8 @@
+import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
-  Mail, MapPin, MessageSquare, Facebook, Twitch, ChevronRight
+  Mail, MapPin, MessageSquare, Facebook, Twitch, ChevronRight, ChevronDown,
+  Route, Radio, Globe
 } from 'lucide-react'
 
 /* Canales de contacto. Cada uno tiene destino REAL: la tarjeta entera es el enlace, así que
@@ -8,7 +11,20 @@ import {
    Enviado!"— sin transmitir nada a ningún lado; se quitó, porque una consulta que el usuario
    cree enviada y nadie recibe es peor que no tener formulario.
    Las URLs se copian de Footer.tsx, que es donde viven. `externo` marca las que salen del
-   sitio y necesitan target/rel; el mailto no abre pestaña. */
+   sitio y necesitan target/rel; el mailto no abre pestaña.
+
+   `acento` es el color de marca de cada plataforma, en hex y no como clase de Tailwind. Tiene
+   que ser así: Tailwind compila leyendo el código como texto plano, así que una clase armada
+   en tiempo de ejecución nunca se genera y saldría sin estilo. El hex viaja a la tarjeta como
+   la custom property `--acento` en un `style` inline, y las clases la leen con `var()`, que sí
+   son estáticas y sí se compilan.
+   Dónde se usa el acento: el ícono, el filo superior, el borde y el halo del hover. NO en el
+   texto de la tarjeta — ver el comentario de la línea de acción, es una decisión de contraste.
+   Los dos morados son deliberados y son una excepción a la regla de color del proyecto: son
+   colores de marca ajenos, del propio Discord y del propio Twitch. La regla de AGENTS.md
+   prohíbe las CLASES de Tailwind con morado, y acá no se usa ninguna — el comando de control
+   que documenta esa regla sigue dando cero. Si algún día se quiere volver a la paleta de la
+   casa, se cambian estos cuatro valores y nada más. */
 const canales = [
   {
     icon: Mail,
@@ -18,6 +34,8 @@ const canales = [
     accion: "Enviar correo",
     href: "mailto:contactolqc@revolution505.com",
     externo: false,
+    /* El correo no tiene color de marca propio, así que lleva el cian de la casa. */
+    acento: "#00d4ff",
     /* El `aria` empieza SIEMPRE con el título visible: como pisa el nombre que saldría del
        contenido, si no lo incluyera incumpliría WCAG 2.5.3 (Label in Name) y quien navega
        por voz no podría activar la tarjeta diciendo lo que lee en pantalla. */
@@ -31,6 +49,7 @@ const canales = [
     accion: "Unirse al servidor",
     href: "https://discord.gg/eS6zkvfkp",
     externo: true,
+    acento: "#5865F2",
     aria: "Discord: unirse al servidor de LQC (abre en pestaña nueva)"
   },
   {
@@ -41,6 +60,7 @@ const canales = [
     accion: "Seguir la página",
     href: "https://www.facebook.com/lolqrochampionship/",
     externo: true,
+    acento: "#1877F2",
     aria: "Facebook: ver la página de LQC (abre en pestaña nueva)"
   },
   {
@@ -51,6 +71,7 @@ const canales = [
     accion: "Ver el canal",
     href: "https://twitch.tv/lqroc",
     externo: true,
+    acento: "#9146FF",
     aria: "Twitch: ver el canal de LQC (abre en pestaña nueva)"
   }
 ]
@@ -101,14 +122,27 @@ export default function Contacto() {
     {
       question: "¿Dónde se transmiten los partidos?",
       answer: "Todos los encuentros oficiales se transmiten en vivo por Twitch.tv/lqroc con comentaristas y producción profesional."
+    },
+    /* Esta respuesta SÍ tiene fuente, a diferencia de lo que advierte el comentario de arriba
+       sobre las cifras: sale de la sección «Restricciones y Modalidad de Juego» del reglamento,
+       verificada contra el PDF el 2026-08-07 con el comando de extracción de más arriba. El
+       documento dice, textual, que el torneo es online con final PRESENCIAL OBLIGATORIA, que
+       los equipos del TOP 4 deben confirmar su participación en la final, y que no presentarse
+       se toma como abandono del torneo. «Play Offs» también es palabra suya.
+       Si el reglamento se reemplaza, esta respuesta hay que volver a verificarla: es de las que
+       envejecen en silencio. */
+    {
+      question: "¿El torneo es online o presencial?",
+      answer: "La fase regular y los Play Offs se juegan online. La gran final es PRESENCIAL y obligatoria: los equipos que lleguen al Top 4 deben confirmar su asistencia y presentarse en persona. No presentarse a la final presencial se toma como abandono del torneo."
     }
   ]
 
-  const supportHours = [
-    { day: "Lunes a Viernes", hours: "10:00 - 18:00", type: "Consultas generales" },
-    { day: "Sábados", hours: "12:00 - 16:00", type: "Apoyo en torneos" },
-    { day: "Domingos", hours: "14:00 - 20:00", type: "Soporte en transmisiones" }
-  ]
+  /* Qué pregunta está abierta, por índice. Arranca en 0 —«¿Cómo nos inscribimos?»— porque es
+     la que trae a la mayoría a esta página y la más larga de las cuatro.
+     Un solo índice y no un conjunto: el acordeón es de apertura única, así que abrir una cierra
+     la anterior. `null` es «todas cerradas», el estado al que se llega pulsando la abierta.
+     Este es el ÚNICO estado del archivo; antes no había ninguno. */
+  const [faqAbierta, setFaqAbierta] = useState<number | null>(0)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
@@ -149,14 +183,21 @@ export default function Contacto() {
             caja y la línea de acción es un <span>, no un botón que no hace nada. */}
         <section className="py-20">
           <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Canales oficiales</h2>
+            {/* Encabezado de sección, mismo bloque en las tres que quedan. Antes los márgenes
+                iban sueltos y distintos (una en mb-6, otra en mb-16, Ubicación sin barra ni
+                encabezado). Ahora el `mb-12` vive en el CONTENEDOR y la bajada, cuando existe,
+                se separa con `mt-6`: así las tres arrancan su contenido a la misma altura
+                tenga o no tenga bajada. */}
+            <div className="mb-12">
+              <div className="flex items-center gap-4">
+                <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                <h2 className="text-3xl font-light">Canales oficiales</h2>
+              </div>
+              <p className="mt-6 text-gray-300 leading-relaxed max-w-3xl">
+                Por correo y Discord respondemos normalmente en 24-48 horas. En Facebook y
+                Twitch puedes seguir a la liga.
+              </p>
             </div>
-            <p className="text-gray-300 leading-relaxed mb-12 max-w-3xl">
-              Por correo y Discord respondemos normalmente en 24-48 horas. En Facebook y
-              Twitch puedes seguir a la liga.
-            </p>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {canales.map((canal) => (
@@ -180,13 +221,30 @@ export default function Contacto() {
                      min-content, y `break-words` (overflow-wrap) NO reduce ese min-content.
                      Sin esto el correo de 29 caracteres estira las 4 columnas más allá del
                      contenedor y aparece scroll horizontal. */
-                  className="after:hidden group flex min-w-0 flex-col bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 text-white hover:border-blue-500/30 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lqc-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                  /* El hex del canal entra como custom property y de ahí lo leen las clases con
+                     `var()`. Es la única vía: una clase de Tailwind armada en runtime no existe
+                     en el CSS compilado. El `as CSSProperties` hace falta porque el tipo de
+                     React no contempla propiedades personalizadas. */
+                  style={{ '--acento': canal.acento } as CSSProperties}
+                  className="after:hidden group relative flex min-w-0 flex-col overflow-hidden bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 text-white transition-all duration-300 hover:-translate-y-1 hover:border-[color:color-mix(in_oklab,var(--acento)_55%,transparent)] hover:shadow-[0_14px_34px_-18px_var(--acento)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lqc-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 >
+                  {/* Filo superior del color de la plataforma, que se despliega de izquierda a
+                      derecha en hover. Es lo que le da vida a la tarjeta sin teñirle el fondo.
+                      Decorativo puro, de ahí el `aria-hidden`. */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-[color:var(--acento)] transition-transform duration-300 group-hover:scale-x-100"
+                  />
                   <div className="flex items-center gap-5 mb-6">
-                    {/* `shrink-0`: sin él el círculo cede ancho y se deforma en óvalo
-                        cuando el texto de al lado no entra, sobre todo en 4 columnas. */}
-                    <div className="w-14 h-14 shrink-0 rounded-full bg-gradient-to-br from-blue-900/40 to-blue-800/30 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <canal.icon className="w-7 h-7 text-blue-400" />
+                    {/* `shrink-0`: sin él el cuadro cede ancho y se deforma cuando el texto de
+                        al lado no entra, sobre todo en 4 columnas.
+                        Pasó de círculo a cuadrado redondeado —encaja mejor con el `rounded-2xl`
+                        de la tarjeta— y de un gradiente azul fijo a un tinte del acento, que se
+                        intensifica junto con su borde al pasar el mouse. Ya no crece con
+                        `scale`: el movimiento ahora lo lleva la tarjeta entera, y dos cosas
+                        moviéndose a destiempo se leían como salto. */}
+                    <div className="w-14 h-14 shrink-0 rounded-2xl border border-white/10 bg-[color:color-mix(in_oklab,var(--acento)_12%,transparent)] flex items-center justify-center transition-all duration-300 group-hover:border-[color:color-mix(in_oklab,var(--acento)_45%,transparent)] group-hover:bg-[color:color-mix(in_oklab,var(--acento)_22%,transparent)]">
+                      <canal.icon className="w-7 h-7 text-[color:var(--acento)]" />
                     </div>
                     <div className="min-w-0">
                       <h3 className="text-xl font-medium text-white">{canal.titulo}</h3>
@@ -198,9 +256,16 @@ export default function Contacto() {
                   <div className="text-lg font-light mb-4 break-words text-gray-200">
                     {canal.valor}
                   </div>
-                  <span className="mt-auto text-blue-400 group-hover:text-blue-300 transition-colors flex items-center gap-2 text-sm font-medium">
+                  {/* El acento NO llega a este texto, y es a propósito. Sobre el fondo de la
+                      tarjeta, el morado de Twitch da ~4.5:1 y el de Discord ~4.6:1: rozan el
+                      mínimo AA para texto normal, mientras que el azul que había daba ~8:1.
+                      El color de marca se queda donde no es texto —ícono, filo, borde y halo—,
+                      que como elementos gráficos solo necesitan 3:1 y lo pasan de sobra.
+                      La flecha se corre a la derecha en hover: da la señal de «esto lleva a otro
+                      lado» sin depender del color. */}
+                  <span className="mt-auto text-gray-300 group-hover:text-white transition-colors flex items-center gap-2 text-sm font-medium">
                     {canal.accion}
-                    <ChevronRight className="w-4 h-4 shrink-0" />
+                    <ChevronRight className="w-4 h-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1" />
                   </span>
                 </a>
               ))}
@@ -208,93 +273,183 @@ export default function Contacto() {
           </div>
         </section>
 
-        {/* Horarios */}
+        {/* ACÁ NO HAY «HORARIOS DE ATENCIÓN». Se fue la sección entera y con ella el array
+            `supportHours` que la alimentaba, que no lo usaba nadie más — dejarlo habría hecho
+            fallar a `tsc` por variable sin leer.
+            También se fue su párrafo de cierre, que prometía respuesta «al siguiente día
+            hábil». Ese dato ya no lo promete nadie; lo que sí queda dicho, y con fuente en la
+            propia tarjeta, es el «Respuesta en 24-48 horas» del correo.
+            Con ella se llevó su `bg-black/20`, que era el que partía la página al medio. Por
+            eso el tinte pasó a la FAQ de acá abajo: si no, Canales y FAQ quedaban las dos sin
+            fondo, una detrás de la otra, y se leían como una sola mancha de 160px. */}
+
+        {/* FAQs. Toma el fondo tintado que tenía Horarios para conservar la alternancia:
+            Hero y Canales sin fondo, esta tintada, Ubicación sin fondo. */}
         <section className="py-20 bg-black/20">
-          <div className="container mx-auto px-6 max-w-3xl">
-            <div className="flex items-center gap-4 mb-10">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Horarios de Atención</h2>
-            </div>
-
-            <div className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5">
-              {supportHours.map((sch, i) => (
-                <div key={i} className="flex justify-between items-center gap-6 py-4 border-b border-white/5 last:border-0">
-                  <div className="min-w-0">
-                    <div className="font-medium">{sch.day}</div>
-                    <div className="text-sm text-gray-400">{sch.type}</div>
-                  </div>
-                  <div className="text-blue-300 font-medium shrink-0">{sch.hours}</div>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-gray-400 text-sm mt-6">
-              Fuera de horario puedes escribirnos por Discord o correo — te responderemos al siguiente día hábil.
-            </p>
-          </div>
-        </section>
-
-        {/* FAQs */}
-        <section className="py-20">
           <div className="container mx-auto px-6 max-w-4xl">
-            <div className="flex items-center gap-4 mb-16">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Preguntas Frecuentes</h2>
+            <div className="mb-12">
+              <div className="flex items-center gap-4">
+                <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                <h2 className="text-3xl font-light">Preguntas Frecuentes</h2>
+              </div>
             </div>
 
-            <div className="space-y-8">
-              {faqs.map((faq, index) => (
-                <div 
-                  key={index}
-                  className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all duration-300"
-                >
-                  <h3 className="text-xl font-medium mb-4">{faq.question}</h3>
-                  <p className="text-gray-300 leading-relaxed">{faq.answer}</p>
-                </div>
-              ))}
+            {/* Acordeón de apertura única. Antes eran cuatro tarjetas siempre abiertas: la
+                primera respuesta sola mide unos 640 caracteres, así que la sección obligaba a
+                scrollear un muro de texto para llegar a la pregunta que uno traía.
+                Cómo está armado, y por qué así:
+                · La cabecera es un <button> DENTRO del <h3>, no un <h3> con onClick. El botón
+                  es lo que le da a la cabecera su rol, su foco por teclado y su activación con
+                  Enter y Espacio sin escribir un solo manejador; el <h3> mantiene el esquema de
+                  encabezados para quien navega saltando de título en título.
+                · `aria-expanded` dice si está abierta y `aria-controls` apunta al panel. El
+                  panel NUNCA se desmonta —colapsa a alto cero— porque un `aria-controls` que
+                  apunta a un id ausente no es válido; es la misma advertencia que documenta el
+                  desplegable de ListaInscripciones.tsx.
+                · La animación va con `grid-template-rows` de 0fr a 1fr sobre un hijo con
+                  `overflow-hidden`. Es el único modo de animar hacia «alto automático» en CSS:
+                  una transición de `height` necesita un valor concreto, y un `max-height`
+                  estimado o corta el texto o deja un retardo visible al cerrar.
+                · Colapsado también lleva `invisible`, que lo saca del árbol de accesibilidad.
+                  Sin eso, un lector de pantalla leería las cuatro respuestas de corrido aunque
+                  en pantalla se vean cerradas, que es justo lo que el acordeón viene a evitar.
+                  `visibility` transiciona de forma discreta: al abrir cambia de inmediato y al
+                  cerrar espera a que termine el colapso, que es el orden que uno quiere.
+                La regla global de `prefers-reduced-motion` de index.css desactiva las dos
+                transiciones sola. */}
+            <div className="space-y-4">
+              {faqs.map((faq, index) => {
+                const abierta = faqAbierta === index
+                const idPanel = `faq-panel-${index}`
+                const idCabecera = `faq-cabecera-${index}`
+
+                return (
+                  <div
+                    key={index}
+                    className={`overflow-hidden rounded-2xl border backdrop-blur-sm transition-colors duration-300 ${
+                      abierta
+                        ? 'border-blue-500/30 bg-black/40'
+                        : 'border-white/5 bg-black/30 hover:border-blue-500/20'
+                    }`}
+                  >
+                    <h3>
+                      {/* Neutraliza lo que index.css le pone a todo <button>: el gradiente azul
+                          de fondo (`bg-none`), el borde de 2px (`border-0`), el radio propio
+                          (`rounded-none`, que acá lo pone la tarjeta) y el salto con halo del
+                          hover. `tracking-tight` repone el espaciado que traía el <h3> y que la
+                          regla de <button> pisaba. Es la receta de BTN_BASE en
+                          ListaInscripciones.tsx.
+
+                          EL FOCO NO PUEDE QUEDAR EN MANOS DE LA CAPA BASE, y acá está el
+                          porqué. index.css trae `button:focus, button:focus-visible { outline:
+                          3px solid rgba(0,212,255,.5) }`, o sea el cian de la casa al 50% y
+                          3px de grosor. El selector incluye `:focus` a secas, así que también
+                          se dispara al hacer CLIC con el mouse y se queda puesto hasta que el
+                          foco se va a otro lado.
+                          Eso, en esta tarjeta, no se veía como un marco sino como una línea:
+                          el outline se dibuja 2px por fuera del botón, el botón es `w-full` y
+                          está pegado al tope, y la tarjeta lleva `overflow-hidden` — así que
+                          los tramos de arriba, izquierda y derecha quedaban recortados y solo
+                          sobrevivía el de abajo, que además solo tiene lugar cuando el panel
+                          está abierto. Abrir pintaba la línea, cerrar la recortaba.
+                          El arreglo tiene dos mitades:
+                          · `focus:outline-hidden` apaga el outline de la base en los dos casos
+                            —`:focus-visible` está contenido en `:focus`—. Va `outline-hidden` y
+                            no `outline-none` porque en Tailwind 4 este último compila a
+                            `outline-style: none` a secas y dejaría sin nada al modo de alto
+                            contraste de Windows, que no pinta sombras.
+                          · `focus-visible:inset-ring-2` repone el indicador SOLO para teclado.
+                            Es un anillo INTERIOR a propósito: cualquier cosa dibujada por fuera
+                            del botón la recorta el mismo `overflow-hidden` que causaba el bug.
+                          Resultado: con el mouse no aparece nada, con Tab se ve el anillo cian
+                          por dentro del borde, y nunca hay línea colgando. */}
+                      <button
+                        type="button"
+                        id={idCabecera}
+                        aria-expanded={abierta}
+                        aria-controls={idPanel}
+                        onClick={() => setFaqAbierta(abierta ? null : index)}
+                        className="flex w-full items-center justify-between gap-4 bg-none border-0 rounded-none px-6 py-5 text-left text-lg md:text-xl font-medium tracking-tight text-white transition-colors duration-300 hover:[transform:none] hover:shadow-none hover:text-blue-200 focus:outline-hidden focus-visible:inset-ring-2 focus-visible:inset-ring-lqc-accent/70"
+                      >
+                        <span className="min-w-0">{faq.question}</span>
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={`w-5 h-5 shrink-0 text-blue-400 transition-transform duration-300 ${
+                            abierta ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                    </h3>
+
+                    <div
+                      id={idPanel}
+                      role="region"
+                      aria-labelledby={idCabecera}
+                      className={`grid transition-all duration-300 ease-out ${
+                        abierta ? 'grid-rows-[1fr] visible' : 'grid-rows-[0fr] invisible'
+                      }`}
+                    >
+                      <div className="overflow-hidden">
+                        <p className="px-6 pb-6 text-gray-300 leading-relaxed">{faq.answer}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </section>
 
-        {/* Ubicación */}
-        <section className="py-20 bg-black/20">
+        {/* Ubicación. Acá había una grilla de dos columnas con un PLACEHOLDER DE MAPA a la
+            derecha: una caja 4:3 vacía con un pin gigante al 30% de opacidad y dos líneas de
+            texto. Se fue entera, y con ella «Querétaro, México» y «Centro de operaciones LQC»,
+            que no se reubicaron. Dos razones: sugería un mapa que no existía, y hablaba de un
+            «centro de operaciones» en una liga que justamente NO tiene sede fija.
+            Al irse la columna derecha, la sección deja de ser una grilla 2×1: el texto pasa a
+            ancho de lectura y los tres puntos, que eran una lista de viñetas apilada, pasan a
+            tres tarjetas en fila. Es lo que hace que la sección se sostenga sola sin la caja de
+            al lado, en vez de quedar media página vacía.
+            El párrafo y los tres puntos son el copy nuevo, entregado ya resuelto. El anterior
+            decía «capital y zona metropolitana» en el párrafo y «todo el estado y más allá» en
+            el punto, que eran dos alcances distintos; el nuevo dice lo mismo en los dos lados.
+            `MapPin` se conserva en el encabezado, así que su import sigue en uso. */}
+        <section className="py-20">
           <div className="container mx-auto px-6 max-w-6xl">
-            <div className="grid md:grid-cols-2 gap-16 items-center">
-              <div className="space-y-10">
-                <div className="flex items-center gap-4">
-                  <MapPin className="w-8 h-8 text-blue-400" />
-                  <h2 className="text-3xl font-light">Ubicación</h2>
-                </div>
-
-                <p className="text-gray-300 leading-relaxed text-lg">
-                  El LQC tiene su base en la hermosa ciudad de Querétaro, México. Organizamos torneos online y eventos presenciales en diferentes sedes de la capital y zona metropolitana.
-                </p>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-blue-500" />
-                    <span className="text-gray-200">Eventos presenciales en sedes rotativas</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-blue-500" />
-                    <span className="text-gray-200">Estudio de transmisión propio</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-blue-500" />
-                    <span className="text-gray-200">Cobertura en todo el estado y más allá</span>
-                  </div>
-                </div>
+            <div className="mb-12">
+              <div className="flex items-center gap-4">
+                <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                <h2 className="text-3xl font-light">Ubicación</h2>
+                <MapPin className="w-6 h-6 text-blue-400 shrink-0" aria-hidden="true" />
               </div>
+              <p className="mt-6 text-gray-300 leading-relaxed text-lg max-w-3xl">
+                El LQC tiene su base en Querétaro. No tenemos una sede fija: los torneos
+                son online y los eventos presenciales van rotando por distintas sedes del
+                estado.
+              </p>
+            </div>
 
-              <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/50 backdrop-blur-md border border-white/5 aspect-[4/3] relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="w-24 h-24 text-blue-500/30 mx-auto mb-4" />
-                    <div className="text-2xl font-light">Querétaro, México</div>
-                    <div className="text-gray-400 mt-2">Centro de operaciones LQC</div>
-                  </div>
+            {/* Tres tarjetas en vez de tres viñetas. Comparten la caja estándar de la página
+                —la misma de las tarjetas de canales— para que la sección se lea como parte del
+                mismo sistema y no como un apéndice.
+                Los iconos son los que nombran el concepto de cada una: un recorrido para las
+                sedes rotativas, una señal para el estudio y un globo para el alcance. Van con
+                `aria-hidden` porque el texto de al lado ya dice lo mismo. */}
+            <div className="grid gap-6 sm:grid-cols-3">
+              {[
+                { icon: Route, texto: 'Eventos presenciales en sedes rotativas' },
+                { icon: Radio, texto: 'Estudio de transmisión propio' },
+                { icon: Globe, texto: 'Cobertura en todo el estado de Querétaro' }
+              ].map(({ icon: Icono, texto }) => (
+                <div
+                  key={texto}
+                  className="flex flex-col gap-4 bg-black/30 backdrop-blur-sm p-6 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-colors duration-300"
+                >
+                  <span className="w-12 h-12 shrink-0 rounded-2xl border border-blue-800/40 bg-blue-950/40 flex items-center justify-center">
+                    <Icono className="w-6 h-6 text-blue-400" aria-hidden="true" />
+                  </span>
+                  <span className="text-gray-200 leading-snug">{texto}</span>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
