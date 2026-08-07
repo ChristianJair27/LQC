@@ -143,6 +143,18 @@ const sponsors = [
      codificada. Da `true` igual: lo que se compara contra el placeholder es el hostname, y
      `xn--lapeadesantiago-1qb.com` tampoco lo es. */
   { id: 10, name: 'La Peña de Santiago', logo: '/sponsors/penaLogoNaran.jpeg', url: 'https://lapeñadesantiago.com/' },
+  /* Va último y con `id: 9`, que era el único hueco de la secuencia —el array salta del 8 al
+     10— así que no hace falta estrenar un 11. El id solo es la `key` de React; el orden lo da
+     la posición en el array, no el número.
+     Su logo es el ÚNICO que no vive en `/sponsors/`: es el mismo archivo que ya usa el botón
+     del header, y duplicarlo en la otra carpeta serían 268 KB repetidos que el día que alguien
+     reemplace la daga se actualizarían en un lado y en el otro no. La ruta absoluta desde
+     `public/` funciona igual desde cualquier carpeta; lo que se pierde es la convención, y a
+     cambio hay una sola fuente para el mismo logo.
+     Sin tratamiento especial de ningún tipo: mismo objeto de cuatro campos que los otros
+     nueve, así que hereda la misma tarjeta, la misma altura de logo y la misma decisión de
+     `tieneSitioReal` —su url es https y no es el placeholder, así que la celda enlaza—. */
+  { id: 9, name: 'ATAK.GG', logo: '/assets/logo-atakkgg.png', url: 'https://atakgg.revolution505.com/' },
 ]
 
 /* Estado real del stream: lo responde la Edge Function `twitch-status`, que consulta la API
