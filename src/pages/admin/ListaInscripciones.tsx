@@ -9,7 +9,8 @@ import {
   Download,
   Eye,
   Inbox,
-  Loader2
+  Loader2,
+  Pencil
 } from 'lucide-react'
 import { obtenerSupabase } from '../../lib/supabase'
 
@@ -29,7 +30,14 @@ import { obtenerSupabase } from '../../lib/supabase'
      una fila por equipo el UPDATE es atómico — sale bien o no sale.
    - Las escrituras por `.in(id, ids)`: ahora son `.eq('id', equipo.id)`.
 
-   Los jugadores NO se editan desde el panel: la RLS solo da UPDATE sobre `equipos`. */
+   De los jugadores se editan SOLO el nombre y el correo, y NO por UPDATE directo: el grant
+   de UPDATE de `authenticated` sobre `jugadores` está revocado, y la única vía es la RPC
+   `editar_jugador`, que valida los campos del lado de la base y sincroniza el correo con
+   ATAK.GG. Todo lo demás del jugador —gamertag, celular, fecha, municipio, escolaridad,
+   género, rol y orden— sigue sin poder tocarse desde acá.
+   `orden` y `rol` en particular NO son un olvido: los asigna `registrar_jugador` contando
+   los que ya estaban, así que cambiarlos a mano rompería la correspondencia entre la
+   posición en el roster y quién es titular. */
 
 type Rol = 'titular' | 'suplente'
 
@@ -99,10 +107,85 @@ const COL_ARCHIVADO_EN = 'archivado_en' as const
    mínimo hay que tocar los dos lugares. */
 const MIN_JUGADORES = 5
 
-/* Techo de las escrituras (pago, notas, archivado): pasado ese tiempo la query se
-   aborta y cae en el mensaje genérico, en vez de dejar la tarjeta trabada en
+/* Techo de las escrituras (pago, notas, archivado, edición de jugador): pasado ese tiempo
+   la query se aborta y cae en el mensaje genérico, en vez de dejar la tarjeta trabada en
    "Guardando…". Mismo criterio que el envío de /registro. */
 const TIEMPO_LIMITE_MS = 15_000
+
+/* --- editar_jugador(p_jugador_id, p_cambios) --- */
+
+/* Lo único que la RPC acepta. El tipo NO es decorativo: el cliente está tipado como
+   `SupabaseClient` pelado (ver la DEUDA que documenta Registro.tsx), así que `.rpc()`
+   aceptaría cualquier objeto y esta forma es la única red que hay antes de runtime.
+   Las dos claves van opcionales porque se manda SOLO lo que cambió: si el admin corrigió
+   el correo y no tocó el nombre, el nombre no viaja. Mandar un campo con su valor actual
+   no es inocuo — la RPC responde 'sin_cambios' y el guardado se vería como un fallo. */
+type CambiosJugador = {
+  nombre?: string
+  correo?: string
+}
+
+/* La RPC responde SIEMPRE con un jsonb y NUNCA lanza: un rechazo llega como
+   `{ ok: false, error: <código> }` con HTTP 200, o sea que `error` de supabase-js viene
+   null. Por eso hay que mirar `data.ok` — verificar solo el error de la librería daría
+   por bueno un guardado que la base rechazó. Es la misma trampa que el `.select()` de
+   verificación de `escribirArchivado` viene a cubrir para los UPDATE. */
+type RespuestaEdicion =
+  | { ok: true; correo: string; nombre: string }
+  | { ok: false; mensaje: string }
+
+/* Traducción de los códigos que devuelve la base. Se mapean acá y no en el componente para
+   que agregar un código sea una línea y no tocar JSX.
+   Un código que no esté en esta tabla cae en el mensaje genérico: es lo único honesto que
+   se puede decir de una respuesta que no sabemos leer, mismo criterio que el
+   'desconocido' de Registro.tsx. */
+const MENSAJES_EDICION: Record<string, string> = {
+  campo_no_permitido: 'Ese campo no se puede editar desde aquí.',
+  correo_invalido: 'El correo no tiene un formato válido.',
+  correo_vacio: 'El correo no puede quedar vacío.',
+  nombre_vacio: 'El nombre no puede quedar vacío.',
+  sin_cambios: 'No hay cambios que guardar.',
+  jugador_no_encontrado: 'No se encontró al jugador (recarga la lista).'
+}
+
+const MENSAJE_EDICION_GENERICO = 'No pudimos guardar el cambio. Inténtalo de nuevo.'
+
+/* Aviso que solo tiene sentido cuando lo que cambió fue el CORREO: la RPC reenvía la
+   invitación de ATAK a la dirección nueva. Si solo se corrigió el nombre, no se muestra —
+   sería prometer un efecto que no ocurrió. */
+const AVISO_CORREO_ATAK = 'Corregido. La invitación de ATAK se reenvía al nuevo correo.'
+
+/* Lectura defensiva del jsonb, con el mismo criterio que `leerSugerencias` en Registro.tsx:
+   llega como `unknown` y se acepta solo si tiene la forma exacta. Cualquier otra cosa cae
+   en el mensaje genérico en vez de dar por bueno un guardado que no se puede confirmar. */
+function leerRespuestaEdicion(cuerpo: unknown): RespuestaEdicion {
+  if (typeof cuerpo !== 'object' || cuerpo === null) {
+    return { ok: false, mensaje: MENSAJE_EDICION_GENERICO }
+  }
+
+  const { ok, error, correo, nombre } = cuerpo as {
+    ok?: unknown
+    error?: unknown
+    correo?: unknown
+    nombre?: unknown
+  }
+
+  /* `=== true` y no un truthy: cualquier otra cosa —undefined, la cadena "true", un JSON
+     con otra forma— tiene que caer del lado del fallo. */
+  if (ok !== true) {
+    const codigo = typeof error === 'string' ? error : ''
+    return { ok: false, mensaje: MENSAJES_EDICION[codigo] ?? MENSAJE_EDICION_GENERICO }
+  }
+
+  /* Éxito pero sin los valores de vuelta: no se puede hacer la actualización pesimista
+     sobre lo que devolvió la base, así que se trata como fallo. Reportar éxito y dejar la
+     fila mostrando el valor viejo sería peor que pedir un reintento. */
+  if (typeof correo !== 'string' || typeof nombre !== 'string') {
+    return { ok: false, mensaje: MENSAJE_EDICION_GENERICO }
+  }
+
+  return { ok: true, correo, nombre }
+}
 
 /* El join: equipos con sus jugadores. Las columnas de jugador que el panel no pinta
    —fecha_nacimiento, escolaridad, municipio, genero— se traen igual para poder
@@ -438,6 +521,53 @@ function EstadoNotas({
   return <span className="font-mono text-[11px] text-gray-500">Sin cambios</span>
 }
 
+/* Indicador del editor de jugador. Hermano de EstadoNotas y con el mismo registro visual,
+   pero NO es el mismo componente y no conviene unificarlos: acá el error viene de la base y
+   trae su propio texto, y el éxito puede llevar el aviso de ATAK. Fundirlos obligaría a
+   pasarle dos props que las notas nunca usan.
+   El orden de las ramas importa: "sin guardar" gana al "guardado" anterior, porque en cuanto
+   se vuelve a teclear lo que la fila muestra ya no es lo que está en la base. */
+function EstadoEdicionJugador({
+  estado,
+  cambiados,
+  mensajeError,
+  avisoCorreo
+}: {
+  estado: 'idle' | 'guardando' | 'guardado' | 'error'
+  cambiados: boolean
+  mensajeError: string
+  avisoCorreo: boolean
+}) {
+  if (estado === 'guardando') {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-blue-300">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Guardando…
+      </span>
+    )
+  }
+  if (estado === 'error') {
+    /* `role="alert"` para que el rechazo se anuncie solo: llega después de una acción del
+       admin y sin esto habría que ir a buscarlo. */
+    return (
+      <span role="alert" className="font-mono text-[11px] text-rose-300">
+        {mensajeError || MENSAJE_EDICION_GENERICO}
+      </span>
+    )
+  }
+  if (cambiados) {
+    return <span className="font-mono text-[11px] text-blue-300">Sin guardar</span>
+  }
+  if (estado === 'guardado') {
+    return (
+      <span role="status" className="font-mono text-[11px] text-lqc-accent">
+        {avisoCorreo ? AVISO_CORREO_ATAK : 'Guardado'}
+      </span>
+    )
+  }
+  return <span className="font-mono text-[11px] text-gray-500">Sin cambios</span>
+}
+
 /* Badge on-paleta: "Confirmado" en cian de marca (positivo), "Pendiente" en gris
    neutro apagado. Sin verde/ámbar; `rose` queda reservado a errores. */
 function BadgePago({ pagado }: { pagado: boolean }) {
@@ -535,6 +665,267 @@ function CampoJugador({
   )
 }
 
+/* Una fila del roster, con su editor inline de nombre y correo.
+   Es componente propio y no JSX suelto dentro del <ul> porque cada fila necesita su propio
+   estado (qué se está editando, qué se tecleó, en qué va el guardado) y meterlo en
+   TarjetaEquipo obligaría a llevar mapas por id de jugador.
+
+   Sigue el molde del editor de notas, que es el patrón de escritura del panel:
+   · Campos controlados y guardado EXPLÍCITO con botón. Nunca al teclear: un correo
+     guardándose a cada tecla mandaría a la base todos los estados intermedios de la
+     corrección, y cada uno reenviaría la invitación de ATAK.
+   · El botón se deshabilita si no hay cambios reales — comparando contra lo guardado, no
+     contra si se tocó el campo.
+   · Estado idle/guardando/guardado/error, y al reeditar vuelve a idle: el indicador
+     siempre habla del texto que está a la vista.
+
+   Lo que NO copia de las notas: acá el mensaje de error viene de la base, así que el
+   estado de error guarda el texto en vez de mostrar uno fijo.
+
+   El <dl> de solo lectura queda visible mientras se edita a propósito. Cuesta ver el
+   correo dos veces unos segundos, y a cambio el valor de la fila se actualiza a la vista
+   al guardar, que es la confirmación de que el cambio entró. */
+function FilaJugador({
+  jugador,
+  onEditar
+}: {
+  jugador: Jugador
+  onEditar: (jugador: Jugador, cambios: CambiosJugador) => Promise<RespuestaEdicion>
+}) {
+  const [editando, setEditando] = useState(false)
+  const [nombreTexto, setNombreTexto] = useState(jugador.nombre)
+  const [correoTexto, setCorreoTexto] = useState(jugador.correo)
+  const [estado, setEstado] = useState<'idle' | 'guardando' | 'guardado' | 'error'>('idle')
+  const [mensajeError, setMensajeError] = useState('')
+  /* Si el último guardado exitoso incluyó el correo. Es lo que decide si se muestra el
+     aviso de ATAK, y se calcula ANTES de guardar: después del éxito los campos ya
+     coinciden con lo guardado y `correoCambiado` sería false. */
+  const [tocoCorreo, setTocoCorreo] = useState(false)
+
+  const nombreId = useId()
+  const correoId = useId()
+  const botonEditarRef = useRef<HTMLButtonElement>(null)
+  const campoNombreRef = useRef<HTMLInputElement>(null)
+
+  const montado = useRef(true)
+  useEffect(() => {
+    montado.current = true
+    return () => {
+      montado.current = false
+    }
+  }, [])
+
+  /* Foco al abrir y al cerrar, comparando el valor previo y no una bandera de primer
+     render: así no se roba el foco al montar ni con el doble montaje de StrictMode. Mismo
+     patrón que la confirmación de pago de la tarjeta. */
+  const editandoPrevio = useRef(editando)
+  useEffect(() => {
+    const previo = editandoPrevio.current
+    editandoPrevio.current = editando
+    if (editando && !previo) campoNombreRef.current?.focus()
+    if (!editando && previo) botonEditarRef.current?.focus()
+  }, [editando])
+
+  const guardando = estado === 'guardando'
+
+  /* Se compara y se manda SIEMPRE con trim: el admin corrige un correo, no su espaciado, y
+     un espacio al final no debería contar como cambio ni viajar a la base. */
+  const nombreLimpio = nombreTexto.trim()
+  const correoLimpio = correoTexto.trim()
+  const nombreCambiado = nombreLimpio !== jugador.nombre
+  const correoCambiado = correoLimpio !== jugador.correo
+  const hayCambios = nombreCambiado || correoCambiado
+
+  const abrirEditor = () => {
+    /* Reabrir siempre parte de lo que hay guardado: si el intento anterior falló y se
+       cerró, el editor no puede reaparecer con el texto rechazado ya puesto. */
+    setNombreTexto(jugador.nombre)
+    setCorreoTexto(jugador.correo)
+    setEstado('idle')
+    setMensajeError('')
+    setTocoCorreo(false)
+    setEditando(true)
+  }
+
+  const cerrarEditor = () => {
+    if (guardando) return
+    setEditando(false)
+  }
+
+  /* Al reeditar se limpia el estado transitorio: el indicador vuelve a derivarse de si hay
+     cambios sin guardar, igual que en las notas. */
+  const alEditarCampo = () => {
+    if (estado !== 'idle') {
+      setEstado('idle')
+      setMensajeError('')
+    }
+  }
+
+  const guardar = async () => {
+    if (guardando || !hayCambios) return
+
+    /* Solo los campos que cambiaron. Mandar el nombre sin tocar haría que la RPC
+       respondiera 'sin_cambios' cuando el correo sí cambió. */
+    const cambios: CambiosJugador = {}
+    if (nombreCambiado) cambios.nombre = nombreLimpio
+    if (correoCambiado) cambios.correo = correoLimpio
+
+    const incluiaCorreo = correoCambiado
+    setEstado('guardando')
+    setMensajeError('')
+
+    const resultado = await onEditar(jugador, cambios)
+    if (!montado.current) return
+
+    if (!resultado.ok) {
+      /* El texto tecleado se conserva para poder corregirlo y reintentar. */
+      setEstado('error')
+      setMensajeError(resultado.mensaje)
+      return
+    }
+
+    /* Los campos se realinean con lo que devolvió la BASE, no con lo que se tecleó: si la
+       RPC normalizó algo (espacios, minúsculas del correo), lo que se ve es lo guardado. */
+    setNombreTexto(resultado.nombre)
+    setCorreoTexto(resultado.correo)
+    setTocoCorreo(incluiaCorreo)
+    setEstado('guardado')
+  }
+
+  return (
+    <li className="px-4 py-4 md:px-6 md:py-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 break-words font-sans font-semibold text-white">
+          {/* La posición se muestra porque es lo que decidió el rol al registrarse:
+              sin ella, "suplente" parece una etiqueta arbitraria. */}
+          {/* `gray-400` y no `gray-500`: sobre esta superficie el 500 se queda en
+              ~3.9:1 (lo documenta la tarjeta de archivados más abajo) y a 11px el
+              mínimo es 4.5:1. Este número no es decorativo — es lo que explica el
+              rol—, así que tiene que leerse. */}
+          <span className="font-mono text-[11px] font-normal text-gray-400">{jugador.orden}</span>
+          {jugador.gamertag || '—'}
+          <BadgeRol rol={jugador.rol} />
+        </p>
+
+        {/* El nombre del jugador va en el nombre accesible del botón: con varias filas en
+            pantalla, cuatro botones que solo dicen "Editar" no se distinguen entre sí al
+            navegar por lista de controles. */}
+        <button
+          ref={botonEditarRef}
+          type="button"
+          onClick={editando ? cerrarEditor : abrirEditor}
+          disabled={guardando}
+          aria-expanded={editando}
+          className={`${BTN_SECUNDARIO} shrink-0`}
+        >
+          <Pencil className="h-4 w-4" />
+          {editando ? 'Cerrar' : 'Editar'}
+          <span className="sr-only"> los datos de {jugador.nombre || 'este jugador'}</span>
+        </button>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+        <CampoJugador label="Nombre" valor={jugador.nombre} />
+        <CampoJugador label="Celular" valor={jugador.celular} mono />
+        <CampoJugador label="Correo" valor={jugador.correo} mono full clase="break-all" />
+        <CampoJugador label="Registro" valor={fmtFecha(jugador.creado_en)} mono />
+      </dl>
+
+      {editando && (
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-4">
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-wider text-gray-400">
+            Corregir datos
+          </p>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="min-w-0">
+              <label
+                htmlFor={nombreId}
+                className="mb-1.5 block font-mono text-[11px] uppercase tracking-wider text-gray-400"
+              >
+                Nombre
+              </label>
+              <input
+                ref={campoNombreRef}
+                id={nombreId}
+                type="text"
+                value={nombreTexto}
+                onChange={(e) => {
+                  setNombreTexto(e.target.value)
+                  alEditarCampo()
+                }}
+                disabled={guardando}
+                className={CLASE_INPUT}
+              />
+            </div>
+
+            <div className="min-w-0">
+              <label
+                htmlFor={correoId}
+                className="mb-1.5 block font-mono text-[11px] uppercase tracking-wider text-gray-400"
+              >
+                Correo
+              </label>
+              {/* `type="email"` para que el teclado móvil sea el correcto, pero el campo NO
+                  vive en un <form> ni se valida acá: quien decide si el correo sirve es la
+                  RPC, y su veredicto es el que se muestra. Duplicar la regla en el cliente
+                  la dejaría envejeciendo aparte. */}
+              <input
+                id={correoId}
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                spellCheck={false}
+                value={correoTexto}
+                onChange={(e) => {
+                  setCorreoTexto(e.target.value)
+                  alEditarCampo()
+                }}
+                disabled={guardando}
+                className={`${CLASE_INPUT} font-mono`}
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <EstadoEdicionJugador
+              estado={estado}
+              cambiados={hayCambios}
+              mensajeError={mensajeError}
+              avisoCorreo={tocoCorreo}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={cerrarEditor}
+                disabled={guardando}
+                className={BTN_SECUNDARIO}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={guardar}
+                disabled={guardando || !hayCambios}
+                className={BTN_PRIMARIO}
+              >
+                {guardando ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Guardando…
+                  </>
+                ) : (
+                  'Guardar cambios'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </li>
+  )
+}
+
 /* Tarjeta de equipo colapsable + acciones (marcar pago, notas, archivar).
 
    Estructura del encabezado — GOTCHA: no se puede anidar <button> dentro de <button>
@@ -568,12 +959,21 @@ function TarjetaEquipo({
   equipo,
   onMarcarPago,
   onGuardarNotas,
-  onArchivar
+  onArchivar,
+  onEditarJugador
 }: {
   equipo: Equipo
   onMarcarPago: (equipo: Equipo, pagar: boolean) => Promise<boolean>
   onGuardarNotas: (equipo: Equipo, notas: string) => Promise<boolean>
   onArchivar: (equipo: Equipo) => Promise<boolean>
+  /* La edición de jugador NO entra en `ocupado`: ese flag bloquea las escrituras que tocan
+     la fila del EQUIPO entre sí (pago, notas, archivado), y esto escribe en otra tabla por
+     otra vía. Cada fila del roster gestiona su propio bloqueo mientras guarda. */
+  onEditarJugador: (
+    equipo: Equipo,
+    jugador: Jugador,
+    cambios: CambiosJugador
+  ) => Promise<RespuestaEdicion>
 }) {
   const notasGuardadas = equipo[COL_NOTAS] ?? ''
 
@@ -876,8 +1276,7 @@ function TarjetaEquipo({
             Este equipo tiene {cantidad}{' '}
             {cantidad === 1 ? 'jugador' : 'jugadores'} y el mínimo para competir es{' '}
             {MIN_JUGADORES}. Cada quien se registra por su cuenta, así que el roster se
-            completa a medida que entran los demás. Los jugadores no se editan desde el
-            panel.
+            completa a medida que entran los demás.
           </p>
         )}
 
@@ -892,27 +1291,11 @@ function TarjetaEquipo({
 
         <ul className="divide-y divide-white/5">
           {equipo.jugadores.map((j) => (
-            <li key={j.id} className="px-4 py-4 md:px-6 md:py-5">
-              <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 break-words font-sans font-semibold text-white">
-                {/* La posición se muestra porque es lo que decidió el rol al registrarse:
-                    sin ella, "suplente" parece una etiqueta arbitraria. */}
-                {/* `gray-400` y no `gray-500`: sobre esta superficie el 500 se queda en
-                    ~3.9:1 (lo documenta la tarjeta de archivados más abajo) y a 11px el
-                    mínimo es 4.5:1. Este número no es decorativo — es lo que explica el
-                    rol—, así que tiene que leerse. */}
-                <span className="font-mono text-[11px] font-normal text-gray-400">
-                  {j.orden}
-                </span>
-                {j.gamertag || '—'}
-                <BadgeRol rol={j.rol} />
-              </p>
-              <dl className="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                <CampoJugador label="Nombre" valor={j.nombre} />
-                <CampoJugador label="Celular" valor={j.celular} mono />
-                <CampoJugador label="Correo" valor={j.correo} mono full clase="break-all" />
-                <CampoJugador label="Registro" valor={fmtFecha(j.creado_en)} mono />
-              </dl>
-            </li>
+            <FilaJugador
+              key={j.id}
+              jugador={j}
+              onEditar={(jugador, cambios) => onEditarJugador(equipo, jugador, cambios)}
+            />
           ))}
         </ul>
 
@@ -1406,6 +1789,70 @@ export default function ListaInscripciones() {
     setEquipos((prev) => prev.map((e) => (e.id === id ? { ...e, ...cambios } : e)))
   }
 
+  /* Aplica un cambio a UN jugador dentro de UN equipo, inmutable en los dos niveles. No
+     reordena: `orden` no es editable, así que la posición en el roster no puede moverse. */
+  const actualizarJugador = (
+    equipoId: string,
+    jugadorId: Jugador['id'],
+    cambios: Partial<Jugador>
+  ) => {
+    setEquipos((prev) =>
+      prev.map((e) =>
+        e.id === equipoId
+          ? {
+              ...e,
+              jugadores: e.jugadores.map((j) =>
+                j.id === jugadorId ? { ...j, ...cambios } : j
+              )
+            }
+          : e
+      )
+    )
+  }
+
+  /* Edición de jugador. ES LA ÚNICA ESCRITURA DEL PANEL QUE NO ES UN UPDATE: va por la RPC
+     `editar_jugador`, porque el grant de UPDATE de `authenticated` sobre `jugadores` está
+     revocado. La RPC valida los campos y sincroniza el correo con ATAK.
+
+     LA VERIFICACIÓN NO ES OPCIONAL. La RPC responde con HTTP 200 incluso al rechazar, así
+     que `error` de supabase-js viene null y mirar solo eso daría por bueno un guardado que
+     la base no hizo. El veredicto está en `data.ok`, y por eso hay dos comprobaciones
+     encadenadas: primero el error de transporte, después el del dominio.
+     Es la misma clase de fallo silencioso que motivó el `.select()` de `escribirArchivado`,
+     y acá pesa más: un correo que no se guardó no se descubre hasta que rebota un mensaje.
+
+     Al éxito, el estado local se actualiza con lo que devolvió LA BASE, no con lo que
+     tecleó el admin. Si la RPC normalizó algo, lo que queda en pantalla es lo que quedó
+     guardado. Sin refetch: perdería la expansión de todas las tarjetas. */
+  const editarJugador = async (
+    equipo: Equipo,
+    jugador: Jugador,
+    cambios: CambiosJugador
+  ): Promise<RespuestaEdicion> => {
+    const supabase = obtenerSupabase()
+    if (!supabase) return { ok: false, mensaje: MENSAJE_EDICION_GENERICO }
+    try {
+      const { data, error } = await supabase
+        .rpc('editar_jugador', { p_jugador_id: jugador.id, p_cambios: cambios })
+        .abortSignal(AbortSignal.timeout(TIEMPO_LIMITE_MS))
+
+      /* Transporte: red, 4xx/5xx o el propio abort del timeout. No se expone ni se loguea
+         —el payload son datos personales—, se traduce al mensaje genérico. */
+      if (error) return { ok: false, mensaje: MENSAJE_EDICION_GENERICO }
+
+      const respuesta = leerRespuestaEdicion(data)
+      if (!respuesta.ok) return respuesta
+
+      actualizarJugador(equipo.id, jugador.id, {
+        nombre: respuesta.nombre,
+        correo: respuesta.correo
+      })
+      return respuesta
+    } catch {
+      return { ok: false, mensaje: MENSAJE_EDICION_GENERICO }
+    }
+  }
+
   /* Escritura de pago. Ahora toca UNA fila por id — antes había que tocar todas las del
      grupo con `.in()`. Actualización pesimista: al éxito muta `equipos` de forma
      inmutable, así el badge, la fecha y el número "Confirmados" del resumen se recalculan
@@ -1626,6 +2073,7 @@ export default function ListaInscripciones() {
                 onMarcarPago={marcarPago}
                 onGuardarNotas={guardarNotas}
                 onArchivar={archivarEquipo}
+                onEditarJugador={editarJugador}
               />
             </li>
           ))}

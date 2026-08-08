@@ -93,9 +93,20 @@ Dos cosas tocan Supabase:
 - El **panel de administración (`/admin`)**, detrás de login, lee las dos tablas con
   **un solo SELECT con join** (`equipos` con sus `jugadores` ordenados por `orden`) y
   **ya no agrupa nada en el cliente**. Tiene sesión de usuario; los admins se crean a
-  mano en Supabase, no hay alta pública. Escribe **solo en `equipos`**, siempre
+  mano en Supabase, no hay alta pública. Sobre `equipos` escribe con
   `UPDATE ... .eq('id', equipo.id)`: pago (`pagado`, `pagado_en`), notas (`notas`) y
-  archivado (`archivado_en`). **Los jugadores no se editan desde el panel.**
+  archivado (`archivado_en`).
+  **De los jugadores edita SOLO el nombre y el correo, y NO por UPDATE**: el grant de
+  UPDATE de `authenticated` sobre `jugadores` fue **revocado**, y la única vía es la RPC
+  `editar_jugador(p_jugador_id uuid, p_cambios jsonb)`, que acepta únicamente esas dos
+  claves, valida del lado de la base y sincroniza el correo con ATAK.GG. Todo lo demás del
+  jugador —`gamertag`, `celular`, `fecha_nacimiento`, `municipio`, `escolaridad`, `genero`,
+  `rol` y `orden`— sigue sin poder tocarse desde el panel. `rol` y `orden` en particular
+  los asigna `registrar_jugador` contando los que ya estaban: cambiarlos a mano rompería la
+  correspondencia entre posición en el roster y quién es titular.
+  **La RPC devuelve `{ ok: false, error: <código> }` con HTTP 200 al rechazar**, así que
+  `error` de supabase-js viene null: hay que mirar `data.ok`. Verificar solo el error de la
+  librería daría por bueno un guardado que la base no hizo.
   **Nunca DELETE**: no hay política de DELETE, así que un borrado fallaría en
   silencio —devolvería 0 filas *sin* error— y archivar es la alternativa
   (`archivado_en` null = activo, con fecha = archivado). El archivado depende además
@@ -165,7 +176,15 @@ La RLS con el modelo nuevo:
   única superficie son las RPC `buscar_equipos` y `registrar_jugador`, que corren con
   permisos propios—. `buscar_equipos` es la excepción aparente y no lo es: devuelve
   nombre y conteo, nunca datos personales. El usuario **autenticado** tiene **SELECT en
-  las dos** y **UPDATE solo en `equipos`** (por eso el panel no edita jugadores).
+  las dos** y **UPDATE solo en `equipos`**.
+- **El UPDATE de `authenticated` sobre `jugadores` está REVOCADO.** El panel edita nombre y
+  correo por la RPC **`editar_jugador(p_jugador_id uuid, p_cambios jsonb)`**, que corre con
+  permisos propios y es la **única** vía de escritura sobre esa tabla desde el sitio.
+  `p_cambios` acepta solo las claves `nombre` y `correo`; cualquier otra se rechaza con
+  `campo_no_permitido`. Devuelve `{ ok: true, jugador_id, correo, nombre }` o
+  `{ ok: false, error: <código> }` —`campo_no_permitido`, `correo_invalido`,
+  `correo_vacio`, `nombre_vacio`, `sin_cambios`, `jugador_no_encontrado`— **siempre con
+  HTTP 200**, así que el rechazo no llega como excepción y hay que leer `data.ok`.
 - **`inscripciones`** (la tabla vieja, ya sin uso): INSERT anónimo y SELECT
   autenticado. Se verificó de punta a punta en producción el 2026-07-23, cuando era la
   tabla en uso.
