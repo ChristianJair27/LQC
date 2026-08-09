@@ -2,8 +2,13 @@
 
 Sitio web público de la **League Querétaro Championship (LQC)**, la liga de esports
 de **Revolution505** en Querétaro. Es un sitio **estático de presentación**: torneos,
-galería, información de la liga y contacto. **No hay backend propio** y el contenido **público** del sitio vive en los
-componentes: sus páginas no leen ninguna base.
+galería, información de la liga y contacto. **No hay backend propio** y casi todo el
+contenido **público** vive en los componentes.
+
+**La excepción es la galería.** Desde el **2026-08-08**, `/galeria` lee la tabla
+`public.galeria_media` y arma las URLs contra el bucket `galeria` de Storage — ver
+[Galería dinámica](#galería-dinámica-galeria--panel). Las demás páginas públicas siguen
+sin leer ninguna base.
 
 ## Modelo de datos: el equipo es una entidad (migrado el 2026-07-29)
 
@@ -35,7 +40,8 @@ con el equipo como un **string repetido** en cada fila, a dos tablas.
   `fecha_nacimiento`, `celular`, `correo`, `municipio`, `escolaridad`, `genero`,
   `rol` (`'titular'|'suplente'`), `creado_en`. **`localidad` ya no existe.**
 
-Dos cosas tocan Supabase:
+Tres cosas tocan Supabase (la tercera, la galería, está documentada en su propia
+sección más abajo):
 
 - El **formulario público de `/registro`** llama a **dos** RPC, y a nada más. El
   cliente anónimo **no lee las tablas**: no intentes un `.select()` sobre `equipos` ni
@@ -107,10 +113,11 @@ Dos cosas tocan Supabase:
   **La RPC devuelve `{ ok: false, error: <código> }` con HTTP 200 al rechazar**, así que
   `error` de supabase-js viene null: hay que mirar `data.ok`. Verificar solo el error de la
   librería daría por bueno un guardado que la base no hizo.
-  **Nunca DELETE**: no hay política de DELETE, así que un borrado fallaría en
-  silencio —devolvería 0 filas *sin* error— y archivar es la alternativa
-  (`archivado_en` null = activo, con fecha = archivado). El archivado depende además
-  de que el SELECT siga devolviendo las filas archivadas.
+  **Nunca DELETE sobre `equipos` ni `jugadores`**: no hay política de DELETE para esas
+  dos, así que un borrado fallaría en silencio —devolvería 0 filas *sin* error— y
+  archivar es la alternativa (`archivado_en` null = activo, con fecha = archivado). El
+  archivado depende además de que el SELECT siga devolviendo las filas archivadas.
+  (`galeria_media` **sí** tiene DELETE, y es la única: ver "Galería dinámica".)
 
 **Lo que desapareció con la migración, y no hay que reponer:** el estado `'parcial'`
 del archivado y su detección de éxito parcial. Existían porque archivar eran *N*
@@ -188,9 +195,135 @@ La RLS con el modelo nuevo:
 - **`inscripciones`** (la tabla vieja, ya sin uso): INSERT anónimo y SELECT
   autenticado. Se verificó de punta a punta en producción el 2026-07-23, cuando era la
   tabla en uso.
+- **`galeria_media` y `storage.objects`** (bucket `galeria`): son las únicas con DELETE.
+  El detalle está en "Galería dinámica", acá abajo.
 
 Nada de esto está en el repo. Si algún día una lectura o una escritura falla por
 permisos, ese es el primer lugar donde mirar, no el código.
+
+## Galería dinámica (`/galeria` + panel)
+
+**Hecho el 2026-08-08, en producción.** `Galeria.tsx` **ya no lleva un array estático**:
+lee `public.galeria_media` con un `select('*')` y arma la URL de cada imagen con
+`supabase.storage.from('galeria').getPublicUrl(storage_path)`. Ese `getPublicUrl` es
+**síncrono** —no pega a la red, arma la URL con la del proyecto— porque el bucket es
+público, así que se resuelve una vez por fila al cargar y no en cada render.
+
+### `public.galeria_media`
+
+| Columna | Tipo |
+| --- | --- |
+| `id` | uuid, default `gen_random_uuid()` |
+| `storage_path` | text, **UNIQUE**, not null — nombre del archivo en el bucket, **no** una URL |
+| `titulo` | text, nullable |
+| `tipo` | text, default `'foto'`, CHECK `foto`/`video` |
+| `es_vertical` | bool, not null |
+| `ancho` / `alto` | int, nullable |
+| `orden` | int, default 0 |
+| `subido_por` | uuid, nullable, ref `auth.users` |
+| `creado_en` | timestamptz |
+
+### Bucket `galeria`
+
+Público para lectura, **límite de 10 MB por archivo** y MIME permitidos: `image/webp`,
+`image/jpeg`, `image/png`.
+
+### Policies
+
+Todas con **condición real** — nunca `check = true`:
+
+- **`galeria_media`** — SELECT público (`anon` + `authenticated`); INSERT y DELETE solo
+  `authenticated`.
+- **`storage.objects`** (bucket `galeria`) — SELECT público; INSERT y DELETE solo
+  `authenticated`.
+
+Es la **primera y única** superficie del proyecto con DELETE habilitado.
+
+### Componentes
+
+- **`SubirGaleria.tsx`** — uploader múltiple, pestaña «Galería».
+- **`GestionGaleria.tsx`** — borrado, pestaña «Gestionar».
+- **`Panel.tsx`** pasó del ternario binario a un mapa
+  `Record<SeccionId, ComponentType>` con **3 pestañas**: Inscripciones / Galería /
+  Gestionar. Con tres secciones el `else` del ternario era un cajón de sastre —cualquier
+  id que no fuera el del `if` caía en el mismo componente—; el mapa tipado obliga a una
+  entrada por cada id.
+
+### Uploader (`SubirGaleria.tsx`)
+
+Sube **varias fotos en un lote y EN SERIE**, nunca en paralelo: cada compresión decodifica
+el original entero en memoria y veinte a la vez tumban la pestaña.
+
+Por foto: comprime a **WebP con canvas** (lado mayor máx. **1920 px**, calidad **~0.85**),
+mide las dimensiones **reales del resultado** para `es_vertical`, `ancho` y `alto`, sube al
+bucket con nombre **`crypto.randomUUID()` + extensión** —nunca el nombre original, que
+traería acentos, espacios y choques contra el UNIQUE de `storage_path`— e inserta la fila
+con **`titulo: null`**.
+
+**Atomicidad por archivo (`publicarUna`):** upload → insert → si el insert falla,
+**rollback** con `storage.remove()` **verificando `data.length > 0`**. El `catch` **no**
+hace rollback: ahí la excepción es ambigua —no se sabe si el archivo llegó a subirse— y
+borrar a ciegas podría eliminar algo que sí quedó bien registrado.
+
+**Fallo parcial:** un archivo que falla **no detiene el lote**, y lo ya publicado **nunca
+se revierte**. La única excepción que corta todo es no tener cliente o no tener sesión, y
+se corta **antes de subir nada**, así que tampoco deja huérfanos.
+
+**Cerrojo `publicandoRef`** (un `useRef`, no estado) para cerrar la ventana de doble clic
+— ver la trampa correspondiente en "Trampas conocidas".
+
+v1 sube **solo fotos, no videos**, sin título por foto (se edita después) y no borra ni
+reordena desde este componente.
+
+### Borrado (`GestionGaleria.tsx`)
+
+Borra **de a una**, con confirmación de dos pasos on-brand: el botón «Borrar» se reemplaza
+**en su lugar** por «Confirmar / Cancelar». **Ni `window.confirm` ni modal**, que es la
+regla del panel.
+
+El borrado son **DOS PASOS, y el orden fila→archivo es a propósito**:
+
+1. `.from('galeria_media').delete().eq('id', id).select('id')` → verificar
+   `data.length > 0`. **El `.select('id')` es obligatorio:** sin él un DELETE de PostgREST
+   **no devuelve filas nunca**, así que no hay forma de distinguir «borré» de «la RLS
+   denegó» (0 filas *sin* error).
+2. **Solo si el paso 1 confirmó el borrado:** `storage.remove([storage_path])`.
+
+**La verificación del paso 1 es la que AUTORIZA el paso 2.** Nunca borrar el archivo con
+la fila viva: dejaría un hueco roto **visible** en la galería pública.
+
+Si el paso 2 falla después de un paso 1 correcto, el resultado es **éxito** —la foto ya no
+está en la galería, que es lo que se pidió— con un **huérfano** en el bucket. Se le avisa
+al admin con el `storage_path`, porque limpiarlo es manual y sin el nombre no hay dónde
+buscarlo.
+
+**Por qué el borrado NO puede ser una RPC.** Dos motivos independientes, y cualquiera de
+los dos alcanza:
+
+1. `storage.objects` trae de fábrica el guard **`storage.protect_delete`** (trigger
+   `BEFORE DELETE`) que bloquea **todo DELETE por SQL directo**, salvo con la señal
+   `storage.allow_delete_query = 'true'`.
+2. Y aunque se pusiera esa señal, **borrar la fila de `storage.objects` por SQL no borra
+   el archivo físico de MinIO**. Solo la API de Storage (`storage.remove`) borra el
+   archivo y su registro juntos.
+
+Por eso el borrado del archivo va **por frontend** y no por función SQL.
+
+### Infra de Storage (Supabase self-hosted)
+
+Hallazgos de reconocimiento sobre producción; nada de esto se puede verificar desde el
+repo:
+
+- El Supabase de producción está montado como **servicio de Coolify**, no como una
+  instalación a mano. Sus archivos viven en
+  `/data/coolify/services/dd3pab1anj2tgzmw5xt6nvxd/` — ese uuid **es** el servicio
+  Supabase.
+- El backend de Storage es **MinIO local** (contenedor `supabase-minio`): interfaz S3,
+  pero disco físico en el mismo `revolutionserv`.
+  `STORAGE_S3_ENDPOINT=http://supabase-minio:9000`.
+- Límite de subida global: `UPLOAD_FILE_SIZE_LIMIT` y `UPLOAD_FILE_SIZE_LIMIT_STANDARD`
+  = **524288000** (500 MB), **hardcodeadas en el `docker-compose.yml`** del servicio. Para
+  `galeria` el techo que de verdad manda es el del bucket (10 MB), muy por debajo.
 
 ## Stack
 
@@ -200,8 +333,9 @@ permisos, ese es el primer lugar donde mirar, no el código.
 - **react-router-dom 7** — rutas declaradas en `src/App.tsx`
 - `lucide-react` (iconos), `react-lazy-load-image-component` (galería)
 - **`@supabase/supabase-js`** — las dos RPC anónimas de `/registro`
-  (`buscar_equipos` y `registrar_jugador`) y el login + SELECT autenticado del
-  panel de `/admin`
+  (`buscar_equipos` y `registrar_jugador`), el login + SELECT autenticado del
+  panel de `/admin`, y la galería: SELECT público sobre `galeria_media` más
+  **Storage** (`getPublicUrl`, `upload`, `remove`) sobre el bucket `galeria`
 - **Infra:** Docker + nginx (`Dockerfile`, `nginx.conf`) y `nixpacks.toml`
 
 ## Estructura
@@ -220,7 +354,8 @@ src/
     atak.ts                API pública de ATAK.GG: valida un Riot ID; nunca lanza ni bloquea
     reglamento.ts          ruta, nombre de descarga y peso del PDF del reglamento
   pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro · Reglamento
-    admin/                 panel protegido: Login · RutaProtegida · Panel · ListaInscripciones
+    admin/                 panel protegido: Login · RutaProtegida · Panel ·
+                           ListaInscripciones · SubirGaleria · GestionGaleria
 public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico,
                            reglamento-lqc-2026.pdf
 ```
@@ -356,6 +491,20 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   `hover:from-lqc-600 hover:to-lqc-400`.
 - **Canon del gradiente de títulos** (idéntico en las 6 páginas):
   `from-blue-400 via-blue-300 to-lqc-accent`.
+- **Un guard derivado de estado NO protege contra el doble clic.** Un
+  `const ocupado = estado === 'x'` recién se vuelve true **después de un re-render**, así
+  que si el handler hace `await` **antes** de tocar estado, un segundo clic entra por esa
+  ventana y lanza la operación dos veces. Le pasó al uploader de galería: el `await` de
+  `getSession()` estaba antes del cambio de estado y un doble clic subía el lote entero
+  **dos veces**, con archivos y filas duplicados que hay que limpiar a mano. Se cierra con
+  un **`useRef` puesto en la primera línea del handler, antes de cualquier `await`, y
+  liberado en un `finally`**: un ref cambia en el acto y no espera al render.
+- **«0 filas sin error» también aplica a DELETE y a Storage.** Ya estaba documentado para
+  el UPDATE de archivado, y vale igual para los dos casos nuevos: un `.delete()` de
+  PostgREST **no devuelve filas** si no se le encadena `.select(...)`, y
+  `storage.remove()` puede volver con `error: null` **sin haber borrado nada** si la
+  política del bucket no lo permite. En los dos hay que comprobar `data.length > 0`, no
+  el `error`.
 - **Un build verde puede salir con el formulario muerto.** Si faltan las
   variables de entorno de Supabase, `npm run build` **pasa igual** (0 errores,
   0 warnings) y el sitio se ve perfecto, pero `/registro` no guarda nada: el
