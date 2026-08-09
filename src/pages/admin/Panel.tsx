@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Images, LogOut } from 'lucide-react'
+import { ClipboardList, Images, LogOut, Trash2 } from 'lucide-react'
 import { obtenerSupabase } from '../../lib/supabase'
 import ListaInscripciones from './ListaInscripciones'
 import SubirGaleria from './SubirGaleria'
+import GestionGaleria from './GestionGaleria'
 
-/* Las dos vistas del panel. El estado vive en memoria y NO en la URL, así que la sección
+/* Las vistas del panel. El estado vive en memoria y NO en la URL, así que la sección
    se pierde al recargar — asumido para esta primera versión. Cuando haga falta que sea
    enlazable, el camino es una ruta hermana `/admin/galeria` dentro de la misma
    <RutaProtegida>, y este archivo pasa a ser el layout compartido.
    `ancho` por sección: el listado de inscripciones son tarjetas de texto y se lee mejor
-   angosto; el formulario de galería, con su vista previa, respira un poco más. */
+   angosto; el formulario de galería, con su vista previa, respira un poco más; la grilla de
+   gestión son miniaturas en tres columnas y necesita todavía más. */
 const SECCIONES = [
   {
     id: 'inscripciones',
@@ -27,10 +29,34 @@ const SECCIONES = [
     titulo: 'Galería',
     bajada: 'Sube fotos para la galería pública del sitio.',
     ancho: 'max-w-3xl'
+  },
+  {
+    id: 'gestion',
+    etiqueta: 'Gestionar',
+    icono: Trash2,
+    titulo: 'Gestionar galería',
+    /* La bajada dice que borra y que no se deshace: es la única sección del panel que
+       destruye datos, y el nombre "Gestionar" por sí solo no lo delata. Por eso también el
+       icono es el bote y no una grilla. */
+    bajada: 'Borra fotos publicadas. Se van de la galería y del almacenamiento.',
+    ancho: 'max-w-5xl'
   }
 ] as const
 
 type SeccionId = (typeof SECCIONES)[number]['id']
+
+/* Qué componente monta cada sección. Va en un mapa y no en el ternario que había: con dos
+   secciones `a ? X : Y` alcanzaba, pero con tres el `else` pasa a ser un cajón de sastre
+   —cualquier id que no sea el del `if` cae en el mismo componente— y la cuarta obligaría a
+   encadenar ternarios. Tipado como `Record<SeccionId, …>`, el compilador exige una entrada
+   por cada id de SECCIONES: agregar una sección sin su vista no compila.
+   Cada id apunta a un componente DISTINTO, así que cambiar de pestaña lo desmonta y lo
+   vuelve a montar — que es justo lo que se quiere (ver el comentario del <main>). */
+const VISTAS: Record<SeccionId, ComponentType> = {
+  inscripciones: ListaInscripciones,
+  galeria: SubirGaleria,
+  gestion: GestionGaleria
+}
 
 /* Pestaña. La base sin colores y cada variante COMPLETA, no apilando clases sobre una
    base que ya trae borde: dos utilidades del mismo grupo se resuelven por su orden en el
@@ -84,6 +110,7 @@ export default function Panel() {
   /* Nunca es undefined: `seccionId` está tipado con los ids del propio array. El `?? ` es
      para que TypeScript no lo dé por opcional al buscar en una tupla `as const`. */
   const seccion = SECCIONES.find((s) => s.id === seccionId) ?? SECCIONES[0]
+  const Vista = VISTAS[seccionId]
 
   const cerrarSesion = async () => {
     if (cerrando) return
@@ -179,11 +206,12 @@ export default function Panel() {
           </h1>
           <p className="text-gray-400 mb-10">{seccion.bajada}</p>
 
-          {/* Listado de equipos con su roster. Ya NO agrupa nada en el cliente: lee
-              `equipos` con sus `jugadores` embebidos por el join.
+          {/* La vista de la sección activa, resuelta por el mapa de arriba.
               Se DESMONTA al cambiar de pestaña, y eso es lo que se quiere: al volver
-              recarga el listado, así se ve lo que haya entrado mientras tanto. */}
-          {seccionId === 'inscripciones' ? <ListaInscripciones /> : <SubirGaleria />}
+              recarga sus datos, así se ve lo que haya entrado mientras tanto. Vale para el
+              listado de equipos y también para la grilla de gestión, que de ese modo muestra
+              lo recién subido desde la pestaña de al lado sin refrescar nada a mano. */}
+          <Vista />
         </div>
       </main>
     </div>
