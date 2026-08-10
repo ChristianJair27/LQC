@@ -515,6 +515,32 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   sirve para probar la ruta real (el chunk de `/registro` pasa de ~238 kB a
   ~25 kB).
 
+### Policies de `jugadores`: seguras HOY solo porque no hay login de jugador (deuda P1)
+
+Las policies RLS de `public.jugadores` para el rol `authenticated` son permisivas sin
+filtro real:
+- **SELECT** "Solo admins leen jugadores" → `qual = true` (VIVA: `authenticated` tiene
+  GRANT SELECT, necesario para el embed `equipos → jugadores` del panel).
+- **UPDATE** "Solo admins actualizan jugadores" → `qual = true, check = true` (MUERTA:
+  el GRANT UPDATE de `authenticated` está revocado, así que hoy no habilita nada. La
+  única escritura legítima es la RPC `editar_jugador`, SECURITY DEFINER).
+
+Los nombres MIENTEN: no filtran por admin. La base **no tiene concepto de admin de LQC**;
+los 3 usuarios de `auth.users` son staff de confianza (todos `@revolution505.com`), así
+que "cualquier authenticated lee todo" == "los admins leen todo". El registro de jugadores
+es anónimo (`anon` no tiene SELECT), así que ningún jugador tiene sesión.
+
+**Por qué es seguro hoy:** no hay nadie no-staff con sesión autenticada. Verificado
+2026-08-09: 3 usuarios en `auth.users`, todos admins creados por el equipo.
+
+**GATILLO (P1) — antes de habilitar CUALQUIER login de jugador/capitán:** crear una tabla
+`app_admins(user_id uuid)` con los uuids del staff y cambiar AMBAS policies a
+`USING (auth.uid() in (select user_id from app_admins))`. Sin esto, el día que un jugador
+pueda autenticarse podrá leer `/rest/v1/jugadores?select=*` con su token (saltándose el
+frontend por completo, vía la API REST de PostgREST) y sacar nombre + correo de TODOS los
+inscritos, menores incluidos. Es cambio de modelo de auth → va probado en local primero
+(Cabo B), no en caliente sobre prod.
+
 ## Variables de entorno
 
 Un build **funcional** necesita las dos variables documentadas en `.env.example`:
