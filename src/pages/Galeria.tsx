@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import {
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
   Image as ImageIcon,
   ImageOff,
   Video as VideoIcon,
@@ -182,6 +184,23 @@ function VacioGaleria() {
   )
 }
 
+/* Flechas de navegación del modal. Misma receta que los filtros y que el botón de cerrar:
+   `bg-none` para que `bg-black/60` no quede debajo del gradiente que index.css:159 le pone
+   a TODO <button>, y `hover:[transform:none]` para matar el salto de -2px de index.css:167
+   —en una flecha pegada al borde ese brinco se lee como un glitch—.
+   El «se ilumina» del hover es el mismo azul del resto del sitio: borde y chevron en
+   `lqc-accent` con el halo `shadow-blue-900/40` que ya usa el filtro activo. Los estados de
+   hover van bajo `enabled:` para que la flecha del extremo, ya atenuada, no reaccione;
+   `disabled:hover:shadow-none` le quita además el halo de la capa base. */
+const BTN_FLECHA = `
+  pointer-events-auto p-3 md:p-4 rounded-full border backdrop-blur-md transition-all duration-300
+  bg-none bg-black/60 border-white/10 text-white
+  hover:[transform:none]
+  enabled:hover:bg-black/80 enabled:hover:border-lqc-accent/60 enabled:hover:text-lqc-accent
+  enabled:hover:shadow-lg enabled:hover:shadow-blue-900/40
+  disabled:opacity-25 disabled:cursor-default disabled:hover:shadow-none
+`
+
 /* ------------------------------------------------------------------ */
 /*  Componente                                                         */
 /* ------------------------------------------------------------------ */
@@ -252,6 +271,52 @@ export default function Galeria() {
   /* Se busca UNA vez, no cinco como hacía el modal antes (un `find` por cada campo que
      pintaba). Si el id ya no está en la lista, `?? null` cierra el modal solo. */
   const itemAbierto = seleccionado === null ? null : (items.find((i) => i.id === seleccionado) ?? null)
+
+  /* La navegación del modal se mueve por `visibles`, NO por `items`: si el usuario está
+     viendo un subconjunto filtrado, siguiente/anterior tienen que quedarse dentro de ese
+     subconjunto. Por eso el índice se busca en la lista filtrada.
+     Con el modal cerrado —o si el abierto quedara fuera del filtro— da -1 y las dos
+     flechas quedan inertes. */
+  const indiceActual = seleccionado === null ? -1 : visibles.findIndex((i) => i.id === seleccionado)
+  const hayAnterior = indiceActual > 0
+  const haySiguiente = indiceActual >= 0 && indiceActual < visibles.length - 1
+
+  /* Un índice fuera de rango devuelve `undefined` y no hace nada. De ahí sale gratis el
+     requisito de no envolver: en la última foto, `visibles[length]` no existe y no se
+     salta a la primera. */
+  const irAlIndice = (indice: number) => {
+    const destino = visibles[indice]
+    if (destino) setSeleccionado(destino.id)
+  }
+
+  /* Teclado: ← anterior, → siguiente, Escape cierra.
+     Con el modal cerrado el efecto sale antes de registrar nada, así que la galería en
+     reposo no tiene ningún listener puesto; el cleanup lo quita tanto al cerrar como al
+     desmontar.
+     La navegación va en línea y no llamando a `irAlIndice` para que las dependencias del
+     efecto sean exactamente lo que el handler lee. `visibles` es un array nuevo en cada
+     render, así que el listener se vuelve a registrar en cada repintado: es barato
+     (add/removeEventListener) y garantiza que el handler nunca navegue sobre una lista
+     vieja. */
+  useEffect(() => {
+    if (seleccionado === null) return
+
+    const alTeclear = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') {
+        setSeleccionado(null)
+        return
+      }
+
+      const paso = evento.key === 'ArrowLeft' ? -1 : evento.key === 'ArrowRight' ? 1 : 0
+      if (paso === 0) return
+
+      const destino = visibles[indiceActual + paso]
+      if (destino) setSeleccionado(destino.id)
+    }
+
+    window.addEventListener('keydown', alTeclear)
+    return () => window.removeEventListener('keydown', alTeclear)
+  }, [seleccionado, visibles, indiceActual])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
@@ -428,6 +493,35 @@ export default function Galeria() {
               >
                 <X className="w-7 h-7" />
               </button>
+
+              {/* Flechas. Van DENTRO de la caja del modal porque tiene `overflow-hidden`:
+                  colgadas por fuera quedarían recortadas. El contenedor es
+                  `pointer-events-none` para no tapar la foto ni los controles del video, y
+                  cada botón se los devuelve con `pointer-events-auto`.
+                  El centrado vertical sale de `items-center`, NO de `-translate-y-1/2`: el
+                  `hover:[transform:none]` que hace falta contra index.css borraría ese
+                  translate y la flecha se desplomaría al pasar el mouse.
+                  Con una sola foto visible no se montan: dos flechas muertas no aportan. */}
+              {visibles.length > 1 && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-between px-4">
+                  <button
+                    className={BTN_FLECHA}
+                    onClick={() => irAlIndice(indiceActual - 1)}
+                    disabled={!hayAnterior}
+                    aria-label="Foto anterior"
+                  >
+                    <ChevronLeft className="w-7 h-7" />
+                  </button>
+                  <button
+                    className={BTN_FLECHA}
+                    onClick={() => irAlIndice(indiceActual + 1)}
+                    disabled={!haySiguiente}
+                    aria-label="Foto siguiente"
+                  >
+                    <ChevronRight className="w-7 h-7" />
+                  </button>
+                </div>
+              )}
 
               {itemAbierto.tipo === 'video' ? (
                 <div style={{ aspectRatio: proporcion(itemAbierto) }} className="bg-black">
