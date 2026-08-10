@@ -541,6 +541,34 @@ frontend por completo, vía la API REST de PostgREST) y sacar nombre + correo de
 inscritos, menores incluidos. Es cambio de modelo de auth → va probado en local primero
 (Cabo B), no en caliente sobre prod.
 
+### Cabo B — entorno local que espeje prod (diagnóstico HECHO, montaje pendiente)
+
+**Cómo está montado prod (verificado 2026-08-10, vía SSH a revolutionserv):**
+Supabase self-hosted armado con el **compose oficial de Supabase vía Coolify** (NO
+instalación a mano, NO el CLI de Supabase). Raíz del proyecto en el servidor:
+`/data/coolify/services/dd3pab1anj2tgzmw5xt6nvxd/`. Los scripts de init de la DB
+viven en `volumes/db/` (roles.sql, jwt.sql, realtime.sql, webhooks.sql, pooler.sql,
+logs.sql, _supabase.sql). `roles.sql` es el crítico para espejar roles/grants.
+Datos físicos en el volumen Docker `dd3pab1anj2tgzmw5xt6nvxd_supabase-db-data`.
+
+**Versiones exactas del stack (para pinear el local):**
+- Postgres: supabase/postgres:15.8.1.085 (server_version 15.8)
+- PostgREST: v14.6
+- GoTrue (auth): v2.186.0
+- Storage API: v1.44.2
+- MinIO: ghcr.io/coollabsio/minio (fork de Coolify, NO el oficial — ojo al espejar Storage)
+- Kong 3.9.1 · Studio 2026.03.16 · supavisor 2.7.4 · realtime v2.76.5 · edge-runtime v1.71.2
+
+**Estrategia elegida: A (CLI oficial de Supabase en local, pineado a estas versiones,
+portando esquema + roles).** NO replicar el compose entero de Coolify (Kong, supavisor,
+analytics, vector — innecesario para probar RLS/policies/RPCs). El objetivo del local es
+probar cambios de RLS/policies/RPCs/triggers ANTES de tocar prod, no correr el stack completo.
+
+**Primeros pasos del montaje (próxima sesión, cabeza fresca):**
+1. `Test-Path supabase` en C:\Dev\LQC — ¿ya hay carpeta de CLI o se arranca de cero?
+2. Extraer esquema de prod: pg_dump --schema-only (comando exacto a definir con cuidado, es lectura sobre prod viva).
+3. Replicar roles base desde roles.sql.
+
 ## Variables de entorno
 
 Un build **funcional** necesita las dos variables documentadas en `.env.example`:
