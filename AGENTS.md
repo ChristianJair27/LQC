@@ -233,7 +233,11 @@ Público para lectura, **límite de 10 MB por archivo** y MIME permitidos: `imag
 Todas con **condición real** — nunca `check = true`:
 
 - **`galeria_media`** — SELECT público (`anon` + `authenticated`); INSERT y DELETE solo
-  `authenticated`.
+  `authenticated`. **No hay policy de UPDATE**, y por eso la edición de título del panel
+  falla en runtime. Ojo además: los GRANTS de `anon` y `authenticated` son bastante más
+  anchos que estas policies (INSERT/UPDATE/DELETE/TRUNCATE completos), así que lo que
+  contiene la escritura hoy es la RLS, no los privilegios. Las dos cosas, con el detalle
+  y el orden en que hay que arreglarlas, en «Edición de título (GestionGaleria.tsx)».
 - **`storage.objects`** (bucket `galeria`) — SELECT público; INSERT y DELETE solo
   `authenticated`.
 
@@ -242,12 +246,22 @@ Es la **primera y única** superficie del proyecto con DELETE habilitado.
 ### Componentes
 
 - **`SubirGaleria.tsx`** — uploader múltiple, pestaña «Galería».
-- **`GestionGaleria.tsx`** — borrado, pestaña «Gestionar».
+- **`GestionGaleria.tsx`** — borrado y edición de título, pestaña «Gestionar».
 - **`Panel.tsx`** pasó del ternario binario a un mapa
   `Record<SeccionId, ComponentType>` con **3 pestañas**: Inscripciones / Galería /
   Gestionar. Con tres secciones el `else` del ternario era un cajón de sastre —cualquier
   id que no fuera el del `if` caía en el mismo componente—; el mapa tipado obliga a una
   entrada por cada id.
+
+### Lightbox con navegación (Galeria.tsx)
+
+**Hecho el 2026-08-10.** El modal de la galería pública (estado `seleccionado` = id de la
+foto abierta) permite navegar entre fotos sin cerrarlo: teclado ←/→ (anterior/siguiente) y
+Escape (cerrar), más flechas en pantalla (ChevronLeft/ChevronRight de lucide-react, estilo
+lqc-accent). CRÍTICO: la navegación se mueve por la lista FILTRADA (`visibles`), no por
+`items` — respeta el filtro activo. No envuelve en los extremos (primera/última foto
+atenúan la flecha). El título de la foto se muestra en el overlay si existe y se actualiza
+al navegar.
 
 ### Uploader (`SubirGaleria.tsx`)
 
@@ -308,6 +322,26 @@ los dos alcanza:
    archivo y su registro juntos.
 
 Por eso el borrado del archivo va **por frontend** y no por función SQL.
+
+### Edición de título (GestionGaleria.tsx) — UI LISTA, FALTA POLICY EN PROD
+
+**Hecho el 2026-08-10, PERO no funciona todavía.** La UI de edición de título está
+completa (botón "Editar título" con Pencil, input que precarga el título actual, guardar/
+cancelar, manejo de foco y estados por-item como el borrado). Guarda con
+`.update({ titulo }).eq('id').select('id')`, verificando error Y data.length > 0 (patrón
+"0 filas sin error"). Vacío se guarda como NULL, no ''.
+
+**BLOQUEANTE:** `galeria_media` NO tiene policy de UPDATE (solo SELECT/INSERT/DELETE), así
+que el guardado FALLA en runtime con el mensaje "La base no guardó nada... tu sesión no
+tenga permiso". Esto es esperado: la UI maneja el fallo con gracia. Para que funcione hay
+que crear la policy de UPDATE en prod (trabajo pendiente).
+
+**Deuda asociada (verificado 2026-08-10):** los GRANTS de `galeria_media` son demasiado
+anchos — `anon` y `authenticated` tienen INSERT/UPDATE/DELETE/TRUNCATE completos (grants
+por defecto de Supabase nunca revocados). Hoy es seguro porque RLS los contiene (solo las
+policies existentes pasan), pero al crear la policy de UPDATE conviene, en la MISMA sesión,
+revocar de `anon` los privilegios de escritura que no debe tener (solo necesita SELECT).
+Cambio de RLS → probar en local (Cabo B) antes de prod.
 
 ### Infra de Storage (Supabase self-hosted)
 
