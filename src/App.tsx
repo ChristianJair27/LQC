@@ -6,6 +6,7 @@ import { Suspense, lazy } from 'react' // ← Para lazy loading (mejor performan
 // que fallan al cargar; el layout público envuelve las rutas del sitio.
 import ErrorBoundary from './components/ErrorBoundary'
 import LayoutPublico from './components/layout/LayoutPublico'
+import ScrollToTop from './components/ScrollToTop'
 
 // Lazy loading de páginas (carga solo cuando se necesita)
 const Home = lazy(() => import('./pages/Home'))
@@ -32,6 +33,13 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex flex-col bg-black text-gray-100 antialiased">
+        {/* Sube al tope en cada cambio de ruta. Va acá y no en main.tsx porque usa
+            `useLocation`, que necesita estar DEBAJO del <BrowserRouter> — en main.tsx sería
+            hermano del router y lanzaría. Al mismo nivel que <Routes> y no adentro: una sola
+            instancia para todo el sitio, admin incluido, y sin depender de qué ruta matchee.
+            No renderiza nada. */}
+        <ScrollToTop />
+
         {/* Suspense global: cubre TODAS las rutas lazy, incluidas las de /admin
             (que quedan fuera de LayoutPublico). Si el Suspense viviera dentro del
             layout, las rutas admin se cargarían sin boundary y React lanzaría. */}
