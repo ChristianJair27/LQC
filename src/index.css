@@ -289,6 +289,81 @@
     animation: var(--animate-pulse-slow);
   }
 
+  /* Pills de marca del navbar — los dos enlaces externos de Header.tsx (ATAK.GG y
+     Revolution505). Acá vive SOLO el mecanismo, que es idéntico para los dos; el color lo
+     inyecta cada acento con `--pill-rgb`.
+     Esa separación no es cosmética. Los dos botones son una pareja de luminancia
+     balanceada —el porqué está documentado en Header.tsx— y si el efecto viviera duplicado
+     dentro de cada acento, el próximo retoque se le haría a uno solo y dejarían de pesar
+     igual. Con el mecanismo compartido eso no se puede hacer sin querer: lo único que
+     difiere entre un botón y el otro sigue siendo el hue.
+
+     Reutiliza el mecanismo de `.text-metal` y no uno nuevo: un gradiente estirado al 200%
+     del ancho de la caja, que se mueve cambiando `background-position` con el
+     `@keyframes shimmer` que ya vivía en este archivo. No se agregó ningún keyframe.
+
+     En REPOSO el gradiente está quieto: el navbar está siempre a la vista y una animación
+     en loop permanente ahí cansa y compite con el contenido de la página. Con la posición
+     en `0% 50%` lo que se ve es la mitad izquierda del gradiente, o sea una subida suave
+     hacia el borde derecho — donde está el chevron. El shimmer corre SOLO en hover.
+
+     `background-image` y no `background`: la abreviada resetearía el `background-color`
+     que el botón trae de su clase base, que es el fondo oscuro sobre el que este gradiente
+     se apoya. Ese fondo tiene que quedar intacto o el texto pierde contraste.
+
+     POR QUÉ EL ACENTO PASA CANALES sRGB (`251 44 54`) Y NO EL COLOR ENTERO. La versión
+     obvia era `color-mix(in oklab, var(--pill-color) 8%, transparent)`, y se probó: compila,
+     pero mal. Lightning CSS —el minificador de Vite— le genera a cada `color-mix` una regla
+     de respaldo para navegadores viejos, y para poder calcularla necesita el color en
+     tiempo de compilación. Las utilidades de Tailwind se lo dan (`border-red-500/50` se
+     resuelve a `#fb2c3680`), pero acá el color llega por una variable que pone OTRA clase,
+     así que no hay nada que calcular y el respaldo que emitía era el color CRUDO, sin
+     mezcla: los dos pills al 100% de rojo y azul sólido. Justo lo contrario de sutil, y
+     encima solo visible en los navegadores que no se prueban.
+     Con `rgb(<canales> / <alfa>)` no hace falta respaldo de nada: es sintaxis soportada
+     desde 2020 y se pinta igual en todos lados. El precio es que los canales son literales
+     y no `var(--color-red-500)`, o sea que si Tailwind algún día cambiara su paleta, borde
+     y gradiente se irían por caminos distintos. Es un precio bajo y ruidoso: los dos tonos
+     salen del análisis de luminancia de Header.tsx y no se tocan sin rehacerlo, y si se
+     desincronizaran se vería a simple vista en el mismo botón.
+     Los valores son los de `red-500` (#fb2c36) y `blue-500` (#3080ff), o sea EXACTAMENTE
+     los mismos que ya pintan el borde y la sombra de cada botón.
+
+     El respaldo `0 0 0` del `var()` no es defensa de más: sin acento puesto, el gradiente
+     queda en negro casi transparente sobre un fondo ya oscuro —o sea, invisible— en vez de
+     invalidar la declaración entera.
+
+     La animación la desactiva sola el bloque de `prefers-reduced-motion` del final de este
+     archivo. El gradiente de reposo se queda —no es movimiento— y no se pierde nada: lo
+     que identifica a cada botón sigue siendo su borde y su sombra, no el brillo. */
+  .pill-marca {
+    background-image: linear-gradient(
+      110deg,
+      transparent 0%,
+      rgb(var(--pill-rgb, 0 0 0) / 8%) 30%,
+      rgb(var(--pill-rgb, 0 0 0) / 15%) 50%,
+      rgb(var(--pill-rgb, 0 0 0) / 8%) 70%,
+      transparent 100%
+    );
+    background-size: 200% auto;
+    background-position: 0% 50%;
+  }
+
+  /* El hover hace las dos cosas a la vez: sube la mezcla (8/15 → 16/28) y suelta el
+     shimmer. La animación arranca en `0% 50%`, que es exactamente la posición de reposo,
+     así que al entrar el mouse no hay salto. */
+  .pill-marca:hover {
+    background-image: linear-gradient(
+      110deg,
+      transparent 0%,
+      rgb(var(--pill-rgb, 0 0 0) / 16%) 30%,
+      rgb(var(--pill-rgb, 0 0 0) / 28%) 50%,
+      rgb(var(--pill-rgb, 0 0 0) / 16%) 70%,
+      transparent 100%
+    );
+    animation: var(--animate-shimmer);
+  }
+
   /* Utilidades de perspectiva */
   .perspective-1000 {
     perspective: 1000px;

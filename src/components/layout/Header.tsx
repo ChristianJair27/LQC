@@ -22,9 +22,18 @@ const navItems = [
    en Home.tsx. Se aplica a los dos para que no se comporten distinto al pasar el mouse.
    El resto es el estilo del botón de Revolution505 tal cual, con dos ajustes de ancho que el
    segundo botón obliga (ver el comentario de la navegación): `px-3` en vez de `px-5` hasta xl,
-   y `gap-2` en vez de `gap-3`. */
+   y `gap-2` en vez de `gap-3`.
+   `pill-marca` es la clase escrita a mano en index.css que trae el gradiente de marca en
+   reposo y el shimmer en hover. Va en la BASE y no en cada acento a propósito: el fondo es
+   lo que los dos botones comparten, y el mecanismo compartido es lo que impide que el
+   próximo retoque le toque a uno solo (ver la nota de paridad más abajo). Lo único que cada
+   acento le pasa es el hue, vía `--pill-rgb`.
+   Está escrita a mano en el CSS y no armada con utilidades por dos razones: Tailwind 4 no
+   tiene forma de expresar «gradiente al 200% de ancho que se mueve en hover» sin un montón
+   de valores arbitrarios ilegibles, y una clase que vive en index.css no depende del
+   escaneo de los .tsx, así que no hay manera de que el purge se la lleve. */
 const CLASE_BOTON_EXTERNO =
-  'after:hidden hidden sm:flex items-center gap-2 xl:gap-3 px-3 xl:px-4 py-2.5 ' +
+  'pill-marca after:hidden hidden sm:flex items-center gap-2 xl:gap-3 px-3 xl:px-4 py-2.5 ' +
   'bg-gray-900 border text-gray-200 hover:text-white rounded-lg ' +
   'transition-all duration-300 shadow-md hover:shadow-lg text-sm font-medium'
 
@@ -32,9 +41,11 @@ const CLASE_BOTON_EXTERNO =
    son idénticas salvo el nombre del color: mismo grosor de borde (el `border` de 1px vive en la
    base), mismas opacidades y mismas dos sombras. Si alguna vez hay que retocar el nivel, se
    retocan LAS DOS o dejan de ser pareja.
-   El fondo NO participa: se queda en el `bg-gray-900` de la base en reposo y en hover. Lo que
-   cambia al pasar el mouse es el borde (de 50% a 90% de opacidad, y un tono más claro) y la
-   sombra (de `shadow-md` al 20% a `shadow-lg` al 40%). Es un realce, no un relleno.
+   El color de fondo no participa: se queda en el `bg-gray-900` de la base en reposo y en hover.
+   Lo que cambia al pasar el mouse es el borde (de 50% a 90% de opacidad, y un tono más claro),
+   la sombra (de `shadow-md` al 20% a `shadow-lg` al 40%) y, desde que existe `pill-marca`, la
+   intensidad del gradiente que corre POR ENCIMA de ese fondo. Sigue siendo un realce y no un
+   relleno: el gradiente es un velo de un dígito porcentual, no una capa de pintura.
 
    Por qué estos dos tonos y no otros, que es la parte que importa:
    Los colores salen de los logos. Muestreados, el de Revolution505 es cian/turquesa —hue 173°
@@ -48,10 +59,27 @@ const CLASE_BOTON_EXTERNO =
    mismo vale para el par de hover, `blue-400`/`red-400` (L≈0.705 los dos). Por eso el azul del
    botón tira más a azul que a cian: es el precio de que las dos marcas pesen igual.
    Nota de paleta: el rojo es la única excepción a la regla azul/negro de CLAUDE.md, y es
-   deliberada — es el color de una marca ajena, acotado a su propio botón. Nada de `purple-*`. */
+   deliberada — es el color de una marca ajena, acotado a su propio botón. Nada de `purple-*`.
+
+   El `--pill-rgb` es el tercer eje que agregó el gradiente, y es DELIBERADAMENTE el mismo
+   tono que ya llevaban el borde y la sombra: `blue-500` (#3080ff) y `red-500` (#fb2c36), el
+   par que la nota de arriba eligió por su luminosidad pareja. Van como canales sRGB sueltos
+   y no como color porque el gradiente les aplica opacidad con `rgb(... / N%)`; el porqué de
+   esa sintaxis, que no es un capricho, está en el comentario de `.pill-marca` en index.css.
+   Si alguno de los dos se cambia acá, hay que cambiar el otro Y su borde, o el mismo botón
+   queda con el filete de un tono y el velo de otro.
+   La tentación con el gradiente puesto es pintar el de Revolution505 con el cian del logo (o
+   con `lqc-accent`) ahora que es un relleno y no un borde de 1px — y sería peor justamente
+   por eso: el cian tiene 2.4 veces la luminancia del rojo, y sobre un área grande esa
+   diferencia no se disimula como en un filete de 1px — se ve como que un botón está encendido
+   y el otro apagado. O sea que el gradiente hace que la paridad importe MÁS que antes, no
+   menos. Si algún día se retoca el nivel de mezcla, se retoca en index.css, que es donde vive
+   una sola vez para los dos. */
 const ACENTO_REVOLUTION =
+  '[--pill-rgb:48_128_255] ' +
   'border-blue-500/50 shadow-blue-500/20 hover:border-blue-400/90 hover:shadow-blue-500/40'
 const ACENTO_ATAK =
+  '[--pill-rgb:251_44_54] ' +
   'border-red-500/50 shadow-red-500/20 hover:border-red-400/90 hover:shadow-red-500/40'
 
 /* Los logos se normalizan por ALTURA y no por caja cuadrada, que es lo que hacía el botón
@@ -75,9 +103,14 @@ const CLASE_CHEVRON_BOTON = 'w-4 h-4 hidden xl:block'
 
 /* Los mismos dos enlaces dentro del cajón móvil, donde no hay problema de ancho y la caja es
    más grande. Sin `mt-4`: lo lleva solo el primero, para despegarse de los enlaces de
-   navegación; entre ellos dos ya separa el `gap-3` del <nav> que los contiene. */
+   navegación; entre ellos dos ya separa el `gap-3` del <nav> que los contiene.
+   Lleva `pill-marca` igual que la versión de barra: es la misma pareja de botones y tiene
+   que verse igual en los dos tamaños. Acá el hover es menos relevante —en móvil casi no
+   existe—, pero el gradiente de reposo sí se ve, y en una caja de fila entera se aprecia
+   más que en la pastilla chica de la barra. Que el efecto no dependa del tamaño es parte de
+   lo mismo: un solo mecanismo, en un solo lugar. */
 const CLASE_BOTON_EXTERNO_MOVIL =
-  'after:hidden flex items-center justify-between px-6 py-4 text-xl font-medium ' +
+  'pill-marca after:hidden flex items-center justify-between px-6 py-4 text-xl font-medium ' +
   'bg-gray-900 border rounded-xl transition-all duration-300 ' +
   'text-gray-200 hover:text-white shadow-md hover:shadow-lg'
 
