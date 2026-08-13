@@ -34,6 +34,16 @@ const MAX_FRASE = 24
 const AVISO_CATALOGO = 'No se pudo cargar el catálogo de campeones. Recargá la página.'
 const AVISO_EXPORT = 'No se pudo generar la imagen. Probá de nuevo.'
 
+/* Descargo de Riot Games. Es un REQUISITO legal por usar su arte y sus marcas, no un
+   adorno: no se saca, no se resume y no se traduce de nuevo. El texto es literal.
+   Va en una constante y no suelto en el JSX para que se pueda comparar carácter por
+   carácter contra el original sin pelear con cómo JSX colapsa los saltos de línea. */
+const AVISO_RIOT =
+  'LQC no está avalado por Riot Games y no refleja los puntos de vista u opiniones de ' +
+  'Riot Games o de cualquier persona involucrada oficialmente en la producción o gestión ' +
+  'de las propiedades de Riot Games. Riot Games y todas las propiedades asociadas son ' +
+  'marcas comerciales o marcas registradas de Riot Games, Inc.'
+
 /* Clases a nivel de módulo: adentro del componente se recrearían en cada render, los
    inputs se remontarían y el foco se perdería al escribir (ver Registro.tsx). */
 const CLASE_INPUT =
@@ -544,6 +554,17 @@ export default function Carta() {
                 </p>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Descargo de Riot. Atenuado pero legible, y separado por un filo: tiene que
+            leerse como pie legal de la página y no como una línea más del generador.
+            No compite con la feature, pero tampoco se esconde — es un requisito. */}
+        <section className="border-t border-white/5 py-12">
+          <div className="container mx-auto px-6 max-w-3xl">
+            <p className="text-center text-xs leading-relaxed text-gray-500">
+              {AVISO_RIOT}
+            </p>
           </div>
         </section>
       </div>

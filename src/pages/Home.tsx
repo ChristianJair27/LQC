@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Twitch, Calendar, ChevronRight, UserPlus } from 'lucide-react'
+import { Twitch, Calendar, ChevronRight, UserPlus, IdCard } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 /* Mismo parche que Footer.tsx: React Router en modo declarativo no resetea el scroll y el
@@ -697,8 +697,43 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Generador de carta de jugador.
+            VA DESPUÉS DEL CTA DE REGISTRO Y CON MENOS PESO, a propósito. La acción que la
+            portada quiere sigue siendo registrarse (ver el comentario de esa sección), así
+            que esta no repite su tarjeta con gradiente ni su botón primario: usa el
+            encabezado de sección con barrita —el mismo de Transmisión y Patrocinadores— y
+            el CTA SECUNDARIO. Si algún día se le sube la jerarquía, hay dos primarios
+            compitiendo en la misma página y el de registro pierde.
+            Sin fondo tintado por el ritmo que fija el comentario de Patrocinadores: el CTA
+            de registro ya es la banda tintada y dos seguidas se leerían como una sola. */}
+        <section className="py-20">
+          <div className="container mx-auto px-6 max-w-6xl">
+            <div className="flex items-center gap-4 mb-12">
+              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+              <h2 className="text-3xl font-light">Armá tu carta de jugador</h2>
+            </div>
+
+            <div className="flex flex-col items-start gap-8 md:flex-row md:items-center md:justify-between">
+              <p className="text-lg text-gray-300 leading-relaxed md:max-w-2xl">
+                Elegí tu campeón, poné tu nick y descargá una carta con los colores del LQC
+                para compartir en tus redes.
+              </p>
+
+              <Link
+                to="/carta"
+                onClick={irAlTope}
+                className={`${CLASE_CTA_SECUNDARIO} w-full shrink-0 sm:w-auto`}
+              >
+                <IdCard className="w-5 h-5 shrink-0" aria-hidden="true" />
+                Crear mi carta
+                <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Patrocinadores. Sin fondo tintado: el ritmo de la portada lo fija el comentario
-            de la sección CTA de más arriba (Hero → Transmisión → CTA tintado → esta). */}
+            de la sección CTA de más arriba (Hero → Transmisión → CTA tintado → Carta → esta). */}
         <section className="py-20">
           <div className="container mx-auto px-6 max-w-6xl">
             <div className="flex items-center gap-4 mb-12">

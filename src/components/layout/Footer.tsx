@@ -147,6 +147,17 @@ export default function Footer() {
                   Registro
                 </Link>
               </li>
+              <li>
+                {/* Va último de Recursos: es lo más liviano de los tres —un generador para
+                    compartir en redes— y no un documento que alguien necesite para competir.
+                    Conserva el `irAlTope` de sus vecinos aunque el ScrollToTop global ya lo
+                    cubra: la limpieza de estos onClick es un cambio aparte y para todos a la
+                    vez, no uno que deje este ítem distinto de los otros dos. */}
+                <Link to="/carta" onClick={irAlTope} className={CLASE_ENLACE}>
+                  <div className={CLASE_PUNTO}></div>
+                  Carta de jugador
+                </Link>
+              </li>
             </ul>
           </div>
 
