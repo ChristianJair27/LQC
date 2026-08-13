@@ -1,5 +1,9 @@
-/* `Award` se fue del import junto con la celda «$500K+ En Premios», que era su único uso. */
-import { Trophy, Users, MapPin, Calendar, Target, Globe, Heart, Star, ChevronRight } from 'lucide-react'
+/* `Award` se fue del import junto con la celda «$500K+ En Premios», que era su único uso.
+   `Star` y `ChevronRight` se fueron por lo mismo, con la sección «El Equipo»: el primero era
+   el avatar de las tarjetas y el segundo el chevron del botón «Contactar al equipo», y
+   ninguno de los dos se usaba en otra parte del archivo. Con `noUnusedLocals` en
+   tsconfig.app.json, dejarlos importados no es un detalle de prolijidad: rompe el build. */
+import { Trophy, Users, MapPin, Calendar, Target, Globe, Heart } from 'lucide-react'
 
 
 export default function Acerca() { 
@@ -23,13 +27,6 @@ export default function Acerca() {
     { year: "2023", event: "Comunidad de 10K+", detail: "Cobertura regional" },
     { year: "2024", event: "Formato competitivo", detail: "Sistema de playoffs" },
     { year: "2025", event: "Ecosistema establecido", detail: "Temporadas regulares" },
-  ]
-
-  const teamMembers = [
-    { name: "Director del Torneo", role: "Organización general", experience: "5+ años en esports" },
-    { name: "Coordinador de Equipos", role: "Gestión de participantes", experience: "4+ temporadas" },
-    { name: "Productor de Contenido", role: "Stream y producción", experience: "3+ años en broadcasting" },
-    { name: "Juez Principal", role: "Reglas y fair play", experience: "6+ años competitivos" },
   ]
 
   const values = [
@@ -227,41 +224,21 @@ export default function Acerca() {
           </div>
         </section>
 
-        {/* Equipo */}
-        <section className="py-20 bg-black/20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-16">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">El Equipo</h2>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {teamMembers.map((member, index) => (
-                <div 
-                  key={index} 
-                  className="bg-black/30 backdrop-blur-sm p-8 rounded-2xl border border-white/5 hover:border-blue-500/30 hover:shadow-blue-900/20 transition-all duration-300 text-center"
-                >
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-800/50 to-gray-700/30 flex items-center justify-center">
-                    <Star className="w-8 h-8 text-blue-400" />
-                  </div>
-                  <h3 className="text-xl font-medium mb-2">{member.name}</h3>
-                  <div className="text-blue-300 mb-2">{member.role}</div>
-                  <div className="text-sm text-gray-400">{member.experience}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-16 text-center">
-              <p className="text-gray-300 mb-8 text-lg">
-                ¿Interesado en unirte al equipo o colaborar con el LQC?
-              </p>
-              <button className="inline-flex items-center gap-3 px-10 py-4 bg-gradient-to-r from-blue-900/40 to-blue-800/20 border border-blue-700/30 text-gray-200 rounded-xl hover:from-blue-800/50 hover:to-blue-700/30 transition-all duration-300 shadow-lg shadow-blue-900/20">
-                Contactar al equipo
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </section>
+        {/* ACÁ NO HAY SECCIÓN «EL EQUIPO». Eran cuatro tarjetas de staff y se fueron enteras
+            —encabezado, tarjetas y el CTA «Contactar al equipo» que colgaba de ellas—, no
+            solo las tarjetas: un <h2> sobre un contenedor vacío es peor que no tener la
+            sección, y el CTA preguntaba «¿Interesado en unirte al equipo?» justo debajo de
+            un equipo que ya no se muestra.
+            Los datos eran placeholder y no personas: los cuatro «nombres» eran cargos
+            genéricos —«Director del Torneo», «Coordinador de Equipos», «Productor de
+            Contenido», «Juez Principal»— con una experiencia inventada al lado («5+ años en
+            esports»). O sea que el sitio presentaba como equipo real algo que nadie podía
+            respaldar, que es el mismo criterio por el que ya se habían ido «200+ Equipos» y
+            «$500K+ En Premios» de las estadísticas de más arriba.
+            Vuelve cuando haya nombres de personas de verdad que quieran figurar.
+            El botón además no llevaba a ningún lado: era un <button> sin onClick ni href. Si
+            la sección vuelve, ese CTA necesita destino —/contacto es el candidato— antes de
+            volver a pintarse. */}
 
         {/* CTA final */}
         <section className="py-20">
