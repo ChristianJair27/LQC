@@ -31,14 +31,14 @@ const URL_VERSIONES = `${BASE}/api/versions.json`
    toda en español. */
 const IDIOMA = 'es_MX'
 
-/* 5 s, el mismo corte que usa atak.ts. `fetch` no trae timeout propio y sin esto la
-   petición queda a merced del timeout del navegador, que puede ser de minutos.
-   OJO con este número: `champion.json` pesa ~156 kB sin comprimir (173 campeones con sus
-   descripciones y estadísticas), bastante más que la respuesta mínima que consulta
-   atak.ts. En una conexión mala 5 s puede quedar corto y la lista caería a vacía. Si eso
-   se ve en la práctica, lo que hay que subir es este corte, no cambiar el manejo de
-   error. */
-const TIEMPO_LIMITE_MS = 5_000
+/* `fetch` no trae timeout propio: sin esto la petición queda a merced del timeout del
+   navegador, que puede ser de minutos.
+   Dos cortes distintos porque los dos cuerpos no se parecen en nada. `versions.json` son
+   5 kB y se resuelve al instante, así que mantiene los 5 s de atak.ts. `champion.json`
+   son ~156 kB SIN comprimir —el CDN no devolvió `Content-Encoding`— y con 5 s en una
+   conexión mala se cortaba a mitad de descarga y el catálogo caía a vacío. */
+const TIEMPO_LIMITE_VERSION_MS = 5_000
+const TIEMPO_LIMITE_CATALOGO_MS = 10_000
 
 /* Valor de respaldo cuando `versions.json` no se puede leer. Verificado vigente el
    2026-08-13. Que quede viejo NO rompe la feature: las rutas versionadas de versiones
@@ -61,11 +61,11 @@ export type Campeon = {
    que no hace falta distinguir POR QUÉ falló: el resultado sería el mismo.
    (Un cuerpo JSON que sea literalmente `null` es indistinguible de un fallo acá. No
    importa: las lecturas de abajo lo rechazarían igual y caerían al mismo valor seguro.) */
-async function pedirJson(url: string): Promise<unknown> {
+async function pedirJson(url: string, tiempoLimiteMs: number): Promise<unknown> {
   try {
     const respuesta = await fetch(url, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(TIEMPO_LIMITE_MS)
+      signal: AbortSignal.timeout(tiempoLimiteMs)
     })
 
     /* `fetch` NO rechaza por 4xx/5xx. Sin este guard, un 403 con cuerpo XML —que es
@@ -95,7 +95,7 @@ const FORMATO_VERSION = /^[\w.]+$/
    recorrer los 497 restantes para comprobar que también son cadenas no cambiaría el
    resultado ni una vez. */
 export async function obtenerVersion(): Promise<string> {
-  const cuerpo = await pedirJson(URL_VERSIONES)
+  const cuerpo = await pedirJson(URL_VERSIONES, TIEMPO_LIMITE_VERSION_MS)
 
   if (!Array.isArray(cuerpo)) return VERSION_FALLBACK
 
@@ -121,7 +121,8 @@ export async function obtenerVersion(): Promise<string> {
    que los acentos no manden a Céfiro después de Zed. */
 export async function obtenerCampeones(version: string): Promise<Campeon[]> {
   const cuerpo = await pedirJson(
-    `${BASE}/cdn/${encodeURIComponent(version)}/data/${IDIOMA}/champion.json`
+    `${BASE}/cdn/${encodeURIComponent(version)}/data/${IDIOMA}/champion.json`,
+    TIEMPO_LIMITE_CATALOGO_MS
   )
 
   if (typeof cuerpo !== 'object' || cuerpo === null) return []

@@ -16,6 +16,7 @@ const Acerca = lazy(() => import('./pages/Acerca'))
 const Contacto = lazy(() => import('./pages/Contacto'))
 const Registro = lazy(() => import('./pages/Registro'))
 const Reglamento = lazy(() => import('./pages/Reglamento'))
+const Carta = lazy(() => import('./pages/Carta'))
 
 // Panel de administración (acceso solo por URL directa, fuera del nav público)
 const Login = lazy(() => import('./pages/admin/Login'))
@@ -53,6 +54,10 @@ export default function App() {
               <Route path="/acerca" element={<Acerca />} />
               <Route path="/contacto" element={<Contacto />} />
               <Route path="/registro" element={<Registro />} />
+
+              {/* Generador de carta de jugador. Todavía SIN acceso desde el navbar ni el
+                  pie: se entra por URL directa hasta que se resuelva por dónde enlazarla. */}
+              <Route path="/carta" element={<Carta />} />
 
               {/* /reglamento NO está en `navItems` de Header.tsx, a diferencia del resto de
                   las públicas. Se entra desde el pie (bloque "Recursos"). Es una excepción
