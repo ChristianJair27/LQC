@@ -364,6 +364,70 @@
     animation: var(--animate-shimmer);
   }
 
+  /* GLOW DEL LOGO. Se enciende con el pill, o sea solo en hover, y se apaga al salir.
+     Cubre los cuatro logos —ATAK y Revolution505, en barra y en cajón móvil— sin tocar el
+     JSX: los cuatro son un <img> dentro de un pill y no hay ningún otro <img> ahí adentro.
+     Si algún día se mete uno (un badge, una bandera), va a encenderse también; es el
+     comportamiento deseable, pero queda dicho.
+
+     Solo el <img>. El rótulo de texto no se toca: ya tiene su propio realce en hover
+     (`text-gray-200` → blanco) y encenderlo también convertiría el botón entero en un
+     cartel, que es justo el límite entre «moderno» y «kitsch».
+
+     TRES CAPAS Y NO UNA. Un solo `drop-shadow` con el blur alto no da un glow marcado, da
+     una mancha lavada: el alfa se reparte sobre demasiada área y ninguna zona llega a
+     leerse encendida. Apilados, cada uno hace un trabajo distinto y se suman —el filtro
+     compone en cadena, cada `drop-shadow` recibe el resultado del anterior—:
+       · 2px al 90%  — el filo. Es lo que dibuja el contorno del logo en color de marca y
+                       lo que hace que se lea «encendido» y no «con sombra de color».
+       · 6px al 70%  — el cuerpo. Rellena el salto entre el filo y el halo, que si no queda
+                       como un contorno flotando dentro de una nube separada.
+       · 14px al 45% — el halo. Es el que sale de la silueta y tiñe el fondo del pill.
+     `drop-shadow` y no `box-shadow` a propósito: `box-shadow` haría un rectángulo alrededor
+     de la caja del <img> —incluido todo el margen transparente del PNG, que en el de ATAK
+     es casi un tercio del ancho— en vez de seguir la silueta calada, que es de donde sale
+     todo el efecto.
+
+     EL REPOSO DECLARA LAS TRES CAPAS EN ALFA 0 en vez de `filter: none`. Con `none` la
+     interpolación depende de que el navegador reconstruya la lista equivalente, y lo que se
+     busca acá es una transición garantizada en los dos sentidos. Con las tres capas puestas
+     y solo el alfa moviéndose, el glow enciende y apaga en su tamaño final, como una
+     lámpara — que es el gesto que se quería. Si además se moviera el blur, se vería
+     expandirse, que es otra cosa.
+
+     PARIDAD (la regla dura de estos dos botones, ver Header.tsx): blur, alfa, cantidad de
+     capas y duración son IDÉNTICOS para los dos. Lo único que cambia es `--pill-rgb`, que
+     cada acento ya define y que acá se reusa tal cual — o sea que no hay forma de tocarle
+     el glow a uno sin tocárselo al otro.
+     Medido sobre los PNG, los dos logos NO son gemelos por dentro: el de ATAK es más calado
+     (23.6% de relleno contra 33.3%) y más oscuro (luminancia media 112 contra 185), y está
+     descentrado en su lienzo. Los dos ejes empujan en direcciones opuestas —menos tinta
+     apaga, tinta más oscura resalta más el color— así que no hay corrección obvia y
+     arrancar idénticos es lo único defendible. Si al verlo queda disparejo, se corrige EL
+     ALFA DE ESTAS TRES LÍNEAS, que valen para los dos. Nunca una perilla por marca: eso es
+     exactamente lo que hace que la pareja derive con el tiempo.
+
+     300ms es la misma duración que los pills ya manejan en su `transition-all`, para que el
+     glow, el borde, la sombra y el gradiente lleguen todos juntos y se lea como UN cambio
+     de estado y no como cuatro. Va explícita y no heredada: la transición del pill está en
+     el <a> y esto es el <img>, que es otro elemento.
+     `prefers-reduced-motion` la anula, como a todas las demás, y ahí el glow aparece de
+     golpe. Es correcto: es un cambio de estado, no un movimiento, igual que el borde. */
+  .pill-marca img {
+    filter:
+      drop-shadow(0 0 2px rgb(var(--pill-rgb, 0 0 0) / 0%))
+      drop-shadow(0 0 6px rgb(var(--pill-rgb, 0 0 0) / 0%))
+      drop-shadow(0 0 14px rgb(var(--pill-rgb, 0 0 0) / 0%));
+    transition: filter 300ms ease;
+  }
+
+  .pill-marca:hover img {
+    filter:
+      drop-shadow(0 0 2px rgb(var(--pill-rgb, 0 0 0) / 90%))
+      drop-shadow(0 0 6px rgb(var(--pill-rgb, 0 0 0) / 70%))
+      drop-shadow(0 0 14px rgb(var(--pill-rgb, 0 0 0) / 45%));
+  }
+
   /* Utilidades de perspectiva */
   .perspective-1000 {
     perspective: 1000px;
