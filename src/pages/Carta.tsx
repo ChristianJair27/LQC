@@ -383,7 +383,7 @@ export default function Carta() {
       </div>
 
       <div className="relative z-10">
-        <section className="py-20 md:py-28">
+        <section className="py-32 md:py-40">
           <div className="container mx-auto px-6 max-w-5xl text-center">
             <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
               Carta de Jugador
