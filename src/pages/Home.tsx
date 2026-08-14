@@ -280,7 +280,6 @@ export default function Home() {
      siguientes del intervalo reemplazan un estado ya resuelto por otro, sin pasar por el
      esqueleto, así que el player no parpadea una vez por minuto. */
   const [streamStatus, setStreamStatus] = useState<'online' | 'offline' | 'cargando'>('cargando')
-  const [] = useState('1.2K')
   const twitchChannel = "lqroc"
   
   const streamSchedule = [
