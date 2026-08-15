@@ -2,17 +2,6 @@ import { Link } from 'react-router-dom'
 import { Trophy, Calendar, Star, Users, UserPlus, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
-/* TERCERA copia de este helper (las otras están en Home.tsx y Footer.tsx). React Router en
-   modo declarativo no resetea el scroll y el proyecto no tiene <ScrollRestoration>, así que
-   un <Link> pulsado con la página scrolleada aterriza en mitad del destino. Hace falta acá
-   porque el bloque destacado vive DEBAJO de un hero de `py-32 md:py-40`: quien pulsa
-   «Registrarme» ya está ~500px abajo, y sin esto /registro abre a esa misma altura, con el
-   formulario empezado.
-   El comentario de Home.tsx dice que al aparecer un tercer lugar conviene extraerlo a un
-   módulo compartido. Este ES el tercero, pero el cambio se limitó a Torneos.tsx, así que
-   queda anotado en vez de hecho. */
-const irAlTope = () => window.scrollTo({ top: 0 })
-
 /* Los dos CTA del bloque destacado, con el canon de AGENTS.md. Son copia de las constantes
    homónimas de Home.tsx —no están exportadas allá y el cambio no podía tocar ese archivo—,
    así que si se retoca una hay que mirar la otra.
@@ -246,7 +235,7 @@ export default function Torneos() {
                   quedarían de anchos distintos, uno debajo del otro y centrados, que se lee
                   como un error de maquetación. */}
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/registro" onClick={irAlTope} className={`${CLASE_CTA_PRIMARIO} w-full sm:w-auto`}>
+                <Link to="/registro" className={`${CLASE_CTA_PRIMARIO} w-full sm:w-auto`}>
                   <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
                   Registrarme
                   <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />

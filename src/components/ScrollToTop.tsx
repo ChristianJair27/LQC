@@ -28,12 +28,11 @@ import { useLocation } from 'react-router-dom'
    una recarga no anima. Una animación acá además pelearía con `prefers-reduced-motion`. Es el
    mismo criterio que ya venían usando los `irAlTope` sueltos del sitio.
 
-   DEUDA CONOCIDA, a saldar en un commit aparte: siguen existiendo 7 `onClick={irAlTope}` en
-   Footer.tsx, Home.tsx y Torneos.tsx, con el helper copiado tres veces. Desde que este
-   componente está montado son redundantes. No molestan —scrollear al tope dos veces es
-   idempotente— pero dicen una cosa mientras el comportamiento real lo decide otro archivo, así
-   que hay que sacarlos. Se dejan por ahora a propósito, para que este cambio sea de una sola
-   pieza y fácil de revertir.
+   QUEDAN 4 `onClick={irAlTope}` DELIBERADOS, todos en Footer.tsx (navegación, /reglamento,
+   /registro, /carta). No son deuda: el pie se renderiza en esas mismas rutas, así que pulsar
+   uno estando ya en el destino no cambia el `pathname` y este efecto no corre. Los de Home.tsx
+   y Torneos.tsx sí se sacaron —apuntaban fuera de su propia página, siempre hay cambio de
+   ruta— junto con sus copias del helper.
 
    Dos cosas que NO cubre, por si el síntoma reaparece:
    · Las páginas son `lazy()` bajo un <Suspense> con fallback corto (App.tsx). En el PRIMER

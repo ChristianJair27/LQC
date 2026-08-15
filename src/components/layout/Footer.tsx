@@ -17,16 +17,10 @@ const CLASE_PUNTO =
 const CLASE_ICONO =
   'after:hidden p-2 border border-gray-800 text-gray-500 hover:text-white hover:border-gray-700 transition-all duration-300 rounded-lg'
 
-/* Al pasar de <a href> a <Link>, la navegación deja de recargar el documento y el navegador
-   ya no lleva la página nueva al tope: React Router en modo declarativo (<BrowserRouter> +
-   <Routes>, ver main.tsx) NO resetea el scroll, y el proyecto no tiene <ScrollRestoration>.
-   Como estos enlaces viven en el PIE, se pulsan siempre con la página abajo del todo, así que
-   sin esto cada clic aterriza en mitad del destino. Scroll instantáneo (el `behavior` por
-   defecto) para replicar lo que hacía la recarga, y no una animación que además pelearía con
-   `prefers-reduced-motion`.
-   NOTA: el mismo agujero existe en los <Link> de Header.tsx. Se arregla acá y no con un
-   ScrollToTop global porque eso cambia el comportamiento de todo el sitio y es otro
-   propósito; queda anotado. */
+/* El <ScrollToTop> global (components/ScrollToTop.tsx) ya sube al tope en cada cambio de ruta,
+   Header incluido. Estos onClick cubren lo único que ese efecto no ve: el pie se renderiza en
+   las mismas rutas a las que apuntan, así que pulsarlos estando ya en el destino no cambia el
+   `pathname` y el efecto no corre. Scroll instantáneo, mismo criterio que el global. */
 const irAlTope = () => window.scrollTo({ top: 0 })
 
 /* Navegación: los mismos destinos que `navItems` de Header.tsx MENOS /registro, que se mudó
@@ -149,10 +143,7 @@ export default function Footer() {
               </li>
               <li>
                 {/* Va último de Recursos: es lo más liviano de los tres —un generador para
-                    compartir en redes— y no un documento que alguien necesite para competir.
-                    Conserva el `irAlTope` de sus vecinos aunque el ScrollToTop global ya lo
-                    cubra: la limpieza de estos onClick es un cambio aparte y para todos a la
-                    vez, no uno que deje este ítem distinto de los otros dos. */}
+                    compartir en redes— y no un documento que alguien necesite para competir. */}
                 <Link to="/carta" onClick={irAlTope} className={CLASE_ENLACE}>
                   <div className={CLASE_PUNTO}></div>
                   Carta de jugador
@@ -385,7 +376,6 @@ export default function Footer() {
           <div>
             <Link
               to="/admin"
-              onClick={irAlTope}
               className="inline-block rounded-sm text-xs text-gray-400 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-lqc-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             >
               Acceso administradores

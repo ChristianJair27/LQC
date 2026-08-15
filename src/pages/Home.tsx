@@ -2,13 +2,6 @@ import { Link } from 'react-router-dom'
 import { Twitch, Calendar, ChevronRight, UserPlus, IdCard } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
-/* Mismo parche que Footer.tsx: React Router en modo declarativo no resetea el scroll y el
-   proyecto no tiene <ScrollRestoration>, así que un <Link> pulsado con la página abajo
-   aterriza en mitad del destino. Importa sobre todo para el CTA de más abajo, que se pulsa
-   con la portada ya scrolleada. Va duplicado —es una línea— en vez de extraído a un módulo:
-   si aparece un tercer lugar que lo necesite, ahí sí conviene el helper compartido. */
-const irAlTope = () => window.scrollTo({ top: 0 })
-
 /* Canon del CTA primario (AGENTS.md, "Canon del CTA primario"). Al ser un <a>/<Link> y no un
    <button> necesita dos cosas que la capa base de index.css no le da: `text-white` explícito
    —si no, `a { color: #66a3ff }` le pisa el texto y el contraste sobre azul se cae— y el
@@ -411,7 +404,6 @@ export default function Home() {
               <div className="flex flex-col items-center gap-3">
                 <Link
                   to="/registro"
-                  onClick={irAlTope}
                   className={CLASE_CTA_PRIMARIO}
                 >
                   <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
@@ -652,7 +644,7 @@ export default function Home() {
                 Cada jugador se registra por su cuenta y elige su equipo de la lista. Un
                 equipo compite con 5 a 7 jugadores.
               </p>
-              <Link to="/registro" onClick={irAlTope} className={CLASE_CTA_PRIMARIO}>
+              <Link to="/registro" className={CLASE_CTA_PRIMARIO}>
                 <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
                 Registrarme
                 <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
@@ -720,7 +712,6 @@ export default function Home() {
 
               <Link
                 to="/carta"
-                onClick={irAlTope}
                 className={`${CLASE_CTA_SECUNDARIO} w-full shrink-0 sm:w-auto`}
               >
                 <IdCard className="w-5 h-5 shrink-0" aria-hidden="true" />
