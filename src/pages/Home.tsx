@@ -364,16 +364,24 @@ export default function Home() {
         <section className="py-32 md:py-40">
           <div className="container mx-auto px-6 max-w-5xl text-center">
             <div className="flex flex-col items-center gap-6">
+              {/* `animate-hero-glow` REEMPLAZA a `drop-shadow-xl`, no se suma. Las dos escriben
+                  la propiedad `filter`, que es una sola: con ambas puestas gana la que el
+                  bundle emita última dentro de `@layer utilities`, o sea que el resultado
+                  dependería del orden de compilación. El glow azul es lo que se quiere
+                  dominante, así que es el único filtro.
+                  La clase vive en index.css —keyframe, token y utilidad— y NO en un <style>
+                  al final de este archivo, que es como quedó `animate-float-slow` repetido en
+                  seis páginas. Ver el comentario de la regla allá. */}
               <div className="flex items-center justify-center gap-6 flex-wrap">
                 <img
                   src="/assets/2 LQC.png"
                   alt="LQC Querétaro Logo"
-                  className="h-24 md:h-32 w-auto object-contain drop-shadow-xl"
+                  className="h-24 md:h-32 w-auto object-contain animate-hero-glow"
                 />
                 <img
                   src="/assets/LOGO COPA.png"
                   alt="Copa LQC"
-                  className="h-20 md:h-28 w-auto object-contain drop-shadow-xl"
+                  className="h-20 md:h-28 w-auto object-contain animate-hero-glow"
                 />
               </div>
               

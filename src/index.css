@@ -39,6 +39,12 @@
   --animate-float: float 6s ease-in-out infinite;
   --animate-pulse-slow: pulse-slow 3s ease-in-out infinite;
   --animate-shimmer: shimmer 3s ease-in-out infinite;
+  /* `hero-glow` NO va acá, y es la única de las animaciones del proyecto que no está en este
+     catálogo. El motivo es mecánico: Tailwind 4 genera una utilidad `animate-X` por cada
+     `--animate-X`, y esa utilidad solo sabe declarar `animation`. La del hero necesita ADEMÁS
+     un `filter` de reposo (ver `.animate-hero-glow` más abajo para el porqué), así que la
+     generada y la escrita a mano salían las dos al CSS con el mismo nombre y el resultado
+     quedaba atado a cuál emitía última el bundle. Vive entera en su regla, en una sola pieza. */
   
   /* Sombras premium */
   --shadow-lqc: 0 10px 40px -10px rgba(0, 102, 255, 0.2);
@@ -289,6 +295,34 @@
     animation: var(--animate-pulse-slow);
   }
 
+  /* GLOW QUE RESPIRA, para los dos logos del hero de Home.tsx. Reusa la TÉCNICA de
+     `.pill-marca img` —tres `drop-shadow` apilados sobre un PNG calado: filo, cuerpo y halo—
+     pero es una regla aparte a propósito. Los pills del navbar son una pareja de luminancia
+     balanceada cuya paridad es regla dura (ver el comentario de `.pill-marca img` más abajo);
+     colgar el hero de esa clase ataría dos cosas que se retocan por motivos distintos.
+     Las otras dos diferencias con el navbar: el color va fijo en los tokens de marca
+     —#0066ff (`lqc-500`) en filo y cuerpo, #00d4ff (`lqc-accent`) en el halo— y no por
+     `--pill-rgb`, porque acá no hay dos marcas que parametrizar; y el glow late solo en vez de
+     encenderse en hover, porque un logo de portada no es un control y no tiene estado de hover
+     que comunicar.
+
+     EL REPOSO SE DECLARA ACÁ, no solo en el keyframe, y esa línea es lo que hace que la
+     animación sobreviva a `prefers-reduced-motion`. La manta del final de este archivo deja
+     toda animación en 0.01ms con una sola iteración; con `animation-fill-mode: none` —el valor
+     por defecto— el `filter` vuelve al del elemento apenas termina. Sin esta declaración, quien
+     pide menos movimiento se quedaría SIN glow (filtro `none`), no con el glow quieto. Con
+     ella se queda exactamente en el fotograma 0%/100%, que es el ciclo cerrado del keyframe.
+     Los radios van en px absolutos, así que el halo pesa proporcionalmente más en el logo
+     chico (`h-20`) que en el grande (`h-32`). Es deliberado: iguala el glow en el aire, no
+     respecto de cada silueta, que es lo que los hace leerse como un solo par encendido. */
+  .animate-hero-glow {
+    filter:
+      drop-shadow(0 0 2px rgba(0, 102, 255, 0.35))
+      drop-shadow(0 0 8px rgba(0, 102, 255, 0.25))
+      drop-shadow(0 0 18px rgba(0, 212, 255, 0.15));
+    animation: hero-glow 4s ease-in-out infinite;
+  }
+
   /* Pills de marca del navbar — los dos enlaces externos de Header.tsx (ATAK.GG y
      Revolution505). Acá vive SOLO el mecanismo, que es idéntico para los dos; el color lo
      inyecta cada acento con `--pill-rgb`.
@@ -472,6 +506,29 @@
   }
   50% {
     background-position: 100% 50%;
+  }
+}
+
+/* CICLO CERRADO: el fotograma 0% y el 100% son idénticos, y el 50% solo sube el alfa y unos px
+   de blur. Las tres capas están declaradas en los DOS fotogramas —ninguna aparece o desaparece
+   a mitad de camino— para que lo único que interpole sea la intensidad y el glow respire en su
+   sitio en vez de verse expandirse, que es el mismo criterio que `.pill-marca img`.
+   Que el ciclo cierre es además lo que lo hace seguro bajo `prefers-reduced-motion`: la manta
+   del final de este archivo lo corta en la primera iteración, y ahí el último fotograma ES el
+   de reposo. Una animación que terminara distinto de como empieza dejaría a ese usuario
+   congelado en la pose intermedia. */
+@keyframes hero-glow {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 2px rgba(0, 102, 255, 0.35))
+      drop-shadow(0 0 8px rgba(0, 102, 255, 0.25))
+      drop-shadow(0 0 18px rgba(0, 212, 255, 0.15));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 3px rgba(0, 102, 255, 0.55))
+      drop-shadow(0 0 12px rgba(0, 102, 255, 0.4))
+      drop-shadow(0 0 26px rgba(0, 212, 255, 0.3));
   }
 }
 
