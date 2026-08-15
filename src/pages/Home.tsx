@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Twitch, Calendar, ChevronRight, UserPlus, IdCard } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import Reveal from '../components/Reveal'
 
 /* Canon del CTA primario (AGENTS.md, "Canon del CTA primario"). Al ser un <a>/<Link> y no un
    <button> necesita dos cosas que la capa base de index.css no le da: `text-white` explícito
@@ -425,187 +426,189 @@ export default function Home() {
         </section>
 
         {/* Transmisión en vivo - sin bordes duros */}
-        <section className="py-20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-12">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Transmisión en Vivo</h2>
-              <div className={`px-4 py-1.5 text-sm rounded-full flex items-center gap-2 backdrop-blur-sm ${
-                streamStatus === 'online' 
-                  ? 'bg-green-950/50 text-green-300 border border-green-800/40' 
-                  : 'bg-gray-900/50 text-gray-400 border border-gray-800/40'
-              }`}>
-                {/* El fondo del badge no distingue 'cargando' de 'offline' —los dos caen en la
-                    rama gris de arriba— y está bien: lo que cambia entre esos dos estados es el
-                    puntito, que en 'cargando' late, y la etiqueta, que en 'cargando' no está.
-                    El latido va con `animate-pulse-slow` (la utilidad del proyecto, 3 s) y no
-                    con el `animate-pulse` de Tailwind que usa 'online': el verde tiene que
-                    llamar la atención, este gris solo indica que algo está pasando. */}
-                <div className={`w-3 h-3 rounded-full ${
-                  streamStatus === 'online'
-                    ? 'bg-green-400 animate-pulse'
-                    : streamStatus === 'cargando'
-                      ? 'bg-gray-500 animate-pulse-slow'
-                      : 'bg-gray-500'
-                }`} />
-                {/* 'cargando' va SIN etiqueta, a propósito. Cualquier palabra acá dura los
-                    milisegundos del fetch y se lee como un parpadeo, que es justo lo que el
-                    tercer estado vino a sacar. Y una palabra tiene que ser falsa o vaga: el
-                    badge todavía no sabe nada que decir.
-                    Tampoco lleva `sr-only`: el esqueleto del player ya anuncia «Consultando el
-                    estado de la transmisión», y repetirlo acá lo haría sonar dos veces.
-                    Sin segundo hijo el `gap-2` del contenedor no aplica —solo separa elementos
-                    existentes—, así que el puntito no queda con un hueco colgando al lado. */}
-                {streamStatus === 'cargando' ? null : streamStatus === 'online' ? 'EN VIVO' : 'OFFLINE'}
-              </div>
-            </div>
-
-            <div className="grid lg:grid-cols-3 gap-10">
-              <div className="lg:col-span-2 space-y-10">
-                <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/60 backdrop-blur-md border border-white/5">
-                  {/* Tres ramas para el MISMO hueco 16:9, y por eso las tres llevan
-                      `aspect-video`: así la columna mide igual en los tres estados y resolver
-                      el estado no empuja el resto de la página.
-                      El pie de la tarjeta (LQROC / Canal oficial / Idioma) queda AFUERA del
-                      condicional a propósito: identifica al canal, y el canal existe transmita
-                      o no. */}
-                  {streamStatus === 'online' ? (
-                    <div className="relative aspect-video">
-                      <iframe
-                        src={`https://player.twitch.tv/?channel=${twitchChannel}&parent=${window.location.hostname}&autoplay=true`}
-                        height="100%"
-                        width="100%"
-                        allowFullScreen
-                        className="border-0"
-                        title="Twitch Stream"
-                      />
-                      {/* Este badge perdió su ternario, no su apariencia: la rama entera solo se
-                          pinta con el canal al aire, así que la variante gris «⚪ OFFLINE» era
-                          código muerto —nunca podría verse—. Lo que se ve en pantalla es
-                          idéntico a lo que se veía antes en estado 'online'. */}
-                      <div className="absolute top-4 left-4">
-                        <div className="px-4 py-1.5 rounded-full text-sm font-medium shadow-lg bg-red-600 text-white">
-                          🔴 EN VIVO
-                        </div>
-                      </div>
-                    </div>
-                  ) : streamStatus === 'cargando' ? (
-                    /* Esqueleto NEUTRO. No dice «EN VIVO» ni «FUERA DE LÍNEA» porque en este
-                       punto todavía no se sabe: cualquiera de las dos sería una afirmación que
-                       la respuesta puede desmentir medio segundo después.
-                       Sin texto visible —un cartel de "cargando" que dura 300 ms es ruido—;
-                       lo que hay para un lector de pantalla va en el `sr-only`, y el resto es
-                       decoración con `aria-hidden`. */
-                    <div className="relative aspect-video bg-black/70">
-                      <div
-                        className="absolute inset-0 animate-pulse bg-gradient-to-br from-white/5 via-white/2 to-transparent"
-                        aria-hidden="true"
-                      />
-                      <div className="relative flex h-full items-center justify-center">
-                        <span
-                          className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-lqc-accent/70 sm:h-11 sm:w-11"
-                          aria-hidden="true"
-                        />
-                        <span className="sr-only">Consultando el estado de la transmisión</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <BloqueSinTransmision />
-                  )}
-                  <div className="p-5 bg-gradient-to-t from-black/80 to-transparent">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lqc-900/40 to-blue-900/40 border border-lqc-accent/20 flex items-center justify-center">
-                          <Twitch className="w-6 h-6 text-lqc-accent" />
-                        </div>
-                        <div>
-                          <div className="font-medium">LQROC</div>
-                          <div className="text-sm text-gray-400">Canal oficial LQC</div>
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-500 hidden sm:block">
-                        Idioma: Español
-                      </div>
-                    </div>
-                  </div>
+        <Reveal>
+          <section className="py-20">
+            <div className="container mx-auto px-6 max-w-6xl">
+              <div className="flex items-center gap-4 mb-12">
+                <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                <h2 className="text-3xl font-light">Transmisión en Vivo</h2>
+                <div className={`px-4 py-1.5 text-sm rounded-full flex items-center gap-2 backdrop-blur-sm ${
+                  streamStatus === 'online' 
+                    ? 'bg-green-950/50 text-green-300 border border-green-800/40' 
+                    : 'bg-gray-900/50 text-gray-400 border border-gray-800/40'
+                }`}>
+                  {/* El fondo del badge no distingue 'cargando' de 'offline' —los dos caen en la
+                      rama gris de arriba— y está bien: lo que cambia entre esos dos estados es el
+                      puntito, que en 'cargando' late, y la etiqueta, que en 'cargando' no está.
+                      El latido va con `animate-pulse-slow` (la utilidad del proyecto, 3 s) y no
+                      con el `animate-pulse` de Tailwind que usa 'online': el verde tiene que
+                      llamar la atención, este gris solo indica que algo está pasando. */}
+                  <div className={`w-3 h-3 rounded-full ${
+                    streamStatus === 'online'
+                      ? 'bg-green-400 animate-pulse'
+                      : streamStatus === 'cargando'
+                        ? 'bg-gray-500 animate-pulse-slow'
+                        : 'bg-gray-500'
+                  }`} />
+                  {/* 'cargando' va SIN etiqueta, a propósito. Cualquier palabra acá dura los
+                      milisegundos del fetch y se lee como un parpadeo, que es justo lo que el
+                      tercer estado vino a sacar. Y una palabra tiene que ser falsa o vaga: el
+                      badge todavía no sabe nada que decir.
+                      Tampoco lleva `sr-only`: el esqueleto del player ya anuncia «Consultando el
+                      estado de la transmisión», y repetirlo acá lo haría sonar dos veces.
+                      Sin segundo hijo el `gap-2` del contenedor no aplica —solo separa elementos
+                      existentes—, así que el puntito no queda con un hueco colgando al lado. */}
+                  {streamStatus === 'cargando' ? null : streamStatus === 'online' ? 'EN VIVO' : 'OFFLINE'}
                 </div>
+              </div>
 
-                {/* El chat desaparece ENTERO en offline —marco y encabezado incluidos—, no solo
-                    el iframe: un cuadro rotulado «Chat de Twitch» con un panel vacío adentro es
-                    peor que no tener la caja, el mismo criterio con el que se fueron los embeds
-                    de Battlefy (ver el comentario más abajo).
-                    En 'cargando' sí se conserva el marco, con un esqueleto en lugar del iframe.
-                    Es a propósito: la mayoría de las visitas terminan en un estado u otro, y
-                    dejando la caja puesta la transición a 'online' cambia el contenido sin mover
-                    nada de lugar. Si termina en offline, la caja se va una sola vez. */}
-                {streamStatus !== 'offline' && (
-                  <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/40 backdrop-blur-md border border-white/5">
-                    <div className="bg-gradient-to-r from-gray-900/60 to-gray-800/40 px-5 py-4">
-                      <div className="font-medium">Chat de Twitch</div>
-                    </div>
-                    <div className="h-64 sm:h-80">
-                      {streamStatus === 'online' ? (
+              <div className="grid lg:grid-cols-3 gap-10">
+                <div className="lg:col-span-2 space-y-10">
+                  <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/60 backdrop-blur-md border border-white/5">
+                    {/* Tres ramas para el MISMO hueco 16:9, y por eso las tres llevan
+                        `aspect-video`: así la columna mide igual en los tres estados y resolver
+                        el estado no empuja el resto de la página.
+                        El pie de la tarjeta (LQROC / Canal oficial / Idioma) queda AFUERA del
+                        condicional a propósito: identifica al canal, y el canal existe transmita
+                        o no. */}
+                    {streamStatus === 'online' ? (
+                      <div className="relative aspect-video">
                         <iframe
-                          src={`https://www.twitch.tv/embed/${twitchChannel}/chat?parent=${window.location.hostname}&darkpopout`}
+                          src={`https://player.twitch.tv/?channel=${twitchChannel}&parent=${window.location.hostname}&autoplay=true`}
                           height="100%"
                           width="100%"
+                          allowFullScreen
                           className="border-0"
-                          title="Twitch Chat"
+                          title="Twitch Stream"
                         />
-                      ) : (
+                        {/* Este badge perdió su ternario, no su apariencia: la rama entera solo se
+                            pinta con el canal al aire, así que la variante gris «⚪ OFFLINE» era
+                            código muerto —nunca podría verse—. Lo que se ve en pantalla es
+                            idéntico a lo que se veía antes en estado 'online'. */}
+                        <div className="absolute top-4 left-4">
+                          <div className="px-4 py-1.5 rounded-full text-sm font-medium shadow-lg bg-red-600 text-white">
+                            🔴 EN VIVO
+                          </div>
+                        </div>
+                      </div>
+                    ) : streamStatus === 'cargando' ? (
+                      /* Esqueleto NEUTRO. No dice «EN VIVO» ni «FUERA DE LÍNEA» porque en este
+                         punto todavía no se sabe: cualquiera de las dos sería una afirmación que
+                         la respuesta puede desmentir medio segundo después.
+                         Sin texto visible —un cartel de "cargando" que dura 300 ms es ruido—;
+                         lo que hay para un lector de pantalla va en el `sr-only`, y el resto es
+                         decoración con `aria-hidden`. */
+                      <div className="relative aspect-video bg-black/70">
                         <div
-                          className="h-full animate-pulse bg-gradient-to-b from-white/4 to-transparent"
+                          className="absolute inset-0 animate-pulse bg-gradient-to-br from-white/5 via-white/2 to-transparent"
                           aria-hidden="true"
                         />
-                      )}
+                        <div className="relative flex h-full items-center justify-center">
+                          <span
+                            className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-lqc-accent/70 sm:h-11 sm:w-11"
+                            aria-hidden="true"
+                          />
+                          <span className="sr-only">Consultando el estado de la transmisión</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <BloqueSinTransmision />
+                    )}
+                    <div className="p-5 bg-gradient-to-t from-black/80 to-transparent">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-lqc-900/40 to-blue-900/40 border border-lqc-accent/20 flex items-center justify-center">
+                            <Twitch className="w-6 h-6 text-lqc-accent" />
+                          </div>
+                          <div>
+                            <div className="font-medium">LQROC</div>
+                            <div className="text-sm text-gray-400">Canal oficial LQC</div>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-500 hidden sm:block">
+                          Idioma: Español
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* Sidebar sigue similar pero más limpio */}
-              <div className="space-y-10">
-                {/* Horario */}
-                <div className="space-y-6">
-                  <div className="flex items-center gap-4">
-                    <Calendar className="w-6 h-6 text-blue-400" />
-                    <h3 className="text-xl font-medium">Horario de Transmisiones</h3>
-                  </div>
-                  <div className="space-y-4 bg-black/30 backdrop-blur-sm p-6 rounded-2xl border border-white/5">
-                    {streamSchedule.map((schedule, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
-                        <div>
-                          <div className="font-medium">{schedule.day}</div>
-                          <div className="text-sm text-gray-400">{schedule.type}</div>
-                        </div>
-                        <div className="text-gray-300">{schedule.time}</div>
+                  {/* El chat desaparece ENTERO en offline —marco y encabezado incluidos—, no solo
+                      el iframe: un cuadro rotulado «Chat de Twitch» con un panel vacío adentro es
+                      peor que no tener la caja, el mismo criterio con el que se fueron los embeds
+                      de Battlefy (ver el comentario más abajo).
+                      En 'cargando' sí se conserva el marco, con un esqueleto en lugar del iframe.
+                      Es a propósito: la mayoría de las visitas terminan en un estado u otro, y
+                      dejando la caja puesta la transición a 'online' cambia el contenido sin mover
+                      nada de lugar. Si termina en offline, la caja se va una sola vez. */}
+                  {streamStatus !== 'offline' && (
+                    <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/60 bg-black/40 backdrop-blur-md border border-white/5">
+                      <div className="bg-gradient-to-r from-gray-900/60 to-gray-800/40 px-5 py-4">
+                        <div className="font-medium">Chat de Twitch</div>
                       </div>
-                    ))}
-                  </div>
+                      <div className="h-64 sm:h-80">
+                        {streamStatus === 'online' ? (
+                          <iframe
+                            src={`https://www.twitch.tv/embed/${twitchChannel}/chat?parent=${window.location.hostname}&darkpopout`}
+                            height="100%"
+                            width="100%"
+                            className="border-0"
+                            title="Twitch Chat"
+                          />
+                        ) : (
+                          <div
+                            className="h-full animate-pulse bg-gradient-to-b from-white/4 to-transparent"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Ir al canal. Pasó de primario a SECUNDARIO: llevaba el gradiente del canon
-                    —el que marca la acción principal de una pantalla— siendo el único CTA de
-                    la portada, así que la acción más destacada del sitio mandaba a Twitch en
-                    vez de al registro. Sigue acá y sigue siendo útil; lo que cambia es la
-                    jerarquía. */}
-                <div>
-                  <a
-                    href={`https://www.twitch.tv/${twitchChannel}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Ir al canal de Twitch de LQC (abre en pestaña nueva)"
-                    className={`${CLASE_CTA_SECUNDARIO} w-full`}
-                  >
-                    <Twitch className="w-5 h-5 shrink-0" aria-hidden="true" />
-                    Ir al canal de Twitch
-                    <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
-                  </a>
+                {/* Sidebar sigue similar pero más limpio */}
+                <div className="space-y-10">
+                  {/* Horario */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <Calendar className="w-6 h-6 text-blue-400" />
+                      <h3 className="text-xl font-medium">Horario de Transmisiones</h3>
+                    </div>
+                    <div className="space-y-4 bg-black/30 backdrop-blur-sm p-6 rounded-2xl border border-white/5">
+                      {streamSchedule.map((schedule, i) => (
+                        <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                          <div>
+                            <div className="font-medium">{schedule.day}</div>
+                            <div className="text-sm text-gray-400">{schedule.type}</div>
+                          </div>
+                          <div className="text-gray-300">{schedule.time}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Ir al canal. Pasó de primario a SECUNDARIO: llevaba el gradiente del canon
+                      —el que marca la acción principal de una pantalla— siendo el único CTA de
+                      la portada, así que la acción más destacada del sitio mandaba a Twitch en
+                      vez de al registro. Sigue acá y sigue siendo útil; lo que cambia es la
+                      jerarquía. */}
+                  <div>
+                    <a
+                      href={`https://www.twitch.tv/${twitchChannel}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Ir al canal de Twitch de LQC (abre en pestaña nueva)"
+                      className={`${CLASE_CTA_SECUNDARIO} w-full`}
+                    >
+                      <Twitch className="w-5 h-5 shrink-0" aria-hidden="true" />
+                      Ir al canal de Twitch
+                      <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </Reveal>
 
         {/* ACÁ NO HAY BRACKETS, STANDINGS NI "EQUIPOS INSCRITOS". Eran tres secciones con
             iframes de Battlefy y se fueron enteras —encabezado, caja y iframe—, no solo el
@@ -705,153 +708,157 @@ export default function Home() {
             compitiendo en la misma página y el de registro pierde.
             Sin fondo tintado por el ritmo que fija el comentario de Patrocinadores: el CTA
             de registro ya es la banda tintada y dos seguidas se leerían como una sola. */}
-        <section className="py-20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-12">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Armá tu carta de jugador</h2>
-            </div>
+        <Reveal>
+          <section className="py-20">
+            <div className="container mx-auto px-6 max-w-6xl">
+              <div className="flex items-center gap-4 mb-12">
+                <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                <h2 className="text-3xl font-light">Armá tu carta de jugador</h2>
+              </div>
 
-            <div className="flex flex-col items-start gap-8 md:flex-row md:items-center md:justify-between">
-              <p className="text-lg text-gray-300 leading-relaxed md:max-w-2xl">
-                Elegí tu campeón, poné tu nick y descargá una carta con los colores del LQC
-                para compartir en tus redes.
-              </p>
+              <div className="flex flex-col items-start gap-8 md:flex-row md:items-center md:justify-between">
+                <p className="text-lg text-gray-300 leading-relaxed md:max-w-2xl">
+                  Elegí tu campeón, poné tu nick y descargá una carta con los colores del LQC
+                  para compartir en tus redes.
+                </p>
 
-              <Link
-                to="/carta"
-                className={`${CLASE_CTA_SECUNDARIO} w-full shrink-0 sm:w-auto`}
-              >
-                <IdCard className="w-5 h-5 shrink-0" aria-hidden="true" />
-                Crear mi carta
-                <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
-              </Link>
+                <Link
+                  to="/carta"
+                  className={`${CLASE_CTA_SECUNDARIO} w-full shrink-0 sm:w-auto`}
+                >
+                  <IdCard className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  Crear mi carta
+                  <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                </Link>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </Reveal>
 
         {/* Patrocinadores. Sin fondo tintado: el ritmo de la portada lo fija el comentario
             de la sección CTA de más arriba (Hero → Transmisión → CTA tintado → Carta → esta). */}
-        <section className="py-20">
-          <div className="container mx-auto px-6 max-w-6xl">
-            <div className="flex items-center gap-4 mb-12">
-              <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
-              <h2 className="text-3xl font-light">Nuestros Patrocinadores</h2>
-            </div>
+        <Reveal>
+          <section className="py-20">
+            <div className="container mx-auto px-6 max-w-6xl">
+              <div className="flex items-center gap-4 mb-12">
+                <div className="w-1.5 h-12 bg-gradient-to-t from-blue-600 to-blue-400 rounded-full" />
+                <h2 className="text-3xl font-light">Nuestros Patrocinadores</h2>
+              </div>
 
-            {/* Muro de logos, no una lista de fichas. Antes era un CARRUSEL que mostraba
-                un patrocinador por vez en una tarjeta enorme y rotaba solo cada 3 s: con
-                10 marcas, nueve de cada diez logos estaban siempre ocultos y ver uno en
-                particular exigía esperar el turno o navegar a mano. Una grilla los muestra
-                todos a la vez y escala sin tocar nada — con 6, con 10 o con 20 lo único
-                que cambia es la cantidad de filas.
-                (De paso se va un problema de accesibilidad: la rotación automática no
-                tenía forma de pausarse —`isPlaying` no tenía setter—, que es justo lo que
-                pide WCAG 2.2.2 para cualquier movimiento que arranque solo y dure más de
-                cinco segundos.)
-                Las columnas suben de 2 a 5 y la última fila queda alineada a la izquierda
-                cuando no completa: es lo normal en un muro de marcas y evita que agregar
-                un patrocinador reacomode toda la sección. */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
-              {sponsors.map((sponsor) => {
-                /* Quién apunta al placeholder se mueve cada vez que un patrocinador
-                   consigue o pierde su sitio —ver el comentario de DOMINIO_PLACEHOLDER, que
-                   es el único lugar donde ese conteo está escrito—, así que acá no va
-                   ningún número: la rama se decide por el valor de la url, no por una lista.
-                   Con la celda entera convertida en enlace, cada placeholder sería un área
-                   de toque grande que lleva al sitio de la IANA en una pestaña nueva.
-                   El que no tiene sitio se pinta igual pero como <div>: sin href, así que
-                   no navega; sin ser tabulable, así que quien usa teclado no tropieza con
-                   una parada muerta; y sin aria-label, así que a nadie se le anuncia una
-                   pestaña nueva que no va a abrirse. Lo que sí conserva es el nombre en
-                   texto visible, que es toda la información que la celda tenía para dar. */
-                const navega = tieneSitioReal(sponsor.url)
+              {/* Muro de logos, no una lista de fichas. Antes era un CARRUSEL que mostraba
+                  un patrocinador por vez en una tarjeta enorme y rotaba solo cada 3 s: con
+                  10 marcas, nueve de cada diez logos estaban siempre ocultos y ver uno en
+                  particular exigía esperar el turno o navegar a mano. Una grilla los muestra
+                  todos a la vez y escala sin tocar nada — con 6, con 10 o con 20 lo único
+                  que cambia es la cantidad de filas.
+                  (De paso se va un problema de accesibilidad: la rotación automática no
+                  tenía forma de pausarse —`isPlaying` no tenía setter—, que es justo lo que
+                  pide WCAG 2.2.2 para cualquier movimiento que arranque solo y dure más de
+                  cinco segundos.)
+                  Las columnas suben de 2 a 5 y la última fila queda alineada a la izquierda
+                  cuando no completa: es lo normal en un muro de marcas y evita que agregar
+                  un patrocinador reacomode toda la sección. */}
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 xl:grid-cols-5">
+                {sponsors.map((sponsor) => {
+                  /* Quién apunta al placeholder se mueve cada vez que un patrocinador
+                     consigue o pierde su sitio —ver el comentario de DOMINIO_PLACEHOLDER, que
+                     es el único lugar donde ese conteo está escrito—, así que acá no va
+                     ningún número: la rama se decide por el valor de la url, no por una lista.
+                     Con la celda entera convertida en enlace, cada placeholder sería un área
+                     de toque grande que lleva al sitio de la IANA en una pestaña nueva.
+                     El que no tiene sitio se pinta igual pero como <div>: sin href, así que
+                     no navega; sin ser tabulable, así que quien usa teclado no tropieza con
+                     una parada muerta; y sin aria-label, así que a nadie se le anuncia una
+                     pestaña nueva que no va a abrirse. Lo que sí conserva es el nombre en
+                     texto visible, que es toda la información que la celda tenía para dar. */
+                  const navega = tieneSitioReal(sponsor.url)
 
-                /* El contenido se escribe UNA vez y lo envuelve una u otra caja: si se
-                   duplicara en las dos ramas, el próximo retoque del logo o del nombre se
-                   haría en una sola y las celdas dejarían de verse idénticas — que es
-                   justo lo que este cambio tiene que garantizar. */
-                const contenido = (
-                  <>
-                    <span
-                      className={`flex w-full items-center justify-center px-2 ${ALTO_LOGO_PATROCINADOR}`}
-                    >
-                      {/* Si el logo no carga se oculta la <img> y el nombre de abajo queda
-                          como única identificación. El manejador NO apunta a un archivo de
-                          reserva a propósito: un fallback que a su vez no cargue vuelve a
-                          disparar onError y entra en bucle. Esto ya fue un bug; no lo
-                          "mejores" apuntándolo a una imagen.
-                          `alt=""` porque el nombre ya está en texto visible justo abajo:
-                          repetirlo haría que un lector de pantalla lo dijera dos veces. En
-                          las celdas que enlazan, además, el nombre accesible ya lo fija el
-                          aria-label del <a>. */}
-                      {/* El logo va SIEMPRE al 100%, sin atenuar, en todos los dispositivos.
-                          Tuvo una atenuación al 70 % que se aplicaba solo donde hay puntero
-                          —vía media query, para no apagar los logos en táctil— y volvía a
-                          100 en hover. El problema no era el efecto sino a quién le tocaba:
-                          el hover lo enciende la celda vía `group`, y solo las celdas con
-                          sitio real son `.group`, así que en escritorio los logos sin sitio
-                          se quedaban atenuados para siempre. Atenuar de forma permanente el
-                          logo de quien paga por estar ahí, y encima solo a algunos, no se
-                          arregla con más CSS condicional.
-                          La celda que navega ya se distingue por el marco (borde y fondo) y
-                          por el nombre, que sí cambian en hover. */}
-                      <img
-                        src={sponsor.logo}
-                        alt=""
-                        loading="lazy"
-                        className="h-full w-full object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none'
-                        }}
-                      />
-                    </span>
-                    {/* `text-sm` y no `text-xs`: index.css baja la raíz a 14px por debajo
-                        de 768px, así que ahí `text-xs` rinde 10.5px reales. Es el único
-                        texto de la celda y el que identifica a la marca cuando el logo no
-                        carga — y, en las celdas sin sitio, todo lo que la celda comunica.
-                        `font-medium` NO es decorativo: sin él, este texto HEREDA el peso
-                        de su contenedor, y la regla base `a { font-weight: 500 }` de
-                        index.css hace que las celdas enlazadas lo pinten en 500 y las que
-                        no, en el 400 de `:root`. Con `font-synthesis: none` no hay nada que
-                        lo disimule, y en una fila mezclada se ven dos pesos distintos lado
-                        a lado sin que nadie haya interactuado — justo lo que este cambio
-                        tiene que evitar. Va en 500 y no en 400 porque es el peso que las
-                        celdas ya tenían cuando todas eran enlaces. */}
-                    <span className="mt-4 text-center text-sm font-medium leading-snug text-gray-400 transition-colors duration-300 group-hover:text-gray-200">
-                      {sponsor.name}
-                    </span>
-                  </>
-                )
-
-                if (!navega) {
-                  return (
-                    <div key={sponsor.id} className={CLASE_CELDA_PATROCINADOR_BASE}>
-                      {contenido}
-                    </div>
+                  /* El contenido se escribe UNA vez y lo envuelve una u otra caja: si se
+                     duplicara en las dos ramas, el próximo retoque del logo o del nombre se
+                     haría en una sola y las celdas dejarían de verse idénticas — que es
+                     justo lo que este cambio tiene que garantizar. */
+                  const contenido = (
+                    <>
+                      <span
+                        className={`flex w-full items-center justify-center px-2 ${ALTO_LOGO_PATROCINADOR}`}
+                      >
+                        {/* Si el logo no carga se oculta la <img> y el nombre de abajo queda
+                            como única identificación. El manejador NO apunta a un archivo de
+                            reserva a propósito: un fallback que a su vez no cargue vuelve a
+                            disparar onError y entra en bucle. Esto ya fue un bug; no lo
+                            "mejores" apuntándolo a una imagen.
+                            `alt=""` porque el nombre ya está en texto visible justo abajo:
+                            repetirlo haría que un lector de pantalla lo dijera dos veces. En
+                            las celdas que enlazan, además, el nombre accesible ya lo fija el
+                            aria-label del <a>. */}
+                        {/* El logo va SIEMPRE al 100%, sin atenuar, en todos los dispositivos.
+                            Tuvo una atenuación al 70 % que se aplicaba solo donde hay puntero
+                            —vía media query, para no apagar los logos en táctil— y volvía a
+                            100 en hover. El problema no era el efecto sino a quién le tocaba:
+                            el hover lo enciende la celda vía `group`, y solo las celdas con
+                            sitio real son `.group`, así que en escritorio los logos sin sitio
+                            se quedaban atenuados para siempre. Atenuar de forma permanente el
+                            logo de quien paga por estar ahí, y encima solo a algunos, no se
+                            arregla con más CSS condicional.
+                            La celda que navega ya se distingue por el marco (borde y fondo) y
+                            por el nombre, que sí cambian en hover. */}
+                        <img
+                          src={sponsor.logo}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      </span>
+                      {/* `text-sm` y no `text-xs`: index.css baja la raíz a 14px por debajo
+                          de 768px, así que ahí `text-xs` rinde 10.5px reales. Es el único
+                          texto de la celda y el que identifica a la marca cuando el logo no
+                          carga — y, en las celdas sin sitio, todo lo que la celda comunica.
+                          `font-medium` NO es decorativo: sin él, este texto HEREDA el peso
+                          de su contenedor, y la regla base `a { font-weight: 500 }` de
+                          index.css hace que las celdas enlazadas lo pinten en 500 y las que
+                          no, en el 400 de `:root`. Con `font-synthesis: none` no hay nada que
+                          lo disimule, y en una fila mezclada se ven dos pesos distintos lado
+                          a lado sin que nadie haya interactuado — justo lo que este cambio
+                          tiene que evitar. Va en 500 y no en 400 porque es el peso que las
+                          celdas ya tenían cuando todas eran enlaces. */}
+                      <span className="mt-4 text-center text-sm font-medium leading-snug text-gray-400 transition-colors duration-300 group-hover:text-gray-200">
+                        {sponsor.name}
+                      </span>
+                    </>
                   )
-                }
 
-                return (
-                  <a
-                    key={sponsor.id}
-                    href={sponsor.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    /* Arranca con el texto visible EXACTO —el nombre, que está en el <span>
-                       de abajo— para no romper el control por voz (WCAG 2.5.3, "Label in
-                       Name") y recién después avisa lo que el texto no dice. Misma fórmula
-                       que los enlaces de comunidad de /registro. */
-                    aria-label={`${sponsor.name} (abre en pestaña nueva)`}
-                    className={CLASE_CELDA_PATROCINADOR_ENLACE}
-                  >
-                    {contenido}
-                  </a>
-                )
-              })}
+                  if (!navega) {
+                    return (
+                      <div key={sponsor.id} className={CLASE_CELDA_PATROCINADOR_BASE}>
+                        {contenido}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <a
+                      key={sponsor.id}
+                      href={sponsor.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      /* Arranca con el texto visible EXACTO —el nombre, que está en el <span>
+                         de abajo— para no romper el control por voz (WCAG 2.5.3, "Label in
+                         Name") y recién después avisa lo que el texto no dice. Misma fórmula
+                         que los enlaces de comunidad de /registro. */
+                      aria-label={`${sponsor.name} (abre en pestaña nueva)`}
+                      className={CLASE_CELDA_PATROCINADOR_ENLACE}
+                    >
+                      {contenido}
+                    </a>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </Reveal>
 
       </div>
 
