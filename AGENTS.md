@@ -359,6 +359,29 @@ repo:
   = **524288000** (500 MB), **hardcodeadas en el `docker-compose.yml`** del servicio. Para
   `galeria` el techo que de verdad manda es el del bucket (10 MB), muy por debajo.
 
+## Carta de jugador (`/carta`)
+
+**Hecho el 2026-08-14.** Generador de "carta de jugador": el usuario elige un campeón y la
+página compone una tarjeta con el arte y la descarga como PNG. El catálogo y el arte de
+campeones salen de **Riot Data Dragon** vía `src/lib/datadragon.ts` (~173 campeones); el
+render final se arma en un **`<canvas>`** y se baja con `toBlob()`. Incluye el **aviso
+legal de Riot** obligatorio (contenido no endosado por Riot). Se llega desde el **Home**
+(CTA) y desde el **footer**. Trampas de canvas: ver
+[Animación y movimiento](#animación-y-movimiento).
+
+## Scroll y animaciones
+
+**Hecho el 2026-08-14/15.** Tres piezas de comportamiento visual, todas frontend:
+
+- **`ScrollToTop.tsx` (global).** Montado una vez en el árbol de rutas; en cada cambio de
+  ruta devuelve el scroll al tope, con **guard de hash** para no romper los anclajes
+  `#seccion`. Reemplaza a los viejos `onClick={irAlTope}` regados por las páginas; **quedan
+  4 onClick deliberados en el Footer** que no hay que borrar.
+- **`Reveal.tsx`.** Animación de entrada al hacer scroll, con `IntersectionObserver`. **Hoy
+  solo está en el Home**; extenderlo al resto de páginas es un pendiente menor abierto.
+- **Glow del hero.** Glow animado sutil en los logos del hero. Efecto de 3 capas pensado
+  para reusarse; **no colgarlo de `.pill-marca`** — ver la trampa correspondiente.
+
 ## Stack
 
 - **React 19** + **TypeScript** (strict) + **Vite 7**
@@ -380,14 +403,18 @@ src/
   main.tsx                 entrypoint
   index.css                tema Tailwind (@theme), tokens y utilidades
   vite-env.d.ts            tipos de las variables de entorno (VITE_*)
-  components/layout/
-    Header.tsx             navegación (arreglo navItems) + menú móvil
-    Footer.tsx
+  components/
+    ScrollToTop.tsx        vuelve al tope en cada cambio de ruta (con guard de hash)
+    Reveal.tsx             animación de entrada al scroll (IntersectionObserver)
+    layout/
+      Header.tsx           navegación (arreglo navItems) + menú móvil
+      Footer.tsx
   lib/
     supabase.ts            cliente de Supabase (perezoso; devuelve null sin credenciales)
     atak.ts                API pública de ATAK.GG: valida un Riot ID; nunca lanza ni bloquea
+    datadragon.ts          catálogo y arte de campeones (Riot Data Dragon) para la carta
     reglamento.ts          ruta, nombre de descarga y peso del PDF del reglamento
-  pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro · Reglamento
+  pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro · Reglamento · Carta
     admin/                 panel protegido: Login · RutaProtegida · Panel ·
                            ListaInscripciones · SubirGaleria · GestionGaleria
 public/                    assets, galeria/, images/, sponsors/, LOGO-COPA.ico,
@@ -548,6 +575,29 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   elimina `supabase-js` entero como código muerto, así que ese build tampoco
   sirve para probar la ruta real (el chunk de `/registro` pasa de ~238 kB a
   ~25 kB).
+
+### Animación y movimiento
+
+- **CORS de canvas: `crossOrigin` antes de `.src`.** Para exportar el canvas a PNG, la
+  imagen de Data Dragon debe cargarse con `img.crossOrigin = 'anonymous'` **asignado antes**
+  de `img.src`. Si se asigna después (o se omite), el canvas queda *tainted* y `toBlob()` /
+  `toDataURL()` **lanzan SecurityError**: el build no avisa, la carta se ve bien en pantalla
+  y lo único que revienta es la descarga.
+- **Glow reusable de 3 capas: no colgarlo de `.pill-marca`.** El glow son 3 capas y está
+  pensado para reusarse. Si se acopla a `.pill-marca` solo funciona ahí y se rompe al
+  reusarlo en otro elemento. Debe vivir como utilidad propia, independiente de esa clase.
+- **`prefers-reduced-motion` acelera a 0.01ms, no apaga — y no cubre la animación por JS.**
+  El reset típico pone `animation-duration: 0.01ms` (ver la manta en `index.css:595-603`),
+  que **acelera** a casi-instantáneo pero **no desactiva**. Como es media query de CSS,
+  cubre cualquier animación declarada en CSS —incluido el `<Reveal>`, cuyo JS solo agrega la
+  clase `animate-slide-in-up` y deja la animación al CSS— pero **no toca lo animado por JS
+  puro** (canvas, rAF/WAAPI): eso necesita su propio chequeo con
+  `matchMedia('(prefers-reduced-motion: reduce)')`.
+- **Reveal seguro: el estado oculto va en el keyframe, nunca en una clase base
+  `opacity-0`.** Si el `opacity: 0` inicial vive en una clase base y el observer no dispara
+  (JS desactivado, error, elemento que nunca entra al viewport), el contenido queda
+  **invisible para siempre**. El estado oculto debe vivir **dentro del keyframe**, de modo
+  que el default sin animar sea *visible*.
 
 ### Policies de `jugadores`: seguras HOY solo porque no hay login de jugador (deuda P1)
 
