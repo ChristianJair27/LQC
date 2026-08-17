@@ -1711,12 +1711,28 @@ export default function Registro() {
 
       <div className="relative z-10">
         {/* Hero */}
-        <section className="py-32 md:py-40">
-          <div className="container mx-auto px-6 max-w-4xl text-center">
-            <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent mb-6">
-              LQC Split Otoño 2026
+        <section className="pt-28 pb-16 md:pt-40 md:pb-24">
+          <div className="container mx-auto px-6 max-w-4xl">
+            {/* Encuadre tipo póster LQC: marca arriba, ubicación a la derecha */}
+            <div className="flex items-center justify-between mb-8 text-xs sm:text-sm font-heading tracking-[0.25em] text-lqc-accent/70">
+              <span>LQC 2026</span>
+              <span>QRO, MX.</span>
+            </div>
+
+            {/* Título protagonista: pesado, mayúsculas, alineado a la izquierda */}
+            <h1 className="font-heading font-bold uppercase leading-[0.95] tracking-tight mb-6 [text-shadow:0_0_40px_rgba(0,212,255,0.35)]">
+              <span className="block text-4xl sm:text-6xl md:text-7xl text-white">
+                Split Otoño
+              </span>
+              <span className="block text-6xl sm:text-8xl md:text-9xl bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
+                2026
+              </span>
             </h1>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
+
+            {/* Línea divisoria estilo póster */}
+            <div className="h-px w-full bg-gradient-to-r from-lqc-accent/60 via-blue-500/20 to-transparent mb-8" />
+
+            <p className="text-lg md:text-xl text-gray-300 max-w-2xl leading-relaxed">
               Cada jugador se registra por su cuenta. Si tu equipo ya está inscrito,
               elígelo de las sugerencias para no crear uno repetido.
             </p>
