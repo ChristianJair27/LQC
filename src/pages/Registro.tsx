@@ -6,6 +6,7 @@ import {
   Send, CheckCircle, AlertCircle, Check, Facebook, MessageSquare,
   Loader2, FileText, ExternalLink, Download
 } from 'lucide-react'
+import Reveal from '../components/Reveal'
 import { obtenerSupabase } from '../lib/supabase'
 import { RUTA_REGLAMENTO, NOMBRE_DESCARGA, PESO_REGLAMENTO } from '../lib/reglamento'
 import { validarRiotId } from '../lib/atak'
@@ -2125,67 +2126,69 @@ export default function Registro() {
                 </div>
 
                 {/* Pago de inscripción (informativo) */}
-                <div>
-                  <TituloSeccion>Pago de Inscripción</TituloSeccion>
-                  <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-sm border border-blue-800/30 rounded-2xl p-6 md:p-8 shadow-lqc">
-                    {/* Encabezado: de qué cuenta se trata + cuánto se transfiere. */}
-                    <div className="flex flex-wrap items-center justify-between gap-5 pb-6 mb-6 border-b border-white/5">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-black/40 border border-blue-700/40 flex items-center justify-center shrink-0">
-                          <CreditCard className="w-6 h-6 text-lqc-accent" />
+                <Reveal>
+                  <div>
+                    <TituloSeccion>Pago de Inscripción</TituloSeccion>
+                    <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-sm border border-blue-800/30 rounded-2xl p-6 md:p-8 shadow-lqc">
+                      {/* Encabezado: de qué cuenta se trata + cuánto se transfiere. */}
+                      <div className="flex flex-wrap items-center justify-between gap-5 pb-6 mb-6 border-b border-white/5">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-black/40 border border-blue-700/40 flex items-center justify-center shrink-0">
+                            <CreditCard className="w-6 h-6 text-lqc-accent" />
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
+                              Cuenta bancaria
+                            </p>
+                            <p className="text-lg md:text-xl font-medium text-white">LQC</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.2em] text-gray-400">
-                            Cuenta bancaria
+
+                        <div className="rounded-xl bg-black/40 border border-blue-700/40 px-5 py-3">
+                          <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">
+                            Inscripción por equipo
                           </p>
-                          <p className="text-lg md:text-xl font-medium text-white">LQC</p>
+                          <p className="font-heading text-2xl md:text-3xl text-white leading-none whitespace-nowrap">
+                            $500 <span className="text-base text-gray-400">MXN</span>
+                          </p>
                         </div>
                       </div>
 
-                      <div className="rounded-xl bg-black/40 border border-blue-700/40 px-5 py-3">
-                        <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1">
-                          Inscripción por equipo
+                      {/* Con el registro individual esto importa MÁS que antes, no menos:
+                          cada quien manda su formulario por separado, así que sin decirlo
+                          siete personas podrían pagar $500 cada una. */}
+                      <p className="mb-6 text-sm md:text-base text-gray-300 leading-relaxed">
+                        La inscripción es de{' '}
+                        <span className="text-white font-medium">$500 MXN por equipo</span>,{' '}
+                        <span className="text-white font-medium">no por jugador</span>: se hace{' '}
+                        <span className="text-white font-medium">un solo pago</span> por equipo y lo
+                        realiza el capitán, con el nombre del equipo como concepto.
+                      </p>
+
+                      {/* Dato protagonista */}
+                      <div className="rounded-xl bg-black/40 border border-lqc-accent/20 p-5 md:p-6">
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-3">
+                          CLABE interbancaria
                         </p>
-                        <p className="font-heading text-2xl md:text-3xl text-white leading-none whitespace-nowrap">
-                          $500 <span className="text-base text-gray-400">MXN</span>
+                        <p className="font-mono text-lqc-accent text-lg sm:text-2xl md:text-3xl tracking-wide break-all select-all leading-snug">
+                          002680003802575132
                         </p>
                       </div>
+
+                      {/* Datos subordinados */}
+                      <dl className="mt-6 grid gap-5 sm:grid-cols-3">
+                        {datosPago.map((dato) => (
+                          <div key={dato.etiqueta}>
+                            <dt className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1.5">
+                              {dato.etiqueta}
+                            </dt>
+                            <dd className="text-white font-medium break-words">{dato.valor}</dd>
+                          </div>
+                        ))}
+                      </dl>
                     </div>
-
-                    {/* Con el registro individual esto importa MÁS que antes, no menos:
-                        cada quien manda su formulario por separado, así que sin decirlo
-                        siete personas podrían pagar $500 cada una. */}
-                    <p className="mb-6 text-sm md:text-base text-gray-300 leading-relaxed">
-                      La inscripción es de{' '}
-                      <span className="text-white font-medium">$500 MXN por equipo</span>,{' '}
-                      <span className="text-white font-medium">no por jugador</span>: se hace{' '}
-                      <span className="text-white font-medium">un solo pago</span> por equipo y lo
-                      realiza el capitán, con el nombre del equipo como concepto.
-                    </p>
-
-                    {/* Dato protagonista */}
-                    <div className="rounded-xl bg-black/40 border border-lqc-accent/20 p-5 md:p-6">
-                      <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-3">
-                        CLABE interbancaria
-                      </p>
-                      <p className="font-mono text-lqc-accent text-lg sm:text-2xl md:text-3xl tracking-wide break-all select-all leading-snug">
-                        002680003802575132
-                      </p>
-                    </div>
-
-                    {/* Datos subordinados */}
-                    <dl className="mt-6 grid gap-5 sm:grid-cols-3">
-                      {datosPago.map((dato) => (
-                        <div key={dato.etiqueta}>
-                          <dt className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-1.5">
-                            {dato.etiqueta}
-                          </dt>
-                          <dd className="text-white font-medium break-words">{dato.valor}</dd>
-                        </div>
-                      ))}
-                    </dl>
                   </div>
-                </div>
+                </Reveal>
 
                 {/* Reglamento.
                     Va acá, entre el pago y el aviso de privacidad, y no arriba del
@@ -2195,105 +2198,107 @@ export default function Registro() {
                     No es un enlace suelto sino una tarjeta con las dos formas de leerlo,
                     con el mismo lenguaje de la tarjeta de pago (misma familia de
                     gradiente, mismo azulejo de icono). */}
-                <div>
-                  <TituloSeccion>Reglamento</TituloSeccion>
-                  <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-sm border border-blue-800/30 rounded-2xl p-6 md:p-8 shadow-lqc">
-                    <div className="flex items-start gap-4 mb-6">
-                      <div className="w-12 h-12 rounded-xl bg-black/40 border border-blue-700/40 flex items-center justify-center shrink-0">
-                        <FileText className="w-6 h-6 text-lqc-accent" aria-hidden="true" />
+                <Reveal>
+                  <div>
+                    <TituloSeccion>Reglamento</TituloSeccion>
+                    <div className="bg-gradient-to-br from-blue-950/30 to-lqc-900/20 backdrop-blur-sm border border-blue-800/30 rounded-2xl p-6 md:p-8 shadow-lqc">
+                      <div className="flex items-start gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-xl bg-black/40 border border-blue-700/40 flex items-center justify-center shrink-0">
+                          <FileText className="w-6 h-6 text-lqc-accent" aria-hidden="true" />
+                        </div>
+                        <div>
+                          {/* «registrarte» y no «enviar»: es la acción que nombra el botón
+                              de abajo, que dice «Registrarme». */}
+                          <p className="text-lg md:text-xl font-medium text-white mb-2">
+                            Léelo antes de registrarte
+                          </p>
+                          <p className="text-sm md:text-base text-gray-300 leading-relaxed">
+                            El reglamento oficial define{' '}
+                            <span className="text-white font-medium">quién puede jugar</span>, el{' '}
+                            <span className="text-white font-medium">formato de la competencia</span>{' '}
+                            y las{' '}
+                            <span className="text-white font-medium">sanciones</span>.
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        {/* «registrarte» y no «enviar»: es la acción que nombra el botón
-                            de abajo, que dice «Registrarme». */}
-                        <p className="text-lg md:text-xl font-medium text-white mb-2">
-                          Léelo antes de registrarte
-                        </p>
-                        <p className="text-sm md:text-base text-gray-300 leading-relaxed">
-                          El reglamento oficial define{' '}
-                          <span className="text-white font-medium">quién puede jugar</span>, el{' '}
-                          <span className="text-white font-medium">formato de la competencia</span>{' '}
-                          y las{' '}
-                          <span className="text-white font-medium">sanciones</span>.
-                        </p>
+
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {/* Se abre en pestaña nueva por una razón que pesa más que cualquier
+                            otra: quien está acá tiene el formulario a medio llenar y sin
+                            guardado, así que navegar en la misma pestaña le borra los datos.
+                            Un <a> normal y no un <Link> de react-router porque con
+                            target="_blank" el navegador hace una carga completa igual: el
+                            Link no aportaría navegación del cliente y esta página no importa
+                            nada de react-router.
+                            Apunta a la PÁGINA y no al PDF a propósito: /reglamento es el
+                            destino canónico y en un teléfono —donde no monta el visor— es una
+                            tarjeta que ofrece abrir o descargar el archivo, no un error. */}
+                        <a
+                          href="/reglamento"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          /* Arranca con el texto visible EXACTO para no romper el control por
+                             voz (WCAG 2.5.3, "Label in Name") y recién después avisa lo que
+                             el texto no dice. Misma fórmula que los enlaces de comunidad. */
+                          aria-label="Ver reglamento (abre en pestaña nueva)"
+                          className={`${CLASE_VER_REGLAMENTO} sm:flex-1`}
+                        >
+                          <ExternalLink className="w-5 h-5 shrink-0" aria-hidden="true" />
+                          Ver reglamento
+                        </a>
+
+                        {/* Apunta al PDF directo y no a /reglamento: es una descarga, y
+                            `download` solo funciona sobre el archivo del mismo origen. */}
+                        <a
+                          href={RUTA_REGLAMENTO}
+                          download={NOMBRE_DESCARGA}
+                          aria-label={`Descargar PDF (${PESO_REGLAMENTO}) del reglamento de la LQC 2026`}
+                          className={`${CLASE_ENLACE_COMUNIDAD} sm:flex-1`}
+                        >
+                          <Download className="w-5 h-5 shrink-0" aria-hidden="true" />
+                          {/* El peso es texto visible, no solo del aria-label: la decisión de
+                              gastar datos móviles la toma quien ve la pantalla. */}
+                          Descargar PDF{' '}
+                          <span className="text-gray-400">({PESO_REGLAMENTO})</span>
+                        </a>
                       </div>
+
+                      {/* HUECO RESERVADO: acá va la casilla «He leído y acepto el
+                          reglamento», y está vacío a propósito — no es un olvido.
+                          Todavía no se pone porque el PDF publicado tiene puntos que van a
+                          cambiar, y marcar una casilla es aceptar UN texto concreto: quien la
+                          marcara hoy estaría aceptando algo distinto de lo que va a regir.
+                          Y no se puede arreglar después, porque no hay dónde guardar QUÉ
+                          versión se aceptó: ni `equipos` ni `jugadores` tienen columna para
+                          eso y el payload de la RPC es un tipo cerrado. (Contacto sí hay —el
+                          payload manda celular y correo—, así que el problema no es no poder
+                          avisar: es que no quedaría registro de qué se aceptó.)
+                          Mejor ofrecer el reglamento sin exigir aceptación que exigir una
+                          aceptación que no dice de qué.
+
+                          Cuando el PDF quede firme, esto es lo que hay que sumar. OJO: las
+                          cuatro cosas son de cliente nomás, igual que `aceptaPrivacidad`, que
+                          tampoco se persiste. Si lo que se quiere es una aceptación
+                          REGISTRADA con fecha y versión, eso además necesita columna nueva y
+                          cambiar la RPC `registrar_jugador`, que vive en Supabase y no en
+                          este repo (ver AGENTS.md).
+                            1. estado `aceptaReglamento` + su `setState`;
+                            2. el `id` del input DEBE ser igual a la clave de error
+                               ('reglamento'): `enfocarClave` hace getElementById y si no lo
+                               encuentra sale por un `return` sin error, o sea que el foco al
+                               primer campo inválido se rompe EN SILENCIO;
+                            3. la clave 'reglamento' en `ORDEN_CLAVES`, y va ANTES de
+                               'privacidad', no al final: ese arreglo es el orden VISUAL y de
+                               ahí sale a qué campo salta el foco;
+                            4. la validación dentro de `validar()`, con el mismo patrón que
+                               `if (!aceptaPrivacidad)`.
+                          Copiar el bloque del checkbox del aviso de privacidad de abajo: ya
+                          tiene el input sr-only + `peer`, el foco visible y el MensajeError
+                          cableados. (El tipo de errores no hay que tocarlo: `Errores` es
+                          `Record<string, string>`, cualquier clave ya es válida.) */}
                     </div>
-
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      {/* Se abre en pestaña nueva por una razón que pesa más que cualquier
-                          otra: quien está acá tiene el formulario a medio llenar y sin
-                          guardado, así que navegar en la misma pestaña le borra los datos.
-                          Un <a> normal y no un <Link> de react-router porque con
-                          target="_blank" el navegador hace una carga completa igual: el
-                          Link no aportaría navegación del cliente y esta página no importa
-                          nada de react-router.
-                          Apunta a la PÁGINA y no al PDF a propósito: /reglamento es el
-                          destino canónico y en un teléfono —donde no monta el visor— es una
-                          tarjeta que ofrece abrir o descargar el archivo, no un error. */}
-                      <a
-                        href="/reglamento"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        /* Arranca con el texto visible EXACTO para no romper el control por
-                           voz (WCAG 2.5.3, "Label in Name") y recién después avisa lo que
-                           el texto no dice. Misma fórmula que los enlaces de comunidad. */
-                        aria-label="Ver reglamento (abre en pestaña nueva)"
-                        className={`${CLASE_VER_REGLAMENTO} sm:flex-1`}
-                      >
-                        <ExternalLink className="w-5 h-5 shrink-0" aria-hidden="true" />
-                        Ver reglamento
-                      </a>
-
-                      {/* Apunta al PDF directo y no a /reglamento: es una descarga, y
-                          `download` solo funciona sobre el archivo del mismo origen. */}
-                      <a
-                        href={RUTA_REGLAMENTO}
-                        download={NOMBRE_DESCARGA}
-                        aria-label={`Descargar PDF (${PESO_REGLAMENTO}) del reglamento de la LQC 2026`}
-                        className={`${CLASE_ENLACE_COMUNIDAD} sm:flex-1`}
-                      >
-                        <Download className="w-5 h-5 shrink-0" aria-hidden="true" />
-                        {/* El peso es texto visible, no solo del aria-label: la decisión de
-                            gastar datos móviles la toma quien ve la pantalla. */}
-                        Descargar PDF{' '}
-                        <span className="text-gray-400">({PESO_REGLAMENTO})</span>
-                      </a>
-                    </div>
-
-                    {/* HUECO RESERVADO: acá va la casilla «He leído y acepto el
-                        reglamento», y está vacío a propósito — no es un olvido.
-                        Todavía no se pone porque el PDF publicado tiene puntos que van a
-                        cambiar, y marcar una casilla es aceptar UN texto concreto: quien la
-                        marcara hoy estaría aceptando algo distinto de lo que va a regir.
-                        Y no se puede arreglar después, porque no hay dónde guardar QUÉ
-                        versión se aceptó: ni `equipos` ni `jugadores` tienen columna para
-                        eso y el payload de la RPC es un tipo cerrado. (Contacto sí hay —el
-                        payload manda celular y correo—, así que el problema no es no poder
-                        avisar: es que no quedaría registro de qué se aceptó.)
-                        Mejor ofrecer el reglamento sin exigir aceptación que exigir una
-                        aceptación que no dice de qué.
-
-                        Cuando el PDF quede firme, esto es lo que hay que sumar. OJO: las
-                        cuatro cosas son de cliente nomás, igual que `aceptaPrivacidad`, que
-                        tampoco se persiste. Si lo que se quiere es una aceptación
-                        REGISTRADA con fecha y versión, eso además necesita columna nueva y
-                        cambiar la RPC `registrar_jugador`, que vive en Supabase y no en
-                        este repo (ver AGENTS.md).
-                          1. estado `aceptaReglamento` + su `setState`;
-                          2. el `id` del input DEBE ser igual a la clave de error
-                             ('reglamento'): `enfocarClave` hace getElementById y si no lo
-                             encuentra sale por un `return` sin error, o sea que el foco al
-                             primer campo inválido se rompe EN SILENCIO;
-                          3. la clave 'reglamento' en `ORDEN_CLAVES`, y va ANTES de
-                             'privacidad', no al final: ese arreglo es el orden VISUAL y de
-                             ahí sale a qué campo salta el foco;
-                          4. la validación dentro de `validar()`, con el mismo patrón que
-                             `if (!aceptaPrivacidad)`.
-                        Copiar el bloque del checkbox del aviso de privacidad de abajo: ya
-                        tiene el input sr-only + `peer`, el foco visible y el MensajeError
-                        cableados. (El tipo de errores no hay que tocarlo: `Errores` es
-                        `Record<string, string>`, cualquier clave ya es válida.) */}
                   </div>
-                </div>
+                </Reveal>
 
                 {/* Aviso de privacidad.
                     VUELVE A LA PRIMERA PERSONA. Con el registro por equipo, quien
@@ -2303,111 +2308,113 @@ export default function Registro() {
                     la autorización de cada integrante. Ahora cada quien manda los
                     suyos: el consentimiento es propio y los derechos ARCO los
                     ejerce la misma persona que está leyendo esto. */}
-                <div>
-                  <TituloSeccion>Aviso de Privacidad</TituloSeccion>
-                  <div className="bg-black/40 backdrop-blur-sm border border-lqc-accent/20 rounded-2xl p-6 md:p-8 shadow-lqc">
-                    <div className="flex items-start gap-4 mb-6">
-                      <div className="w-12 h-12 rounded-xl bg-black/40 border border-lqc-accent/30 flex items-center justify-center shrink-0">
-                        <ShieldCheck className="w-6 h-6 text-lqc-accent" />
-                      </div>
-                      <p className="text-gray-300 leading-relaxed text-sm md:text-base">
-                        Tus datos personales se tratan conforme a la{' '}
-                        <span className="text-white font-medium">
-                          Ley Federal de Protección de Datos Personales en Posesión de los
-                          Particulares
-                        </span>
-                        .
-                      </p>
-                    </div>
-
-                    <ul className="space-y-4 text-sm md:text-base">
-                      <li className="flex items-start gap-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
-                        <span className="text-gray-300">
-                          <span className="text-white font-medium">Finalidad:</span> organización,
-                          logística y comunicación del evento LQC Split Otoño 2026.
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
-                        <span className="text-gray-300">
-                          {/* La relación con Revolution505 va explícita porque el correo ARCO
-                              es @revolution505.com: si no, el titular no sabe si le escribe
-                              al responsable o a un tercero. */}
-                          <span className="text-white font-medium">Responsable:</span> League
-                          Querétaro Championship (LQC), liga organizada por Revolution505.
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
-                        <span className="text-gray-300">
-                          Tus datos{' '}
+                <Reveal>
+                  <div>
+                    <TituloSeccion>Aviso de Privacidad</TituloSeccion>
+                    <div className="bg-black/40 backdrop-blur-sm border border-lqc-accent/20 rounded-2xl p-6 md:p-8 shadow-lqc">
+                      <div className="flex items-start gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-xl bg-black/40 border border-lqc-accent/30 flex items-center justify-center shrink-0">
+                          <ShieldCheck className="w-6 h-6 text-lqc-accent" />
+                        </div>
+                        <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                          Tus datos personales se tratan conforme a la{' '}
                           <span className="text-white font-medium">
-                            no se comparten con terceros
-                          </span>{' '}
-                          sin tu consentimiento.
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
-                        <span className="text-gray-300">
-                          Puedes ejercer tus{' '}
-                          <span className="text-white font-medium">
-                            derechos ARCO (acceso, rectificación, cancelación u oposición)
-                          </span>{' '}
-                          sobre tus propios datos escribiendo a{' '}
-                          <a
-                            href="mailto:contactolqc@revolution505.com"
-                            className="after:hidden text-lqc-accent font-medium underline underline-offset-4 decoration-lqc-accent/40 hover:decoration-lqc-accent"
-                          >
-                            contactolqc@revolution505.com
-                          </a>
+                            Ley Federal de Protección de Datos Personales en Posesión de los
+                            Particulares
+                          </span>
                           .
-                        </span>
-                      </li>
-                    </ul>
+                        </p>
+                      </div>
 
-                    <div className="mt-8 pt-6 border-t border-white/5">
-                      <label className="flex items-start gap-4 cursor-pointer group">
-                        <input
-                          id="privacidad"
-                          type="checkbox"
-                          name="privacidad"
-                          required
-                          checked={aceptaPrivacidad}
-                          onChange={(e) => {
-                            setAceptaPrivacidad(e.target.checked)
-                            if (e.target.checked) limpiarError('privacidad')
-                          }}
-                          aria-invalid={errores.privacidad ? true : undefined}
-                          aria-describedby={errores.privacidad ? 'privacidad-error' : undefined}
-                          className="peer sr-only"
-                        />
-                        <span
-                          className={`
-                            mt-0.5 w-6 h-6 shrink-0 rounded-md border-2 flex items-center justify-center transition-all duration-300
-                            peer-focus:ring-2 peer-focus:ring-lqc-accent/60 peer-focus:ring-offset-2 peer-focus:ring-offset-black
-                            ${aceptaPrivacidad
-                              ? 'bg-gradient-to-br from-lqc-700 to-lqc-500 border-lqc-500'
-                              : errores.privacidad
-                                ? 'bg-black/40 border-rose-500/70'
-                                : 'bg-black/40 border-white/20 group-hover:border-blue-500/60'
-                            }
-                          `}
-                        >
-                          {aceptaPrivacidad && <Check className="w-4 h-4 text-white" />}
-                        </span>
-                        <span className="text-sm md:text-base text-gray-200 leading-relaxed">
-                          Acepto que mis datos se traten conforme al aviso de privacidad.{' '}
-                          <span className="text-lqc-accent" aria-hidden="true">*</span>
-                        </span>
-                      </label>
-                      {errores.privacidad && (
-                        <MensajeError id="privacidad-error" texto={errores.privacidad} />
-                      )}
+                      <ul className="space-y-4 text-sm md:text-base">
+                        <li className="flex items-start gap-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
+                          <span className="text-gray-300">
+                            <span className="text-white font-medium">Finalidad:</span> organización,
+                            logística y comunicación del evento LQC Split Otoño 2026.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
+                          <span className="text-gray-300">
+                            {/* La relación con Revolution505 va explícita porque el correo ARCO
+                                es @revolution505.com: si no, el titular no sabe si le escribe
+                                al responsable o a un tercero. */}
+                            <span className="text-white font-medium">Responsable:</span> League
+                            Querétaro Championship (LQC), liga organizada por Revolution505.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
+                          <span className="text-gray-300">
+                            Tus datos{' '}
+                            <span className="text-white font-medium">
+                              no se comparten con terceros
+                            </span>{' '}
+                            sin tu consentimiento.
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-lqc-accent mt-2.5 shrink-0" />
+                          <span className="text-gray-300">
+                            Puedes ejercer tus{' '}
+                            <span className="text-white font-medium">
+                              derechos ARCO (acceso, rectificación, cancelación u oposición)
+                            </span>{' '}
+                            sobre tus propios datos escribiendo a{' '}
+                            <a
+                              href="mailto:contactolqc@revolution505.com"
+                              className="after:hidden text-lqc-accent font-medium underline underline-offset-4 decoration-lqc-accent/40 hover:decoration-lqc-accent"
+                            >
+                              contactolqc@revolution505.com
+                            </a>
+                            .
+                          </span>
+                        </li>
+                      </ul>
+
+                      <div className="mt-8 pt-6 border-t border-white/5">
+                        <label className="flex items-start gap-4 cursor-pointer group">
+                          <input
+                            id="privacidad"
+                            type="checkbox"
+                            name="privacidad"
+                            required
+                            checked={aceptaPrivacidad}
+                            onChange={(e) => {
+                              setAceptaPrivacidad(e.target.checked)
+                              if (e.target.checked) limpiarError('privacidad')
+                            }}
+                            aria-invalid={errores.privacidad ? true : undefined}
+                            aria-describedby={errores.privacidad ? 'privacidad-error' : undefined}
+                            className="peer sr-only"
+                          />
+                          <span
+                            className={`
+                              mt-0.5 w-6 h-6 shrink-0 rounded-md border-2 flex items-center justify-center transition-all duration-300
+                              peer-focus:ring-2 peer-focus:ring-lqc-accent/60 peer-focus:ring-offset-2 peer-focus:ring-offset-black
+                              ${aceptaPrivacidad
+                                ? 'bg-gradient-to-br from-lqc-700 to-lqc-500 border-lqc-500'
+                                : errores.privacidad
+                                  ? 'bg-black/40 border-rose-500/70'
+                                  : 'bg-black/40 border-white/20 group-hover:border-blue-500/60'
+                              }
+                            `}
+                          >
+                            {aceptaPrivacidad && <Check className="w-4 h-4 text-white" />}
+                          </span>
+                          <span className="text-sm md:text-base text-gray-200 leading-relaxed">
+                            Acepto que mis datos se traten conforme al aviso de privacidad.{' '}
+                            <span className="text-lqc-accent" aria-hidden="true">*</span>
+                          </span>
+                        </label>
+                        {errores.privacidad && (
+                          <MensajeError id="privacidad-error" texto={errores.privacidad} />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Reveal>
 
                 {/* Resumen de errores + envío */}
                 <div className="space-y-6">
