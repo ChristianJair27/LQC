@@ -2497,10 +2497,10 @@ export default function Registro() {
                     type="submit"
                     disabled={enviando}
                     aria-busy={enviando}
-                    className={`w-full py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 rounded-xl font-medium transition-all duration-300 shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3 ${
+                    className={`w-full py-4 bg-gradient-to-r from-lqc-700 to-lqc-500 rounded-xl font-medium transition-all duration-200 shadow-lg shadow-blue-900/30 flex items-center justify-center gap-3 ${
                       enviando
                         ? 'opacity-60 cursor-not-allowed'
-                        : 'hover:from-lqc-600 hover:to-lqc-400'
+                        : 'hover:from-lqc-600 hover:to-lqc-400 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-lqc-accent/20 active:translate-y-0'
                     }`}
                   >
                     {enviando ? (
