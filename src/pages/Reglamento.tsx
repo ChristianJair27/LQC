@@ -238,9 +238,11 @@ export default function Reglamento() {
         {/* Hero. El h1 toma Orbitron de la regla base de index.css (h1–h6). */}
         <section className="pt-24 pb-12 md:pt-32 md:pb-16">
           <div className="container mx-auto px-6 max-w-5xl text-center">
-            <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent mb-6">
+            <h1 className="font-heading font-bold uppercase text-4xl sm:text-5xl md:text-7xl tracking-tight leading-[0.95] [text-shadow:0_0_40px_rgba(0,212,255,0.35)] bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
               Reglamento
             </h1>
+            {/* Línea divisoria estilo póster */}
+            <div className="h-px w-40 mx-auto mb-6 bg-gradient-to-r from-transparent via-lqc-accent/60 to-transparent" />
             <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
               Las reglas oficiales de la League Querétaro Championship: formato de
               competencia, requisitos de los equipos y conducta dentro y fuera del juego.
