@@ -383,11 +383,13 @@ export default function Carta() {
       </div>
 
       <div className="relative z-10">
-        <section className="py-32 md:py-40">
+        <section className="pt-28 pb-16 md:py-40">
           <div className="container mx-auto px-6 max-w-5xl text-center">
-            <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
+            <h1 className="font-heading font-bold uppercase text-4xl sm:text-5xl md:text-7xl tracking-tight leading-[0.95] [text-shadow:0_0_40px_rgba(0,212,255,0.35)] bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
               Carta de Jugador
             </h1>
+            {/* Línea divisoria estilo póster */}
+            <div className="h-px w-40 mx-auto mb-6 bg-gradient-to-r from-transparent via-lqc-accent/60 to-transparent" />
             <p className="text-xl text-gray-300 max-w-2xl mx-auto mt-6 leading-relaxed">
               Armá tu carta con tu nick y tu campeón, y descargala para compartirla.
             </p>
