@@ -362,7 +362,7 @@ export default function Home() {
       {/* Contenido principal */}
       <div className="relative z-10">
         {/* Hero - más limpio y centrado */}
-        <section className="py-32 md:py-40">
+        <section className="pt-28 pb-16 md:py-40">
           <div className="container mx-auto px-6 max-w-5xl text-center">
             <div className="flex flex-col items-center gap-6">
               {/* `animate-hero-glow` REEMPLAZA a `drop-shadow-xl`, no se suma. Las dos escriben
@@ -386,9 +386,11 @@ export default function Home() {
                 />
               </div>
               
-              <h1 className="text-5xl md:text-7xl font-extralight tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
+              <h1 className="font-heading font-bold uppercase text-4xl sm:text-5xl md:text-7xl tracking-tight leading-[0.95] [text-shadow:0_0_40px_rgba(0,212,255,0.35)] bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-blue-300 to-lqc-accent">
                 League Querétaro
               </h1>
+              {/* Línea divisoria estilo póster */}
+              <div className="h-px w-40 bg-gradient-to-r from-transparent via-lqc-accent/60 to-transparent" />
               
               <div className="inline-flex items-center gap-4 mt-4">
                 <span className="px-5 py-2 text-base bg-blue-950/40 text-blue-300 backdrop-blur-sm border border-blue-800/30 rounded-full shadow-lg">
