@@ -469,8 +469,14 @@ migraron a azul/cian el 2026-07-22. La verificación es
 
 Convenciones que dejó esa migración, a respetar en páginas nuevas:
 
-- **Gradiente canónico de títulos** (idéntico en las 6 páginas):
-  `from-blue-400 via-blue-300 to-lqc-accent`.
+- **Título de hero (canon, idéntico en las 7 páginas).** Clases:
+  `font-heading font-bold uppercase text-4xl sm:text-5xl md:text-7xl tracking-tight leading-[0.95]`
+  más el glow `[text-shadow:0_0_40px_rgba(0,212,255,0.35)]` y el gradiente
+  `from-blue-400 via-blue-300 to-lqc-accent` (bg-clip-text text-transparent). El escalón base
+  `text-4xl` existe para que títulos largos en mayúsculas (ej. "ARCHIVO DE TORNEOS", 18
+  caracteres) no desborden a 375px. Debajo del `<h1>` va una línea divisoria (ver más abajo).
+  El hero usa padding mobile-first `pt-28 pb-16 md:py-40` (excepción: Reglamento ya tenía el
+  suyo, `pt-24 pb-12 md:pt-32 md:pb-16`).
 - **CTA primario:** `from-lqc-700 to-lqc-500` con
   `hover:from-lqc-600 hover:to-lqc-400` y `shadow-blue-900/30`. Rampa dentro de
   la escala `lqc` (#003d99 → #0066ff): salto de luminancia visible y ~4.8:1 con
@@ -550,8 +556,19 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   viéndose **más vívido que el CTA primario**. Los secundarios necesitan `bg-none`.
 - **Canon del CTA primario:** `from-lqc-700 to-lqc-500` con
   `hover:from-lqc-600 hover:to-lqc-400`.
-- **Canon del gradiente de títulos** (idéntico en las 6 páginas):
-  `from-blue-400 via-blue-300 to-lqc-accent`.
+- **Canon del título de hero** (idéntico en las 7 páginas): tipografía pesada
+  `font-heading font-bold uppercase` con `text-4xl sm:text-5xl md:text-7xl leading-[0.95]`,
+  glow `[text-shadow:0_0_40px_rgba(0,212,255,0.35)]` y el gradiente
+  `from-blue-400 via-blue-300 to-lqc-accent`. Debajo, una **línea divisoria** en dos
+  variantes según la alineación del hero:
+  - Heros **centrados** (Torneos, Acerca, Galería, Contacto, Home, Reglamento, Carta): la línea
+    en sí es `h-px w-40 bg-gradient-to-r from-transparent via-lqc-accent/60 to-transparent`
+    — corta, simétrica. El centrado y la separación dependen del hero: si usa
+    `flex flex-col items-center` (Torneos, Acerca, Home) la línea hereda el centro y el gap; si
+    no (Galería, Contacto, Reglamento, Carta) la línea lleva `mx-auto mb-6` propios.
+  - Hero de **Registro** (alineado a la izquierda):
+    `h-px w-full bg-gradient-to-r from-lqc-accent/60 via-blue-500/20 to-transparent`
+    — ancha, asimétrica.
 - **Un guard derivado de estado NO protege contra el doble clic.** Un
   `const ocupado = estado === 'x'` recién se vuelve true **después de un re-render**, así
   que si el handler hace `await` **antes** de tocar estado, un segundo clic entra por esa
