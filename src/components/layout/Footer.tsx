@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Twitch, Facebook, MessageSquare, Mail, Trophy, MapPin } from 'lucide-react'
+import { INSCRIPCIONES_ABIERTAS } from '../../lib/inscripciones'
 
 /* Enlaces de la lista de Navegación. Quedan en constantes —aunque hoy cada una se use en un
    solo lugar— para reponer una segunda lista con el mismo aspecto sin copiar la cadena. */
@@ -224,7 +225,17 @@ export default function Footer() {
               Mismo tratamiento que el QR de «¿Vas a competir?» en Home.tsx: si se toca uno,
               mirar el otro. No están extraídos a un componente compartido porque son dos cajas
               de cinco líneas con tamaños y textos distintos, y el envoltorio costaría más de lo
-              que ahorra. */}
+              que ahorra.
+              Con la convocatoria cerrada la columna entera se oculta: el QR apunta al
+              registro y su SVG no se puede reapuntar desde el repo —es puro <path>, la URL
+              no está en el archivo—, así que lo único posible es no ofrecerlo. El enlace
+              «Registro» del bloque Recursos de acá arriba SÍ se queda: la página existe y
+              ahora es donde se informa el cierre.
+              Ojo al reabrir: en `lg` esta columna ocupa una pista fija de 112px de la
+              grilla (ver el comentario de la grilla). Oculta, esa pista queda vacía y las
+              otras cuatro no se reacomodan — es el comportamiento buscado, no un bug de
+              maquetación. */}
+          {INSCRIPCIONES_ABIERTAS && (
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-white uppercase tracking-wider">Regístrate</h4>
             <div className="flex items-center gap-3 lg:flex-col lg:items-start">
@@ -266,6 +277,7 @@ export default function Footer() {
               </span>
             </div>
           </div>
+          )}
         </div>
 
         {/* Separador */}

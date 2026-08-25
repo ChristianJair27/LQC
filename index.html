@@ -7,8 +7,14 @@
     <!-- Título principal - optimizado para SEO y pestañas -->
     <title>LQC | League Querétaro Championship - Torneo Competitivo LoL</title>
     
-    <!-- Meta descripción (máx 160 chars recomendados) -->
-    <meta name="description" content="Torneo competitivo de League of Legends en Querétaro. Inscripciones abiertas, premios en efectivo, transmisiones en vivo y comunidad apasionada.">
+    <!-- Meta descripción (máx 160 chars recomendados).
+         Las tres descripciones de acá (description, og:description y twitter:description) son
+         HTML estático: INSCRIPCIONES_ABIERTAS de src/lib/inscripciones.ts NO las alcanza, así
+         que al abrir o cerrar la convocatoria hay que editarlas a mano.
+         Se les quitó «Inscripciones abiertas» el 2026-08-25, al cerrarse la convocatoria, y de
+         paso «premios en efectivo»: el reglamento oficial dice «Premiación: Por definir», así
+         que era una promesa que el documento no respalda. No reponerla sin fuente. -->
+    <meta name="description" content="Torneo competitivo de League of Legends en Querétaro. Transmisiones en vivo, comunidad apasionada y toda la información del Split Otoño 2026.">
     
     <!-- Palabras clave -->
     <meta name="keywords" content="League of Legends, LQC, torneo LoL Querétaro, esports Querétaro, campeonato League, gaming competitivo México">
@@ -36,7 +42,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://lqc.revolution505.com/" />
     <meta property="og:title" content="LQC | League Querétaro Championship" />
-    <meta property="og:description" content="El torneo más competitivo de League of Legends en Querétaro. Inscripciones, transmisiones en vivo y premios." />
+    <meta property="og:description" content="El torneo más competitivo de League of Legends en Querétaro. Transmisiones en vivo, resultados y comunidad." />
     <!-- Imagen propia de 1200x630 (lqc-og.png), la proporción que piden las tarjetas
          sociales. No cambiar a 2 LQC.png ni a LOGO COPA.png: son RGBA con
          fondo transparente y los scrapers aplanan el alfa contra blanco — quedarían
@@ -53,7 +59,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:url" content="https://lqc.revolution505.com/" />
     <meta name="twitter:title" content="LQC | League Querétaro Championship" />
-    <meta name="twitter:description" content="Torneo competitivo LoL en Querétaro - Inscripciones abiertas" />
+    <meta name="twitter:description" content="Torneo competitivo LoL en Querétaro - Split Otoño 2026" />
     <meta name="twitter:image" content="https://lqc.revolution505.com/assets/lqc-og.png" />
     <meta name="twitter:image:alt" content="Logo de la League Querétaro Championship" />
     
@@ -101,7 +107,7 @@
         <img src="/assets/2 LQC.png" alt="LQC Logo" style="height: 80px; margin-bottom: 1.5rem;" />
         <h1 style="font-size: 2.2rem; margin-bottom: 1rem; color: #3b82f6;">JavaScript está deshabilitado</h1>
         <p style="font-size: 1.2rem; max-width: 500px; margin-bottom: 2rem;">
-          Para ver la transmisión en vivo, la galería y el registro de equipos, habilita JavaScript en tu navegador.
+          Para ver la transmisión en vivo, la galería y la información del torneo, habilita JavaScript en tu navegador.
         </p>
         <p style="color: #666; font-size: 1rem;">
           Este sitio es una experiencia dinámica construida con React.

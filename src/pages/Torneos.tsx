@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Trophy, Calendar, Star, Users, UserPlus, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
+import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
 
 /* Los dos CTA del bloque destacado, con el canon de AGENTS.md. Son copia de las constantes
    homónimas de Home.tsx —no están exportadas allá y el cambio no podía tocar ese archivo—,
@@ -201,17 +202,32 @@ export default function Torneos() {
                   `prefers-reduced-motion` de index.css ya la desactiva sola.
                   El texto va en minúsculas en el JSX y lo pone en caja alta el `uppercase`, así
                   un lector de pantalla lee la frase y no deletrea las mayúsculas.
-                  OJO: «Inscripciones abiertas» no sale de ningún dato del repo —nada acá
-                  registra el estado de la convocatoria—, es el mensaje de la campaña. Ya está
-                  escrito a mano en la portada (Home.tsx, bajo el CTA del hero); ahora son DOS
-                  lugares que hay que borrar a mano el día que las inscripciones cierren. */}
-              <div className="inline-flex items-center gap-2.5 rounded-full border border-green-800/40 bg-green-950/50 px-4 py-1.5 text-sm font-medium uppercase tracking-wide text-green-300 shadow-lg shadow-green-900/20">
-                <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-400" />
-                </span>
-                Inscripciones abiertas
-              </div>
+                  El estado ya NO está escrito a mano acá: lo decide INSCRIPCIONES_ABIERTAS
+                  (src/lib/inscripciones.ts). El comentario que ocupaba este lugar avisaba que
+                  «Inscripciones abiertas» estaba en DOS archivos y que había que borrarlas a
+                  mano el día del cierre; ese día llegó (2026-08-25) y el flag es lo que lo
+                  reemplaza.
+                  Cerrado, el badge NO desaparece: la fecha de inicio del split es el 25 de
+                  agosto y el estado de la convocatoria es justamente lo que alguien viene a
+                  mirar acá. Lo que cambia es el registro visual — se va el verde de «pasando
+                  ahora» y se va el latido, porque ya no hay nada en curso que anunciar, y
+                  queda el gris neutro emparentado con el «Finalizado» del historial. El punto
+                  se queda en una sola capa, sin `animate-ping`: da la forma del badge sin
+                  fingir actividad. */}
+              {INSCRIPCIONES_ABIERTAS ? (
+                <div className="inline-flex items-center gap-2.5 rounded-full border border-green-800/40 bg-green-950/50 px-4 py-1.5 text-sm font-medium uppercase tracking-wide text-green-300 shadow-lg shadow-green-900/20">
+                  <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-400" />
+                  </span>
+                  Inscripciones abiertas
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2.5 rounded-full border border-gray-700/60 bg-gray-900/70 px-4 py-1.5 text-sm font-medium uppercase tracking-wide text-gray-300 shadow-lg shadow-black/30">
+                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-gray-500" aria-hidden="true" />
+                  Inscripciones cerradas
+                </div>
+              )}
 
               <h2 className="mt-6 text-3xl md:text-5xl font-light">LQC Split Otoño 2026</h2>
 
@@ -235,13 +251,19 @@ export default function Torneos() {
               {/* Apilados en móvil y en fila desde `sm`. `w-full sm:w-auto` para que apilados
                   midan lo mismo: con el ancho por contenido, «Registrarme» y «Ver en ATAK»
                   quedarían de anchos distintos, uno debajo del otro y centrados, que se lee
-                  como un error de maquetación. */}
+                  como un error de maquetación.
+                  Con la convocatoria cerrada queda un solo botón y ese apareo deja de
+                  importar, pero las clases NO se tocan: el `w-full sm:w-auto` que le queda a
+                  «Ver en ATAK» solo lo estira a lo ancho en móvil, que es como ya se veía, y
+                  quitarlo obligaría a reponerlo al reabrir. */}
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/registro" className={`${CLASE_CTA_PRIMARIO} w-full sm:w-auto`}>
-                  <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
-                  Registrarme
-                  <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
-                </Link>
+                {INSCRIPCIONES_ABIERTAS && (
+                  <Link to="/registro" className={`${CLASE_CTA_PRIMARIO} w-full sm:w-auto`}>
+                    <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
+                    Registrarme
+                    <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  </Link>
+                )}
                 {/* El aria-label arranca con el texto visible EXACTO para no romper el control
                     por voz (WCAG 2.5.3, «Label in Name») y recién después avisa lo que el texto
                     no dice. Misma fórmula que los enlaces externos del footer y del header. */}

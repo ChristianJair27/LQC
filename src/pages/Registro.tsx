@@ -4,11 +4,12 @@ import {
   Users, Gamepad2, User, Calendar, Phone, GraduationCap,
   MapPin, Mail, UserCircle, ShieldCheck, CreditCard, Crown,
   Send, CheckCircle, AlertCircle, Check, Facebook, MessageSquare,
-  Loader2, FileText, ExternalLink, Download
+  Loader2, FileText, ExternalLink, Download, Lock
 } from 'lucide-react'
 import Reveal from '../components/Reveal'
 import { obtenerSupabase } from '../lib/supabase'
 import { RUTA_REGLAMENTO, NOMBRE_DESCARGA, PESO_REGLAMENTO } from '../lib/reglamento'
+import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
 import { validarRiotId } from '../lib/atak'
 import type { ResultadoRiotId } from '../lib/atak'
 
@@ -1733,10 +1734,50 @@ export default function Registro() {
             {/* Línea divisoria estilo póster */}
             <div className="h-px w-full bg-gradient-to-r from-lqc-accent/60 via-blue-500/20 to-transparent mb-8" />
 
-            <p className="text-lg md:text-xl text-gray-300 max-w-2xl leading-relaxed">
-              Cada jugador se registra por su cuenta. Si tu equipo ya está inscrito,
-              elígelo de las sugerencias para no crear uno repetido.
-            </p>
+            {INSCRIPCIONES_ABIERTAS ? (
+              <p className="text-lg md:text-xl text-gray-300 max-w-2xl leading-relaxed">
+                Cada jugador se registra por su cuenta. Si tu equipo ya está inscrito,
+                elígelo de las sugerencias para no crear uno repetido.
+              </p>
+            ) : (
+              /* Aviso de cierre (2026-08-25). Neutro a propósito: ni el rose de los
+                 banners de error —que en esta página significa «revisá lo que
+                 escribiste»— ni el verde que significaba «abiertas». Que la convocatoria
+                 esté cerrada no es un error de quien llegó hasta acá, y pintarlo de rojo
+                 lo leería como si algo le hubiera fallado.
+                 El <h1> del hero NO cambia: la página sigue siendo la del Split Otoño
+                 2026, y el estado de la convocatoria es un dato de la página, no su
+                 título. */
+              <div className="max-w-2xl rounded-2xl border border-white/15 bg-black/40 backdrop-blur-sm p-6 md:p-8 shadow-lqc">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/15 flex items-center justify-center shrink-0">
+                    <Lock className="w-6 h-6 text-gray-300" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <p className="text-lg md:text-xl font-medium text-white mb-2">
+                      Inscripciones cerradas
+                    </p>
+                    <p className="text-base md:text-lg text-gray-300 leading-relaxed">
+                      Las inscripciones para el Split Otoño 2026 están cerradas. Si tu
+                      equipo ya se registró, su lugar sigue en pie.
+                    </p>
+                    {/* El correo va como enlace y no dentro de la cadena: mismo criterio
+                        que los avisos de rechazo de abajo — en un teléfono, un correo en
+                        texto plano hay que transcribirlo a mano. */}
+                    <p className="mt-4 text-sm md:text-base text-gray-400 leading-relaxed">
+                      ¿Dudas sobre tu registro? Escríbenos a{' '}
+                      <a
+                        href="mailto:contactolqc@revolution505.com"
+                        className="after:hidden text-lqc-accent font-medium underline underline-offset-4 decoration-lqc-accent/40 hover:decoration-lqc-accent"
+                      >
+                        contactolqc@revolution505.com
+                      </a>
+                      .
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -1849,8 +1890,33 @@ export default function Registro() {
                 </button>
               </div>
             ) : (
-              /* ---------- Formulario ---------- */
-              <form onSubmit={handleSubmit} noValidate className="space-y-12">
+              /* ---------- Formulario ----------
+                 El <form> se sigue montando SIEMPRE, abierto o cerrado. Lo que
+                 desaparece con la convocatoria cerrada son sus tres bloques de
+                 formulario propiamente dichos —campos, casilla de privacidad y
+                 botón de envío—, cada uno condicionado en su lugar. Las tarjetas
+                 informativas (Pago de Inscripción, Reglamento y el texto del Aviso
+                 de Privacidad) quedan visibles siempre y EN SU POSICIÓN ACTUAL, sin
+                 mover un solo nodo del árbol.
+
+                 `onSubmit` se quita en vez de dejarlo colgado: sin campos ni botón
+                 no hay forma normal de disparar un submit, pero un submit
+                 programático sí lo haría, y el handler llamaría a
+                 `registrar_jugador` con el formulario vacío. La RPC es pública para
+                 `anon` y este flag no la cierra (ver src/lib/inscripciones.ts), así
+                 que la única defensa de este lado es no tener handler.
+
+                 Sobre la indentación de los bloques condicionados: el contenido
+                 envuelto NO se re-indentó a propósito. Son ~270 líneas y sangrarlas
+                 convertiría un cambio de seis líneas en un diff de cuatrocientas,
+                 con el cambio real enterrado en ruido de espacios. */
+              <form
+                onSubmit={INSCRIPCIONES_ABIERTAS ? handleSubmit : undefined}
+                noValidate
+                className="space-y-12"
+              >
+                {INSCRIPCIONES_ABIERTAS && (
+                  <>
                 {/* Equipo.
                     `relative z-20` en la SECCIÓN, no en la lista: `CLASE_TARJETA` lleva
                     `backdrop-blur-sm`, y un backdrop-filter crea contexto de apilamiento,
@@ -2125,7 +2191,12 @@ export default function Registro() {
                   </div>
                 </div>
 
-                {/* Pago de inscripción (informativo) */}
+                  </>
+                )}
+
+                {/* Pago de inscripción (informativo).
+                    Visible SIEMPRE, cerrada la convocatoria incluida: quien ya se
+                    registró sigue necesitando la CLABE y el monto para pagar. */}
                 <Reveal>
                   <div>
                     <TituloSeccion>Pago de Inscripción</TituloSeccion>
@@ -2373,6 +2444,13 @@ export default function Registro() {
                         </li>
                       </ul>
 
+                      {/* La casilla de consentimiento es un CONTROL del formulario, no
+                          parte del aviso: sin envío que consentir, una casilla obligatoria
+                          suelta no significa nada y solo se puede trabar. El TEXTO del
+                          aviso, en cambio, queda visible siempre — es el aviso vigente
+                          para los datos que ya se entregaron, y los derechos ARCO no
+                          caducan porque se cierre la convocatoria. */}
+                      {INSCRIPCIONES_ABIERTAS && (
                       <div className="mt-8 pt-6 border-t border-white/5">
                         <label className="flex items-start gap-4 cursor-pointer group">
                           <input
@@ -2412,11 +2490,13 @@ export default function Registro() {
                           <MensajeError id="privacidad-error" texto={errores.privacidad} />
                         )}
                       </div>
+                      )}
                     </div>
                   </div>
                 </Reveal>
 
                 {/* Resumen de errores + envío */}
+                {INSCRIPCIONES_ABIERTAS && (
                 <div className="space-y-6">
                   {hayErrores && (
                     <div
@@ -2521,6 +2601,7 @@ export default function Registro() {
                     <span className="text-lqc-accent">*</span> son obligatorios.
                   </p>
                 </div>
+                )}
               </form>
             )}
           </div>

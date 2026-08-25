@@ -10,6 +10,13 @@ contenido **público** vive en los componentes.
 [Galería dinámica](#galería-dinámica-galeria--panel). Las demás páginas públicas siguen
 sin leer ninguna base.
 
+> **LEER ANTES DE TOCAR `/registro`: las inscripciones están CERRADAS desde el
+> 2026-08-25.** El formulario existe y está entero, pero no se renderiza: lo apaga la
+> bandera `INSCRIPCIONES_ABIERTAS` de `src/lib/inscripciones.ts`. Todo lo que describe la
+> sección de abajo sigue siendo cierto del modelo y de las RPC —la base no cambió—, pero
+> hoy **nada de eso se dispara desde el sitio**. Ver
+> [Inscripciones cerradas](#inscripciones-cerradas-desde-el-2026-08-25--inscripciones_abiertas).
+
 ## Modelo de datos: el equipo es una entidad (migrado el 2026-07-29)
 
 **La tabla `inscripciones` ya NO se usa.** Sigue existiendo en la base —no se borró—
@@ -200,6 +207,88 @@ La RLS con el modelo nuevo:
 
 Nada de esto está en el repo. Si algún día una lectura o una escritura falla por
 permisos, ese es el primer lugar donde mirar, no el código.
+
+## Inscripciones CERRADAS desde el 2026-08-25 — `INSCRIPCIONES_ABIERTAS`
+
+**El 2026-08-25 arrancó el pareo suizo y la organización cerró las inscripciones.** El
+estado de la convocatoria vive ahora en **`src/lib/inscripciones.ts`**, en una única
+constante:
+
+```ts
+export const INSCRIPCIONES_ABIERTAS: boolean = false
+```
+
+**Para reabrir: poner `true` ahí y rebuildear. Es el único cambio de código.** Verificado
+el 2026-08-25 en las dos direcciones: con `true` el build también pasa con 0 errores y 0
+warnings, y el chunk de `/registro` vuelve de 16 kB a 43 kB.
+
+### Los cuatro consumidores
+
+Todo lo que el flag gobierna, y qué hace cada uno cuando está en `false`:
+
+| Archivo | Qué se apaga |
+| --- | --- |
+| `src/pages/Registro.tsx` | Los campos del formulario, la casilla obligatoria de privacidad y el bloque de errores + botón «Registrarme». Aparece en su lugar un aviso de cierre bajo el título del hero. |
+| `src/pages/Home.tsx` | El CTA «Registrarme» del hero con su línea «Inscripciones abiertas», y la sección «¿Vas a competir?» entera, con su QR. |
+| `src/pages/Torneos.tsx` | El CTA «Registrarme» del split. El badge NO desaparece: pasa de verde con `animate-ping` a gris neutro con el texto «Inscripciones cerradas». |
+| `src/components/layout/Footer.tsx` | La columna del QR «Regístrate». El enlace «Registro» del bloque Recursos **se queda**. |
+
+Lo que **no** se tocó y no hay que "arreglar": la ruta `/registro` en `App.tsx`, los 6
+ítems de `navItems` en `Header.tsx`, y los tres enlaces a
+`atakgg.revolution505.com/tournaments` — el alta en ATAK la dispara la base, no un link
+del sitio, y ver el torneo sigue siendo válido con la convocatoria cerrada.
+
+### Cómo está implementado en `Registro.tsx`, y por qué así
+
+El `<form>` **se sigue montando siempre**. Dentro, solo tres bloques están condicionados:
+los campos, la casilla de privacidad y el bloque de envío. **Las tarjetas informativas
+—Pago de Inscripción con la CLABE, Reglamento y el texto del Aviso de Privacidad— quedan
+visibles siempre y en su posición original.** No se movió un solo nodo del árbol: están
+anidadas dentro del `<form>` y sacarlas de ahí, en un archivo de 2531 líneas, era riesgo
+sin beneficio.
+
+`onSubmit` se quita cuando está cerrado (`INSCRIPCIONES_ABIERTAS ? handleSubmit :
+undefined`). Sin campos ni botón no hay forma normal de disparar un submit, pero uno
+programático sí lo haría y el handler llamaría a `registrar_jugador` con el formulario
+vacío.
+
+**El contenido envuelto NO está re-indentado, a propósito.** Son ~270 líneas: sangrarlas
+convertiría un cambio de seis líneas en un diff de cuatrocientas. Si el diff parece raro,
+es esto.
+
+### ⚠ El flag NO cierra la RPC
+
+**`registrar_jugador` sigue abierta.** Es una bandera del frontend y nada más: la función
+sigue siendo pública para `anon` y acepta envíos de cualquiera que la llame con la URL del
+proyecto y la anon key, las dos a la vista en el bundle por diseño. Esto cierra **la puerta
+de entrada del sitio, no la base**. Si hace falta un cierre real, va del lado de Supabase.
+
+### Dos textos que el flag NO alcanza
+
+No son React, así que al reabrir hay que editarlos **a mano**:
+
+- **`index.html`** — `description`, `og:description`, `twitter:description` y el
+  `<noscript>`. Se les quitó «Inscripciones abiertas» el 2026-08-25 y, de paso, **«premios
+  en efectivo»**: el reglamento oficial dice «Premiación: Por definir», así que era una
+  promesa sin respaldo. No reponerla sin fuente.
+- **`src/pages/Contacto.tsx`** — la respuesta del FAQ «¿Cómo nos inscribimos?», que es una
+  cadena dentro del arreglo de preguntas y no un bloque condicionable. Sigue **primera**
+  (es la que el acordeón abre por defecto) justamente porque la respuesta cambió. La
+  redacción anterior quedó guardada en un comentario al lado, para reponerla tal cual.
+
+### Verificar esto NO se hace grepeando `dist/`
+
+Con el flag en `false`, Rollup propaga la constante entre módulos y **elimina del bundle**
+el JSX que quedó detrás de los condicionales. Que `grep "Registrarme" dist/` dé 0 es lo
+**esperado**, no una señal de que se borró código. El fuente está entero: verificar contra
+`src/`.
+
+### Deuda que esto saldó
+
+Los comentarios de `Home.tsx` y `Torneos.tsx` que avisaban que «Inscripciones abiertas»
+estaba escrito a mano en dos archivos y que **había que borrarlo a mano el día del cierre**
+ya cumplieron su función y **se reemplazaron** por el flag. Si alguien los busca por el
+texto viejo, no están; la nota que los sustituye apunta a `src/lib/inscripciones.ts`.
 
 ## Galería dinámica (`/galeria` + panel)
 
@@ -414,6 +503,7 @@ src/
     atak.ts                API pública de ATAK.GG: valida un Riot ID; nunca lanza ni bloquea
     datadragon.ts          catálogo y arte de campeones (Riot Data Dragon) para la carta
     reglamento.ts          ruta, nombre de descarga y peso del PDF del reglamento
+    inscripciones.ts       bandera INSCRIPCIONES_ABIERTAS: estado de la convocatoria
   pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro · Reglamento · Carta
     admin/                 panel protegido: Login · RutaProtegida · Panel ·
                            ListaInscripciones · SubirGaleria · GestionGaleria

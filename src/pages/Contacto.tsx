@@ -108,8 +108,24 @@ export default function Contacto() {
      que fechas y cupo SÍ tienen fuente y los premios NO: nunca publicar un monto. */
   const faqs = [
     {
+      /* Reescrita el 2026-08-25, al cerrarse la convocatoria. Se queda PRIMERA —es la que
+         el acordeón abre por defecto (ver el estado de más abajo)— justamente porque la
+         respuesta cambió: quien llega buscando cómo inscribirse tiene que toparse con el
+         cierre antes que con cualquier otra cosa.
+         Es una cadena dentro de un arreglo de datos, no un bloque de JSX, así que
+         INSCRIPCIONES_ABIERTAS no la alcanza: al reabrir hay que reescribirla a mano. La
+         redacción anterior —el modelo individual con elección de equipo de las
+         sugerencias— queda registrada acá para poder reponerla tal cual:
+         "Cada jugador se registra por su cuenta, desde la sección Registro del menú. Al
+         escribir el nombre del equipo aparecen los que ya están inscritos: si el tuyo está
+         en la lista, elígelo de ahí para no crear uno repetido; si eres el primero de tu
+         equipo, escribe el nombre y se crea con tu registro. Se piden Riot ID, nombre,
+         fecha de nacimiento, celular, correo, municipio, escolaridad y género, más una
+         casilla opcional para marcar quién es el capitán. Un equipo compite con 5 a 7
+         jugadores: los 5 primeros en registrarse quedan como titulares y del 6º en
+         adelante como suplentes." */
       question: "¿Cómo nos inscribimos?",
-      answer: "Cada jugador se registra por su cuenta, desde la sección Registro del menú. Al escribir el nombre del equipo aparecen los que ya están inscritos: si el tuyo está en la lista, elígelo de ahí para no crear uno repetido; si eres el primero de tu equipo, escribe el nombre y se crea con tu registro. Se piden Riot ID, nombre, fecha de nacimiento, celular, correo, municipio, escolaridad y género, más una casilla opcional para marcar quién es el capitán. Un equipo compite con 5 a 7 jugadores: los 5 primeros en registrarse quedan como titulares y del 6º en adelante como suplentes."
+      answer: "Las inscripciones para el Split Otoño 2026 están cerradas. Si tu equipo ya se registró, su lugar sigue en pie y no hay nada más que hacer desde aquí. Si tienes dudas sobre un registro que ya enviaste, escríbenos a contactolqc@revolution505.com."
     },
     {
       question: "¿Cuáles son los requisitos para participar?",

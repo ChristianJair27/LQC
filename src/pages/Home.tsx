@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Twitch, Calendar, ChevronRight, UserPlus, IdCard } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Reveal from '../components/Reveal'
+import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
 
 /* Canon del CTA primario (AGENTS.md, "Canon del CTA primario"). Al ser un <a>/<Link> y no un
    <button> necesita dos cosas que la capa base de index.css no le da: `text-white` explícito
@@ -405,24 +406,29 @@ export default function Home() {
                   documento aunque el destino sea correcto. */}
               {/* Agrupados con su propio gap: como hermanos sueltos heredaban el `gap-6` del
                   contenedor y la línea de apoyo quedaba flotando lejos del botón. */}
-              {/* «Inscripciones abiertas» NO sale del repo —no hay nada acá que registre el
-                  estado de la convocatoria—: es el mensaje de la campaña, confirmado por quien
-                  administra el proyecto al pedir este cambio (2026-07-28). Se anota porque es
-                  la única frase de la portada que un grep no puede corroborar, y porque el
-                  formulario no tiene forma de cerrarse solo: el día que las inscripciones
-                  cierren, esta línea hay que borrarla a mano. No agregar fechas, cupos ni
-                  premios al lado, que eso sí sigue sin confirmarse. */}
-              <div className="flex flex-col items-center gap-3">
-                <Link
-                  to="/registro"
-                  className={CLASE_CTA_PRIMARIO}
-                >
-                  <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
-                  Registrarme
-                  <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
-                </Link>
-                <p className="text-sm text-gray-400">Inscripciones abiertas</p>
-              </div>
+              {/* El estado de la convocatoria ya NO está escrito a mano acá: lo decide
+                  INSCRIPCIONES_ABIERTAS (src/lib/inscripciones.ts). El comentario que vivía
+                  en este lugar avisaba que el día del cierre había que borrar la línea
+                  «Inscripciones abiertas» a mano; ese día llegó (2026-08-25) y el flag es
+                  lo que lo reemplaza.
+                  El CTA se OCULTA con la convocatoria cerrada, no se reetiqueta: un botón
+                  primario que lleva a un cartel de «cerrado» es una promesa rota a un clic
+                  de distancia. Con esto la portada se queda sin CTA primario y el de la
+                  carta de jugador pasa a ser la única acción — es correcto, es la única
+                  que sigue siendo posible. */}
+              {INSCRIPCIONES_ABIERTAS && (
+                <div className="flex flex-col items-center gap-3">
+                  <Link
+                    to="/registro"
+                    className={CLASE_CTA_PRIMARIO}
+                  >
+                    <UserPlus className="w-5 h-5 shrink-0" aria-hidden="true" />
+                    Registrarme
+                    <ChevronRight className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  </Link>
+                  <p className="text-sm text-gray-400">Inscripciones abiertas</p>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -647,7 +653,14 @@ export default function Home() {
             Contacto).
             Y describe el modelo de registro VIGENTE —cada quien se registra solo y elige su
             equipo de las sugerencias—, que ya cambió dos veces. Si vuelve a cambiar, esta
-            copia miente en silencio: es una de las tres en prosa que nada sincroniza. */}
+            copia miente en silencio: es una de las tres en prosa que nada sincroniza.
+            Con la convocatoria cerrada la sección ENTERA se oculta, QR incluido: sin
+            registro posible no hay «segundo camino al registro» que ofrecer, y dejar la
+            tarjeta con el botón fuera sería un encabezado preguntando «¿Vas a competir?»
+            sin ninguna forma de responder que sí. El ritmo de fondos que describe el
+            párrafo de arriba se reacomoda solo —Transmisión (sin fondo) → Patrocinadores
+            (sin fondo)—: quedan dos seguidas sin tintar, no tres. */}
+        {INSCRIPCIONES_ABIERTAS && (
         <section className="py-20 bg-black/20">
           <div className="container mx-auto px-6 max-w-4xl text-center">
             {/* Tarjeta oscura de CTA, con el gradiente que AGENTS.md marca como canon. */}
@@ -700,6 +713,7 @@ export default function Home() {
             </div>
           </div>
         </section>
+        )}
 
         {/* Generador de carta de jugador.
             VA DESPUÉS DEL CTA DE REGISTRO Y CON MENOS PESO, a propósito. La acción que la
