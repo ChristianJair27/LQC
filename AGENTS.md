@@ -218,11 +218,12 @@ constante:
 export const INSCRIPCIONES_ABIERTAS: boolean = false
 ```
 
-**Para reabrir: poner `true` ahí y rebuildear. Es el único cambio de código.** Verificado
+**Para reabrir: poner `true` ahí y rebuildear.** Es el único cambio de **código**; aparte
+hay que editar a mano las metas de `index.html`, que son HTML estático (ver abajo). Verificado
 el 2026-08-25 en las dos direcciones: con `true` el build también pasa con 0 errores y 0
 warnings, y el chunk de `/registro` vuelve de 16 kB a 43 kB.
 
-### Los cuatro consumidores
+### Los cinco consumidores
 
 Todo lo que el flag gobierna, y qué hace cada uno cuando está en `false`:
 
@@ -231,6 +232,7 @@ Todo lo que el flag gobierna, y qué hace cada uno cuando está en `false`:
 | `src/pages/Registro.tsx` | Los campos del formulario, la casilla obligatoria de privacidad y el bloque de errores + botón «Registrarme». Aparece en su lugar un aviso de cierre bajo el título del hero. |
 | `src/pages/Home.tsx` | El CTA «Registrarme» del hero con su línea «Inscripciones abiertas», y la sección «¿Vas a competir?» entera, con su QR. |
 | `src/pages/Torneos.tsx` | El CTA «Registrarme» del split. El badge NO desaparece: pasa de verde con `animate-ping` a gris neutro con el texto «Inscripciones cerradas». |
+| `src/pages/Contacto.tsx` | La respuesta del FAQ «¿Cómo nos inscribimos?» — la primera, la que el acordeón abre por defecto — cambia por la de cierre. Las dos redacciones viven en `RESPUESTA_INSCRIPCION_ABIERTA` y `RESPUESTA_INSCRIPCION_CERRADA`, a nivel de módulo. |
 | `src/components/layout/Footer.tsx` | La columna del QR «Regístrate». El enlace «Registro» del bloque Recursos **se queda**. |
 
 Lo que **no** se tocó y no hay que "arreglar": la ruta `/registro` en `App.tsx`, los 6
@@ -263,18 +265,22 @@ sigue siendo pública para `anon` y acepta envíos de cualquiera que la llame co
 proyecto y la anon key, las dos a la vista en el bundle por diseño. Esto cierra **la puerta
 de entrada del sitio, no la base**. Si hace falta un cierre real, va del lado de Supabase.
 
-### Dos textos que el flag NO alcanza
+### El único texto que el flag NO alcanza
 
-No son React, así que al reabrir hay que editarlos **a mano**:
+**`index.html`** — `description`, `og:description`, `twitter:description` y el
+`<noscript>`. Es HTML estático, no pasa por el bundle, así que al abrir o cerrar la
+convocatoria hay que editarlo **a mano**. Se le quitó «Inscripciones abiertas» el
+2026-08-25 y, de paso, **«premios en efectivo»**: el reglamento oficial dice «Premiación:
+Por definir», así que era una promesa sin respaldo. No reponerla sin fuente.
 
-- **`index.html`** — `description`, `og:description`, `twitter:description` y el
-  `<noscript>`. Se les quitó «Inscripciones abiertas» el 2026-08-25 y, de paso, **«premios
-  en efectivo»**: el reglamento oficial dice «Premiación: Por definir», así que era una
-  promesa sin respaldo. No reponerla sin fuente.
-- **`src/pages/Contacto.tsx`** — la respuesta del FAQ «¿Cómo nos inscribimos?», que es una
-  cadena dentro del arreglo de preguntas y no un bloque condicionable. Sigue **primera**
-  (es la que el acordeón abre por defecto) justamente porque la respuesta cambió. La
-  redacción anterior quedó guardada en un comentario al lado, para reponerla tal cual.
+**Ojo con un razonamiento que ya falló una vez.** El commit del cierre (`b05082d`) listaba
+acá un segundo texto fuera de alcance: la respuesta del FAQ de `Contacto.tsx`, con el
+argumento de que era «una cadena dentro de un arreglo, no un bloque de JSX». **Es falso**:
+la bandera gobierna cualquier expresión de TypeScript, no solo JSX. La consecuencia no era
+teórica — al reabrir, la primera respuesta del FAQ habría seguido diciendo «cerradas»
+hasta que alguien la editara a mano. Se corrigió con un ternario y Contacto pasó a ser el
+5.º consumidor. **Regla: si un texto vive en un `.ts` o `.tsx`, el flag LO ALCANZA.** La
+única frontera real es lo que no pasa por el bundle.
 
 ### Verificar esto NO se hace grepeando `dist/`
 

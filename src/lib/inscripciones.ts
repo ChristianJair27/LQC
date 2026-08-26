@@ -10,7 +10,7 @@
    consumidor, y duplicarla en cada página la desincroniza en silencio al primer cambio.
 
    PARA REABRIR LAS INSCRIPCIONES: poner `true` acá y rebuildear. Es el único cambio de
-   código que hace falta. Vuelven todos juntos, porque los cuatro consumidores leen esta
+   código que hace falta. Vuelven todos juntos, porque los cinco consumidores leen esta
    misma constante:
      · src/pages/Registro.tsx   — los campos del formulario, la casilla de privacidad y el
                                   botón «Registrarme»; el aviso de cierre del hero se va.
@@ -18,6 +18,8 @@
                                   competir?» entera, con su QR.
      · src/pages/Torneos.tsx    — el CTA «Registrarme» del split, y el badge vuelve a
                                   verde con su pulso.
+     · src/pages/Contacto.tsx   — la respuesta del FAQ «¿Cómo nos inscribimos?», que es la
+                                  primera y la que el acordeón abre por defecto.
      · src/components/layout/Footer.tsx — la columna del QR «Regístrate» del pie.
 
    El tipo es `boolean` explícito y no el literal inferido: sin la anotación, TypeScript
@@ -38,10 +40,15 @@
    `registrar_jugador` es lo ESPERADO, no una señal de que se borró algo. El código fuente
    está entero; lo que no viaja es el código muerto. Verificar siempre contra src/.
 
-   Y hay dos textos que TAMPOCO alcanza, porque no son React. Al reabrir hay que volver a
-   editarlos a mano:
-     · Las metas de index.html (`description`, `og:description`, `twitter:description`) y
-       el bloque <noscript>: son HTML estático.
-     · La respuesta del FAQ «¿Cómo nos inscribimos?» en src/pages/Contacto.tsx, que es una
-       cadena dentro del arreglo de preguntas, no un bloque condicionable. */
+   Y hay UN texto que TAMPOCO alcanza, porque no es React: las metas de index.html
+   (`description`, `og:description`, `twitter:description`) y el bloque <noscript>. Son
+   HTML estático y hay que editarlos a mano en los dos sentidos.
+
+   Ese "un texto" fueron dos hasta que se corrigió el error: el commit del cierre daba por
+   perdida también la respuesta del FAQ de Contacto.tsx, con el argumento de que era «una
+   cadena dentro de un arreglo, no un bloque de JSX». El argumento era falso —esta bandera
+   gobierna cualquier expresión de TypeScript, no solo JSX— y ya se arregló con un ternario.
+   Queda anotado porque el mismo razonamiento equivocado puede volver: si un texto vive en
+   un .ts o .tsx, el flag LO ALCANZA. La única frontera real es lo que no pasa por el
+   bundle. */
 export const INSCRIPCIONES_ABIERTAS: boolean = false

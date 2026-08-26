@@ -4,6 +4,25 @@ import {
   Mail, MapPin, MessageSquare, Facebook, Twitch, ChevronRight, ChevronDown,
   Route, Radio, Globe
 } from 'lucide-react'
+import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
+
+/* Las dos redacciones de la respuesta «¿Cómo nos inscribimos?», elegidas por
+   INSCRIPCIONES_ABIERTAS.
+
+   Nacieron así el 2026-08-25 corrigiendo un error del commit del cierre: ahí la respuesta
+   quedó reescrita a mano, con un comentario que decía que el flag «no la alcanza por ser
+   una cadena y no un bloque de JSX». Eso era falso —el flag gobierna cualquier expresión,
+   no solo JSX— y tenía una consecuencia concreta: al reabrir, ESTA respuesta —la primera,
+   la que el acordeón abre por defecto— habría seguido diciendo «cerradas» hasta que
+   alguien se acordara de editarla.
+
+   Van a nivel de módulo y no dentro de `faqs` para que las dos redacciones se lean juntas
+   y ninguna quede escondida en un comentario, donde nada la verifica. */
+const RESPUESTA_INSCRIPCION_ABIERTA =
+  "Cada jugador se registra por su cuenta, desde la sección Registro del menú. Al escribir el nombre del equipo aparecen los que ya están inscritos: si el tuyo está en la lista, elígelo de ahí para no crear uno repetido; si eres el primero de tu equipo, escribe el nombre y se crea con tu registro. Se piden Riot ID, nombre, fecha de nacimiento, celular, correo, municipio, escolaridad y género, más una casilla opcional para marcar quién es el capitán. Un equipo compite con 5 a 7 jugadores: los 5 primeros en registrarse quedan como titulares y del 6º en adelante como suplentes."
+
+const RESPUESTA_INSCRIPCION_CERRADA =
+  "Las inscripciones para el Split Otoño 2026 están cerradas. Si tu equipo ya se registró, su lugar sigue en pie y no hay nada más que hacer desde aquí. Si tienes dudas sobre un registro que ya enviaste, escríbenos a contactolqc@revolution505.com."
 
 /* Canales de contacto. Cada uno tiene destino REAL: la tarjeta entera es el enlace, así que
    no hay ningún control que parezca accionable y no haga nada. Antes esta página ofrecía
@@ -108,24 +127,14 @@ export default function Contacto() {
      que fechas y cupo SÍ tienen fuente y los premios NO: nunca publicar un monto. */
   const faqs = [
     {
-      /* Reescrita el 2026-08-25, al cerrarse la convocatoria. Se queda PRIMERA —es la que
-         el acordeón abre por defecto (ver el estado de más abajo)— justamente porque la
-         respuesta cambió: quien llega buscando cómo inscribirse tiene que toparse con el
-         cierre antes que con cualquier otra cosa.
-         Es una cadena dentro de un arreglo de datos, no un bloque de JSX, así que
-         INSCRIPCIONES_ABIERTAS no la alcanza: al reabrir hay que reescribirla a mano. La
-         redacción anterior —el modelo individual con elección de equipo de las
-         sugerencias— queda registrada acá para poder reponerla tal cual:
-         "Cada jugador se registra por su cuenta, desde la sección Registro del menú. Al
-         escribir el nombre del equipo aparecen los que ya están inscritos: si el tuyo está
-         en la lista, elígelo de ahí para no crear uno repetido; si eres el primero de tu
-         equipo, escribe el nombre y se crea con tu registro. Se piden Riot ID, nombre,
-         fecha de nacimiento, celular, correo, municipio, escolaridad y género, más una
-         casilla opcional para marcar quién es el capitán. Un equipo compite con 5 a 7
-         jugadores: los 5 primeros en registrarse quedan como titulares y del 6º en
-         adelante como suplentes." */
+      /* La ÚNICA respuesta que depende del estado de la convocatoria. Se queda PRIMERA —es
+         la que el acordeón abre por defecto (ver el estado de más abajo)— justamente por
+         eso: quien llega buscando cómo inscribirse tiene que toparse con el cierre antes
+         que con cualquier otra cosa. Las dos redacciones están arriba, a nivel de módulo. */
       question: "¿Cómo nos inscribimos?",
-      answer: "Las inscripciones para el Split Otoño 2026 están cerradas. Si tu equipo ya se registró, su lugar sigue en pie y no hay nada más que hacer desde aquí. Si tienes dudas sobre un registro que ya enviaste, escríbenos a contactolqc@revolution505.com."
+      answer: INSCRIPCIONES_ABIERTAS
+        ? RESPUESTA_INSCRIPCION_ABIERTA
+        : RESPUESTA_INSCRIPCION_CERRADA
     },
     {
       question: "¿Cuáles son los requisitos para participar?",
