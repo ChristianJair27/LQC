@@ -51,4 +51,4 @@
    Queda anotado porque el mismo razonamiento equivocado puede volver: si un texto vive en
    un .ts o .tsx, el flag LO ALCANZA. La única frontera real es lo que no pasa por el
    bundle. */
-export const INSCRIPCIONES_ABIERTAS: boolean = true
+export const INSCRIPCIONES_ABIERTAS: boolean = false
