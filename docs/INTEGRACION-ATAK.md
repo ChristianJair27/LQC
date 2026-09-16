@@ -438,7 +438,9 @@ Pública, sin credenciales. **Caché de 15 s del lado del servidor según ATAK**
 observable desde afuera (la respuesta trae `ETag`, pero ni `Cache-Control` ni `Age`).
 Responde
 `{ ok:true, data:{ standings:[{position, team, wins, losses, points}], teamsRegistered,
-teamsMax, … } }`. La pintan `/` y `/torneos`; el sitio la sondea cada **30 s**.
+… } }`. La pintan `/` y `/torneos`; el sitio la sondea cada **30 s**. El tipo `TorneoAtak`
+recoge **solo** `standings` y `teamsRegistered`: el resto de los campos llega y se
+descarta.
 
 **Contrato del cliente, el mismo en espíritu que el de la validación: `obtenerTorneo()`
 nunca lanza y nunca escribe en consola.** Todo fallo —red, CORS, timeout, 4xx/5xx,

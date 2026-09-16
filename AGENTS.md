@@ -475,7 +475,8 @@ Pública, sin credenciales. Slug del split actual: `lqc-2026` (`SLUG_TORNEO`, ex
 desde el hook porque el botón «Ver en ATAK» de `/torneos` usa el mismo). Según el backend
 de ATAK hay **caché de 15 s del lado del servidor** — no es observable desde afuera: la
 respuesta trae `ETag` pero ni `Cache-Control` ni `Age`. Responde `{ ok:true, data:{ standings:[{position, team, wins, losses,
-points}], teamsRegistered, teamsMax, … } }`.
+points}], teamsRegistered, … } }` (`teamsMax` y el resto de los campos llegan, pero el
+tipo no los recoge).
 
 ### Las tres piezas
 
@@ -546,11 +547,20 @@ número. Las dos pantallas se contradecirían y la que más se ve es la portada.
 - **`rulesUrl`** es una ruta **relativa** (`/docs/reglamento-lqc.pdf`) que un `<a>`
   resolvería contra **nuestro** dominio y daría 404. El PDF ya tiene una sola fuente:
   `src/lib/reglamento.ts`.
-- **`phase`** y **`format`** no los muestra ninguna pantalla, así que no están en el tipo.
+- **`phase`**, **`format`** y **`teamsMax`** no los muestra ninguna pantalla, así que no
+  están en el tipo.
 
-`teamsRegistered` / `teamsMax` **sí** se usan: son el «19 de 32 equipos» del bloque
-destacado de `/torneos`, que hasta el 2026-09-15 era un «Hasta 32 equipos» escrito a mano.
-Ese texto sobrevive como **respaldo** si la petición falla — es respaldo, no fuente.
+**`teamsRegistered` es el único campo suelto que sí se usa**: es el «19 equipos
+participantes» del bloque destacado de `/torneos`, que hasta el 2026-09-15 era un «Hasta
+32 equipos» escrito a mano.
+
+**Dice «participantes» y no «19 de 32», a propósito.** Una fracción comunica lugares
+libres —«quedan 13»— y ese renglón está a cuatro líneas del badge «Inscripciones
+cerradas»: desde el 2026-08-25 no hay cupo que ofrecer. Por eso `teamsMax` tampoco está en
+el tipo: al salir de esa línea se quedó **sin un solo consumidor en el repo**, y un campo
+que nadie lee es código muerto. El «Hasta 32 equipos» sobrevive únicamente como
+**respaldo** si la petición falla, y ahí es un dato del **reglamento** («máximo de 32
+equipos»), no un campo de ATAK.
 
 ## Carta de jugador (`/carta`)
 

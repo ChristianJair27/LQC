@@ -245,12 +245,20 @@ export default function Torneos() {
                   El conteo de equipos YA NO es el techo escrito a mano. El comentario que
                   ocupaba este lugar decía que «Hasta 32 equipos» era el TECHO y no un conteo
                   «porque no hay nada en el repo que sepa cuántos equipos van inscritos, y un
-                  número en vivo pediría una fuente». La fuente apareció: `teamsRegistered` y
-                  `teamsMax` de la API pública de ATAK.
-                  El techo sigue escrito como RESPALDO, y es lo único de esta página que
-                  duplica un dato de la API: si la petición falla, un bloque destacado sin el
-                  renglón de equipos se vería roto, y «Hasta 32» era exactamente lo que decía
-                  antes. Es un respaldo, no la fuente — si ATAK cambia el cupo, manda ATAK.
+                  número en vivo pediría una fuente». La fuente apareció: `teamsRegistered` de
+                  la API pública de ATAK.
+                  DICE «participantes», NO «19 de 32», y el cupo NO se menciona. Una fracción
+                  comunica lugares libres —«quedan 13»— y este renglón está a cuatro líneas
+                  del badge que dice «Inscripciones cerradas»: desde el 2026-08-25 no hay
+                  cupo que ofrecer, así que la fracción invitaba a algo que ya no existe.
+                  Es la razón por la que `teamsMax` ni siquiera está en el tipo `TorneoAtak`:
+                  al salir de acá se quedó sin un solo consumidor en el repo.
+                  El techo queda SOLO como respaldo para cuando la API no responde, y ahí es
+                  un dato del reglamento —«máximo de 32 equipos»—, no un campo de ATAK: sin él
+                  el bloque destacado perdería el renglón entero y se vería roto. El cero
+                  cae también en el respaldo: «0 equipos participantes» es cierto y suena a
+                  error, y pasa de verdad si algún día el slug apunta a un split que todavía
+                  no arrancó.
                   La fecha NO sale de la API a propósito: `startDate` responde 2026-09-01 y el
                   reglamento oficial dice 25 de agosto. Hay un dato mal y no se resuelve acá. */}
               <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-gray-300">
@@ -261,8 +269,8 @@ export default function Torneos() {
                 <span className="text-gray-600" aria-hidden="true">•</span>
                 <span className="inline-flex items-center gap-2">
                   <Users className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
-                  {torneo?.teamsRegistered != null && torneo.teamsMax != null
-                    ? `${torneo.teamsRegistered} de ${torneo.teamsMax} equipos`
+                  {torneo?.teamsRegistered != null && torneo.teamsRegistered > 0
+                    ? `${torneo.teamsRegistered} equipos participantes`
                     : 'Hasta 32 equipos'}
                 </span>
               </div>

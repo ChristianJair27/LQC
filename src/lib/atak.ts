@@ -132,20 +132,25 @@ export type FilaClasificacion = {
    el próximo lector confunde con un pendiente.
 
    La respuesta trae bastante más de lo que está acá (`id`, `name`, `region`, `prize`,
-   `description`, `logoUrl`, `bannerUrl`, `fearless`, `registrationUrl`, `teams`…). Estos
-   cuatro se listan porque son los que alguien podría querer pintar, y cada uno tiene su
-   motivo para no estar:
+   `description`, `logoUrl`, `bannerUrl`, `fearless`, `registrationUrl`, `teams`…). Los de
+   abajo se listan porque son los que alguien podría querer pintar —sin conteo, que es lo
+   que envejece—, y cada uno trae su motivo para no estar:
      · `startDate` dice 2026-09-01 y el reglamento oficial dice 25 de agosto. Hay un
        dato mal y no se arregla desde acá. NO lo pintes sin resolver eso primero.
      · `rulesUrl` es una ruta RELATIVA ('/docs/reglamento-lqc.pdf') que un <a>
        resolvería contra NUESTRO dominio y daría un 404. El PDF del reglamento ya
        tiene una sola fuente y es src/lib/reglamento.ts.
      · `phase` y `format` no los muestra ninguna pantalla hoy. Se agregan el día que
-       haya dónde ponerlos, no antes. */
+       haya dónde ponerlos, no antes.
+     · `teamsMax` (el cupo, 32) estuvo acá y SE FUE el 2026-09-15, el día que el bloque
+       destacado de /torneos pasó de «19 de 32 equipos» a «19 equipos participantes».
+       Una fracción comunica lugares libres, y las inscripciones están cerradas desde el
+       2026-08-25. Sin esa línea se quedó sin un solo consumidor, así que salió del tipo
+       en vez de quedarse como campo que nadie lee. El techo que sigue escrito a mano en
+       esa página, como respaldo si la API no responde, sale del reglamento y no de acá. */
 export type TorneoAtak = {
   standings: FilaClasificacion[]
   teamsRegistered: number | null
-  teamsMax: number | null
 }
 
 function numeroFinito(valor: unknown): number | null {
@@ -221,10 +226,9 @@ function leerTorneo(cuerpo: unknown): TorneoAtak | null {
   const { ok, data } = cuerpo as { ok?: unknown; data?: unknown }
   if (ok !== true || typeof data !== 'object' || data === null) return null
 
-  const { standings, teamsRegistered, teamsMax } = data as {
+  const { standings, teamsRegistered } = data as {
     standings?: unknown
     teamsRegistered?: unknown
-    teamsMax?: unknown
   }
 
   const clasificacion = leerClasificacion(standings)
@@ -232,8 +236,7 @@ function leerTorneo(cuerpo: unknown): TorneoAtak | null {
 
   return {
     standings: clasificacion,
-    teamsRegistered: numeroFinito(teamsRegistered),
-    teamsMax: numeroFinito(teamsMax)
+    teamsRegistered: numeroFinito(teamsRegistered)
   }
 }
 
