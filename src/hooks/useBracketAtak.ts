@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { obtenerBracket } from '../lib/atak'
+import { obtenerBracket, SLUG_TORNEO } from '../lib/atak'
 import type { PartidaBracket } from '../lib/atak'
-import { SLUG_TORNEO } from './useTorneoAtak'
 
 /* Sondeo del bracket del torneo en curso contra la API pública de ATAK.GG.
 
@@ -14,9 +13,9 @@ import { SLUG_TORNEO } from './useTorneoAtak'
    cada una falla por su cuenta. Que la clasificación no cargue no tiene por qué llevarse
    puestos los emparejamientos, ni al revés: cada sección degrada sola.
 
-   El slug se IMPORTA de `useTorneoAtak` en vez de repetirlo. Es la misma constante y ya
-   tiene tres consumidores —los dos sondeos y el botón «Ver en ATAK» de Torneos.tsx—; una
-   cuarta copia es la que un día apunta a otro split que las demás. */
+   El slug sale de `lib/atak.ts`, junto a `BASE_ATAK`: es un dato de la API y no de React,
+   y lo comparten los dos sondeos y el botón «Ver en ATAK» de Torneos.tsx. Repetirlo sería
+   la copia que un día apunta a otro split que las demás. */
 
 /* 30 s, igual que el otro sondeo: del lado del servidor hay caché y pedir más seguido no
    traería nada nuevo. Las dos peticiones salen juntas al montar la página y después cada

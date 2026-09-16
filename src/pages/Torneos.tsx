@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom'
 import { Trophy, Calendar, Star, Users, UserPlus, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
+import { SLUG_TORNEO } from '../lib/atak'
 import Clasificacion from '../components/Clasificacion'
 import Emparejamientos from '../components/Emparejamientos'
-import { useTorneoAtak, SLUG_TORNEO } from '../hooks/useTorneoAtak'
+import { useTorneoAtak } from '../hooks/useTorneoAtak'
 import { useBracketAtak } from '../hooks/useBracketAtak'
 
 /* Los dos CTA del bloque destacado, con el canon de AGENTS.md. Son copia de las constantes

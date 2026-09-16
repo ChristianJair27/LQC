@@ -473,7 +473,8 @@ GET https://atakback.revolution505.com/api/public/v1/tournaments/<slug>
 ```
 
 Pública, sin credenciales. Slug del split actual: `lqc-2026` (`SLUG_TORNEO`, exportada
-desde el hook porque el botón «Ver en ATAK» de `/torneos` usa el mismo). Según el backend
+desde `lib/atak.ts` junto a `BASE_ATAK` — es un dato de la API, no de React, y lo comparten
+los dos sondeos y el botón «Ver en ATAK» de `/torneos`). Según el backend
 de ATAK hay **caché de 15 s del lado del servidor** — no es observable desde afuera: la
 respuesta trae `ETag` pero ni `Cache-Control` ni `Age`. Responde `{ ok:true, data:{ standings:[{position, team, wins, losses,
 points}], teamsRegistered, … } }` (`teamsMax` y el resto de los campos llegan, pero el
@@ -483,10 +484,10 @@ tipo no los recoge).
 
 | Archivo | Qué hace |
 | --- | --- |
-| `src/lib/atak.ts` | Transporte: `obtenerTorneo(slug, señal)` y `obtenerBracket(slug, señal)`. Mismo CONTRATO que `validarRiotId` — **nunca lanza, nunca escribe en consola**, todo fallo colapsa en `null`. |
-| `src/hooks/useTorneoAtak.ts` | Sondeo cada **30 s** (con 15 s de caché del lado del servidor, más seguido no traería nada nuevo). Exporta también `SLUG_TORNEO`. |
+| `src/lib/atak.ts` | Transporte: `obtenerTorneo(slug, señal)` y `obtenerBracket(slug, señal)`, las dos sobre un `pedirJson()` privado que concentra el corte y la composición de la señal. Mismo CONTRATO que `validarRiotId` — **nunca lanza, nunca escribe en consola**, todo fallo colapsa en `null`. También exporta `SLUG_TORNEO`. |
+| `src/hooks/useTorneoAtak.ts` | Sondeo cada **30 s** (con 15 s de caché del lado del servidor, más seguido no traería nada nuevo). |
 | `src/components/Clasificacion.tsx` | **Solo presentación.** Variantes `completa` (tabla de los 19) y `compacta` (bloque de portada). |
-| `src/hooks/useBracketAtak.ts` | Sondeo del **bracket**, 30 s, gemelo del anterior. Importa `SLUG_TORNEO` del otro, no lo repite. |
+| `src/hooks/useBracketAtak.ts` | Sondeo del **bracket**, 30 s, gemelo del anterior. |
 | `src/components/Emparejamientos.tsx` | **Solo presentación.** La ronda en curso, en `/torneos`. |
 
 **Son DOS sondeos, no uno.** Van a endpoints distintos y cada uno falla por su cuenta: que

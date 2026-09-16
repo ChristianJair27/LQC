@@ -42,6 +42,15 @@ const BASE_ATAK = 'https://atakback.revolution505.com/api/public/v1'
 const URL_VALIDAR_RIOT_ID = `${BASE_ATAK}/validate-riot-id`
 const URL_TORNEOS = `${BASE_ATAK}/tournaments`
 
+/* El slug del torneo en curso. Vive ACÁ y no en un hook porque es un dato de la API
+   —igual que `BASE_ATAK`, y con los mismos consumidores—, no un dato de React. Estuvo
+   un tiempo en `src/hooks/useTorneoAtak.ts`, de donde lo importaban los dos sondeos y
+   `Torneos.tsx` para armar el enlace «Ver en ATAK»: eso obligaba a una página y a un
+   hook a depender de OTRO hook solo por una cadena. AGENTS.md es explícito en que
+   `src/lib/` es el hogar de los módulos SIN React, y este es uno.
+   El día que arranque el split siguiente se cambia UNA vez, acá. */
+export const SLUG_TORNEO = 'lqc-2026'
+
 /* 5 s, deliberadamente más corto que los 15 s del insert de Supabase. Esto corre
    mientras alguien llena el formulario y ya movió el cursor al campo siguiente:
    un indicador colgado ahí estorba. El insert, en cambio, es la acción final y
@@ -240,44 +249,46 @@ function leerTorneo(cuerpo: unknown): TorneoAtak | null {
   }
 }
 
-/* Trae un torneo por su slug (hoy 'lqc-2026'). Mismo CONTRATO que `validarRiotId`:
-   no lanza y no escribe en consola. `null` colapsa TODO fallo —red, DNS, CORS,
-   timeout, 4xx/5xx, `ok:false`, JSON con otra forma— igual que 'indeterminado' allá
-   y que el `null` de `obtenerSupabase()`.
+/* La danza de abortar —corte propio, señal externa y limpieza— ESTUVO DUPLICADA LITERAL
+   en las dos funciones de abajo. Que las dos copias fueran idénticas era lo único que
+   evitaba un bug; al tercer endpoint iban a ser tres y la que se arreglara mal iba a ser
+   silenciosa. Es el mismo defecto que este módulo ya se sacó de encima con `BASE_ATAK`,
+   solo que lo repetido no era una constante sino la parte sutil del código.
 
-   Quien llama trata el `null` como "no hay nada que mostrar" y NO pinta un error:
-   esto alimenta una sección de un sitio público en día de partida, y un cartel rojo
-   sobre la clasificación es peor que no tener la sección.
+   CONTRATO: no lanza y no escribe en consola. Devuelve el cuerpo ya parseado, o `null`
+   ante cualquier fallo —red, DNS, CORS, timeout, aborto, 4xx/5xx, cuerpo que no es JSON—.
+   Que ese `null` se confunda con un JSON que sea literalmente `null` no importa: los dos
+   lectores empiezan descartando lo que no es un objeto, así que los dos caminos terminan
+   en el mismo lugar.
 
-   El corte vive ACÁ y no en quien llama, para que la promesa siempre resuelva sola
-   —es el mismo contrato que ya tiene la validación del Riot ID—. `señal` es el
-   aborto EXTERNO (desmontar el componente, o un sondeo que pisa al anterior) y se
-   compone a mano con el del corte: `AbortSignal.any` haría esto en una línea, pero
-   es reciente de más para un sitio público y no vale estrenarlo por dos líneas. */
-export async function obtenerTorneo(
-  slug: string,
-  señal?: AbortSignal
-): Promise<TorneoAtak | null> {
+   `validarRiotId` NO pasa por acá, a propósito: tiene otro corte —5 s, porque corre
+   mientras alguien llena el formulario y un indicador colgado ahí estorba— y no recibe
+   señal externa, así que no comparte la parte complicada. Unificarla obligaría a
+   parametrizar el timeout y a tocar el camino crítico del registro por un refactor que
+   no lo necesita. */
+async function pedirJson(url: string, señal?: AbortSignal): Promise<unknown> {
   const propio = new AbortController()
   const corte = setTimeout(() => propio.abort(), TIEMPO_LIMITE_TORNEO_MS)
   const alAbortarExterno = () => propio.abort()
 
-  /* El listener va ANTES del chequeo de `aborted`: sobre una señal ya abortada el
-     evento nunca vuelve a dispararse, así que sin esa segunda línea el fetch saldría
-     igual y recién se cortaría por timeout. */
+  /* El listener va ANTES del chequeo de `aborted`: sobre una señal ya abortada el evento
+     nunca vuelve a dispararse, así que sin esa segunda línea el fetch saldría igual y
+     recién se cortaría por timeout.
+     `AbortSignal.any` haría esta composición en una línea, pero es reciente de más para
+     un sitio público y no vale estrenarlo por dos líneas. */
   señal?.addEventListener('abort', alAbortarExterno, { once: true })
   if (señal?.aborted) propio.abort()
 
   try {
-    const respuesta = await fetch(`${URL_TORNEOS}/${encodeURIComponent(slug)}`, {
+    const respuesta = await fetch(url, {
       headers: { Accept: 'application/json' },
       signal: propio.signal
     })
 
-    /* `fetch` NO rechaza por 4xx/5xx: sin este guard, un 500 con cuerpo HTML seguiría
-       a .json() y el error saldría por el catch como si fuera un fallo de red. */
+    /* `fetch` NO rechaza por 4xx/5xx: sin este guard, un 500 con cuerpo HTML seguiría a
+       .json() y el error saldría por el catch como si fuera un fallo de red. */
     if (!respuesta.ok) return null
-    return leerTorneo(await respuesta.json())
+    return await respuesta.json()
   } catch {
     /* Red caída, DNS, CORS, aborto (propio o externo) o cuerpo que no es JSON. Sin
        console.*: el invariante de cero salida por consola vale para todo src/. */
@@ -288,6 +299,19 @@ export async function obtenerTorneo(
   }
 }
 
+/* Trae un torneo por su slug (hoy `SLUG_TORNEO`). Mismo CONTRATO que `validarRiotId`: no
+   lanza y no escribe en consola. `null` colapsa TODO fallo, y son dos capas: `pedirJson`
+   se ocupa del transporte y `leerTorneo` de la forma del cuerpo.
+
+   Quien llama trata el `null` como "no hay nada que mostrar" y NO pinta un error: esto
+   alimenta una sección de un sitio público en día de partida, y un cartel rojo sobre la
+   clasificación es peor que no tener la sección. */
+export async function obtenerTorneo(
+  slug: string,
+  señal?: AbortSignal
+): Promise<TorneoAtak | null> {
+  return leerTorneo(await pedirJson(`${URL_TORNEOS}/${encodeURIComponent(slug)}`, señal))
+}
 
 /* ------------------------------------------------------------------ */
 /*  Bracket: emparejamientos de la ronda                               */
@@ -401,36 +425,12 @@ function leerBracket(cuerpo: unknown): PartidaBracket[] | null {
   return leerPartidas(matches)
 }
 
-/* Trae el bracket de un torneo por su slug. MISMO CONTRATO que el resto del módulo:
-   no lanza, no escribe en consola, y todo fallo —red, DNS, CORS, timeout, 4xx/5xx,
-   `ok:false`, JSON con otra forma— colapsa en `null`, que quien llama trata como «no
-   hay nada que mostrar» y resuelve haciendo desaparecer la sección en silencio.
-
-   El corte y la composición de la señal externa son idénticos a `obtenerTorneo`; el
-   porqué de cada línea está explicado allá y no se repite acá. */
+/* Gemela de `obtenerTorneo`, con el mismo contrato: no lanza, no escribe en consola y
+   todo fallo colapsa en `null`, que quien llama resuelve haciendo desaparecer la sección
+   en silencio. Toda la mecánica de abortar vive en `pedirJson`. */
 export async function obtenerBracket(
   slug: string,
   señal?: AbortSignal
 ): Promise<PartidaBracket[] | null> {
-  const propio = new AbortController()
-  const corte = setTimeout(() => propio.abort(), TIEMPO_LIMITE_TORNEO_MS)
-  const alAbortarExterno = () => propio.abort()
-
-  señal?.addEventListener('abort', alAbortarExterno, { once: true })
-  if (señal?.aborted) propio.abort()
-
-  try {
-    const respuesta = await fetch(`${URL_TORNEOS}/${encodeURIComponent(slug)}/bracket`, {
-      headers: { Accept: 'application/json' },
-      signal: propio.signal
-    })
-
-    if (!respuesta.ok) return null
-    return leerBracket(await respuesta.json())
-  } catch {
-    return null
-  } finally {
-    clearTimeout(corte)
-    señal?.removeEventListener('abort', alAbortarExterno)
-  }
+  return leerBracket(await pedirJson(`${URL_TORNEOS}/${encodeURIComponent(slug)}/bracket`, señal))
 }

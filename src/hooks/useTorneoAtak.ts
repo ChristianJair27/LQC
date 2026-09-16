@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { obtenerTorneo } from '../lib/atak'
+import { obtenerTorneo, SLUG_TORNEO } from '../lib/atak'
 import type { TorneoAtak } from '../lib/atak'
 
 /* Sondeo del torneo en curso contra la API pública de ATAK.GG.
@@ -13,15 +13,6 @@ import type { TorneoAtak } from '../lib/atak'
 
    Tampoco va en `src/lib/`: esa carpeta es de módulos SIN React —transporte,
    constantes, catálogos— y meter un hook adentro borra esa frontera. */
-
-/* El torneo en curso. Se EXPORTA porque tiene un segundo consumidor: el botón «Ver en
-   ATAK» de Torneos.tsx, que arma la URL del frontend de ATAK con el mismo slug. Tenerlo
-   escrito en los dos lados es el defecto que `atak.ts` acaba de sacarse de encima con
-   `BASE_ATAK` —dos copias de una constante se desincronizan en silencio en el primer
-   cambio—, y acá la desincronización sería peor que cosmética: el sitio mostraría la
-   clasificación de un split y el botón llevaría a otro.
-   El día que arranque el split siguiente se cambia UNA vez, acá. */
-export const SLUG_TORNEO = 'lqc-2026'
 
 /* 30 s. Del lado del servidor hay 15 s de caché, así que sondear más seguido no
    traería nada nuevo, solo más peticiones. */
