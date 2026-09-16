@@ -287,3 +287,150 @@ export async function obtenerTorneo(
     señal?.removeEventListener('abort', alAbortarExterno)
   }
 }
+
+
+/* ------------------------------------------------------------------ */
+/*  Bracket: emparejamientos de la ronda                               */
+/* ------------------------------------------------------------------ */
+
+/* Una partida del bracket, ya validada. SOLO los campos que el sitio pinta.
+
+   TRES QUE LA RESPUESTA TRAE Y QUE NO ESTÁN, y el primero importa de verdad:
+
+     · `status` NO se lee, y es a propósito. Dice `"active"` en partidas que están
+       simplemente EMPAREJADAS Y SIN JUGAR —sin `gameId`, sin marcador— y dice
+       `"complete"` en un BYE, que tampoco se jugó. O sea que no significa lo que su
+       nombre promete y pintarlo como «en vivo» publicaría una mentira. Los tres
+       estados reales se derivan de campos que no engañan, y el ORDEN importa porque
+       un BYE también trae `winner`:
+         1. `team2 === 'BYE'`  → descansa
+         2. `winner === null`  → por jugar
+         3. si no             → jugada
+       No lo agregues al tipo «por completitud»: el día que alguien lo lea va a
+       creerle.
+     · `gameId` y `gameRegion` solo vienen en las partidas realmente jugadas y no se
+       muestran en ninguna pantalla. Verificado el 2026-09-15: los 11 nulos de esos
+       campos son exactamente las 8 pendientes más los 3 BYE.
+
+   Y una consecuencia de lo anterior que conviene saber antes de que la pidan: la API
+   NO expone ningún campo que marque una partida EN JUEGO AHORA. No es que no lo
+   pintemos, es que no se puede. Los únicos estados representables son esos tres. */
+export type PartidaBracket = {
+  id: string
+  round: number
+  matchNumber: number
+  team1: string
+  /* Puede ser el literal 'BYE', que NO es un equipo: es el descanso que le toca a
+     alguien cuando el torneo tiene un número impar de participantes (hoy 19, así que
+     hay uno por ronda, siempre en `matchNumber` 10). Quien renderiza lo trata aparte;
+     acá se guarda tal cual viene para no perder la distinción. */
+  team2: string
+  winner: string | null
+  score1: number | null
+  score2: number | null
+}
+
+/* Mismo criterio que `leerClasificacion`: se valida campo por campo y la fila que no
+   tiene la forma exacta SE DESCARTA, en vez de romper la sección entera.
+
+   Los cinco campos exigidos son los que hacen falta para PINTAR una tarjeta: sin `id`
+   no hay key estable, sin `round` no se puede agrupar, sin `matchNumber` no hay
+   etiqueta, y sin los dos equipos no hay partida que mostrar. `winner` y los dos
+   marcadores son nullables por diseño: en las pendientes y en los BYE vienen en null,
+   y todo el render tiene que aguantarlo. */
+function leerPartidas(cuerpo: unknown): PartidaBracket[] | null {
+  if (!Array.isArray(cuerpo)) return null
+
+  const partidas: PartidaBracket[] = []
+  for (const cruda of cuerpo) {
+    if (typeof cruda !== 'object' || cruda === null) continue
+
+    const { id, round, matchNumber, team1, team2, winner, score1, score2 } = cruda as {
+      id?: unknown
+      round?: unknown
+      matchNumber?: unknown
+      team1?: unknown
+      team2?: unknown
+      winner?: unknown
+      score1?: unknown
+      score2?: unknown
+    }
+
+    const idPartida = textoONulo(id)
+    const ronda = numeroFinito(round)
+    const numero = numeroFinito(matchNumber)
+    const equipo1 = textoONulo(team1)
+    const equipo2 = textoONulo(team2)
+
+    if (
+      idPartida === null ||
+      ronda === null ||
+      numero === null ||
+      equipo1 === null ||
+      equipo2 === null
+    ) {
+      continue
+    }
+
+    partidas.push({
+      id: idPartida,
+      round: ronda,
+      matchNumber: numero,
+      team1: equipo1,
+      team2: equipo2,
+      winner: textoONulo(winner),
+      score1: numeroFinito(score1),
+      score2: numeroFinito(score2)
+    })
+  }
+
+  return partidas
+}
+
+/* Gemela de `leerTorneo`. Devuelve solo el arreglo de partidas porque `phase` es el
+   único otro campo de `data` y no lo muestra ninguna pantalla.
+   Un arreglo VACÍO es válido —un torneo sin emparejamientos publicados todavía— y
+   quien llama decide qué hacer con eso. */
+function leerBracket(cuerpo: unknown): PartidaBracket[] | null {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return null
+
+  const { ok, data } = cuerpo as { ok?: unknown; data?: unknown }
+  if (ok !== true || typeof data !== 'object' || data === null) return null
+
+  const { matches } = data as { matches?: unknown }
+  return leerPartidas(matches)
+}
+
+/* Trae el bracket de un torneo por su slug. MISMO CONTRATO que el resto del módulo:
+   no lanza, no escribe en consola, y todo fallo —red, DNS, CORS, timeout, 4xx/5xx,
+   `ok:false`, JSON con otra forma— colapsa en `null`, que quien llama trata como «no
+   hay nada que mostrar» y resuelve haciendo desaparecer la sección en silencio.
+
+   El corte y la composición de la señal externa son idénticos a `obtenerTorneo`; el
+   porqué de cada línea está explicado allá y no se repite acá. */
+export async function obtenerBracket(
+  slug: string,
+  señal?: AbortSignal
+): Promise<PartidaBracket[] | null> {
+  const propio = new AbortController()
+  const corte = setTimeout(() => propio.abort(), TIEMPO_LIMITE_TORNEO_MS)
+  const alAbortarExterno = () => propio.abort()
+
+  señal?.addEventListener('abort', alAbortarExterno, { once: true })
+  if (señal?.aborted) propio.abort()
+
+  try {
+    const respuesta = await fetch(`${URL_TORNEOS}/${encodeURIComponent(slug)}/bracket`, {
+      headers: { Accept: 'application/json' },
+      signal: propio.signal
+    })
+
+    if (!respuesta.ok) return null
+    return leerBracket(await respuesta.json())
+  } catch {
+    return null
+  } finally {
+    clearTimeout(corte)
+    señal?.removeEventListener('abort', alAbortarExterno)
+  }
+}

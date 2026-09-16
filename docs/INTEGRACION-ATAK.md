@@ -364,13 +364,14 @@ Aparte de los triggers, ATAK expone endpoints **públicos** que el sitio llama
 directo desde el navegador. Es la única parte de la integración que sí está en el
 código: **[`src/lib/atak.ts`](../src/lib/atak.ts)**.
 
-Hoy son **dos**, y los dos cuelgan de la misma base —que por eso es una constante,
+Hoy son **tres**, y los tres cuelgan de la misma base —que por eso es una constante,
 `BASE_ATAK`—: `https://atakback.revolution505.com/api/public/v1`.
 
 | Endpoint | Quién lo usa | Función |
 | --- | --- | --- |
 | `GET /validate-riot-id?riotId=…` | el campo Riot ID de `/registro`, al perder el foco | `validarRiotId()` |
 | `GET /tournaments/<slug>` | la clasificación de `/` y `/torneos` | `obtenerTorneo()` |
+| `GET /tournaments/<slug>/bracket` | los emparejamientos de la ronda, en `/torneos` | `obtenerBracket()` |
 
 ### Validación de Riot ID
 
@@ -457,6 +458,23 @@ Tres cosas de la respuesta que el sitio **NO** pinta, a propósito:
 
 El detalle completo —incluido cómo se agrupan los empates para no publicar un ranking
 que no existe— está en [AGENTS.md](../AGENTS.md), «Clasificación en vivo».
+
+### Bracket (misma familia, mismo contrato)
+
+```
+GET https://atakback.revolution505.com/api/public/v1/tournaments/lqc-2026/bracket
+```
+
+Responde `{ ok:true, data:{ phase, matches:[{ id, round, matchNumber, team1, team2, winner,
+status, score1, score2, gameId, gameRegion }] }}`. `obtenerBracket()` devuelve **solo el
+arreglo de partidas** —`phase` no lo muestra ninguna pantalla— y colapsa todo fallo en
+`null`, igual que las otras dos.
+
+**`status` no se lee, a propósito.** Dice `"active"` en partidas apenas emparejadas y
+`"complete"` en un BYE. Y **`team2` puede ser el literal `'BYE'`**, que no es un equipo: es
+el descanso por número impar de participantes (19 hoy), **cuenta como victoria** y suma 3
+puntos en `standings`. Las dos trampas están desarrolladas en
+[AGENTS.md](../AGENTS.md), «Emparejamientos de la ronda».
 
 ---
 

@@ -3,7 +3,9 @@ import { Trophy, Calendar, Star, Users, UserPlus, ChevronRight } from 'lucide-re
 import { useState } from 'react'
 import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
 import Clasificacion from '../components/Clasificacion'
+import Emparejamientos from '../components/Emparejamientos'
 import { useTorneoAtak, SLUG_TORNEO } from '../hooks/useTorneoAtak'
+import { useBracketAtak } from '../hooks/useBracketAtak'
 
 /* Los dos CTA del bloque destacado, con el canon de AGENTS.md. Son copia de las constantes
    homónimas de Home.tsx —no están exportadas allá y el cambio no podía tocar ese archivo—,
@@ -79,6 +81,11 @@ export default function Torneos() {
      y el conteo de equipos del bloque destacado. Nunca lanza y nunca escribe en
      consola; si falla, `torneo` se queda en null y cada consumidor degrada solo. */
   const { torneo, cargando } = useTorneoAtak()
+
+  /* El bracket va en su PROPIO sondeo y no junto al torneo: son dos endpoints distintos
+     y cada uno falla por su cuenta. Que la clasificación no cargue no tiene por qué
+     llevarse puestos los emparejamientos, ni al revés — cada sección degrada sola. */
+  const { partidas, cargando: cargandoBracket } = useBracketAtak()
 
   const tournaments = [
     {
@@ -309,6 +316,13 @@ export default function Torneos() {
             </div>
           </div>
         </section>
+
+        {/* EMPAREJAMIENTOS DE LA RONDA EN CURSO. Va entre la tarjeta del split y la
+            clasificación, y ese orden es deliberado: el emparejamiento es más PRESENTE
+            que la tabla —es lo que se juega esta semana— y la tabla es el acumulado.
+            Como la clasificación, el <section> y el <h2> viven DENTRO del componente:
+            si la API falla no queda un encabezado colgado sobre un hueco. */}
+        <Emparejamientos partidas={partidas} cargando={cargandoBracket} />
 
         {/* CLASIFICACIÓN EN VIVO. Va acá por la misma razón que el bloque de arriba: es
             presente, y todo lo que sigue —el selector, el podio, el historial— es archivo.

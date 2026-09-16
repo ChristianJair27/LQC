@@ -10,9 +10,10 @@ contenido **público** vive en los componentes.
 1. **La galería.** Desde el **2026-08-08**, `/galeria` lee la tabla
    `public.galeria_media` y arma las URLs contra el bucket `galeria` de Storage — ver
    [Galería dinámica](#galería-dinámica-galeria--panel).
-2. **La clasificación del split.** Desde el **2026-09-15**, `/` y `/torneos` pintan la
-   tabla de posiciones real del torneo en curso leyendo la **API pública de ATAK.GG**
-   —no una base nuestra— con `obtenerTorneo()` de `src/lib/atak.ts` — ver
+2. **El split en vivo.** Desde el **2026-09-15**, `/` y `/torneos` pintan la **tabla de
+   posiciones** real del torneo en curso, y `/torneos` además los **emparejamientos de la
+   ronda**, leyendo la **API pública de ATAK.GG** —no una base nuestra— con
+   `obtenerTorneo()` y `obtenerBracket()` de `src/lib/atak.ts` — ver
    [Clasificación en vivo](#clasificación-en-vivo-desde-el-2026-09-15).
 
 Ninguna otra página pública lee nada.
@@ -482,9 +483,14 @@ tipo no los recoge).
 
 | Archivo | Qué hace |
 | --- | --- |
-| `src/lib/atak.ts` | Transporte: `obtenerTorneo(slug, señal)`. Mismo CONTRATO que `validarRiotId` — **nunca lanza, nunca escribe en consola**, todo fallo colapsa en `null`. |
+| `src/lib/atak.ts` | Transporte: `obtenerTorneo(slug, señal)` y `obtenerBracket(slug, señal)`. Mismo CONTRATO que `validarRiotId` — **nunca lanza, nunca escribe en consola**, todo fallo colapsa en `null`. |
 | `src/hooks/useTorneoAtak.ts` | Sondeo cada **30 s** (con 15 s de caché del lado del servidor, más seguido no traería nada nuevo). Exporta también `SLUG_TORNEO`. |
 | `src/components/Clasificacion.tsx` | **Solo presentación.** Variantes `completa` (tabla de los 19) y `compacta` (bloque de portada). |
+| `src/hooks/useBracketAtak.ts` | Sondeo del **bracket**, 30 s, gemelo del anterior. Importa `SLUG_TORNEO` del otro, no lo repite. |
+| `src/components/Emparejamientos.tsx` | **Solo presentación.** La ronda en curso, en `/torneos`. |
+
+**Son DOS sondeos, no uno.** Van a endpoints distintos y cada uno falla por su cuenta: que
+la clasificación no cargue no se lleva puestos los emparejamientos, ni al revés.
 
 **El hook lo llama la PÁGINA, no el componente.** En `/torneos` hay dos consumidores del
 mismo torneo —la tabla y el conteo de equipos del bloque destacado—, y con el fetch dentro
@@ -538,6 +544,43 @@ dice cuántos son y enlaza a `/torneos`.
 se arma por PUNTOS, y por puntos hoy entran cinco 2-0 y un 2-1; llamarlos empatados diría
 lo contrario de lo que `/torneos` declara a dos clics, donde ese 2-1 lleva su propio
 número. Las dos pantallas se contradecirían y la que más se ve es la portada.
+
+### Emparejamientos de la ronda (`/torneos`)
+
+```
+GET https://atakback.revolution505.com/api/public/v1/tournaments/<slug>/bracket
+```
+
+Devuelve **todas las partidas de todas las rondas**; el sitio pinta **solo la ronda en curso**, en
+una sección que va **entre la tarjeta del split y la clasificación** — el emparejamiento es
+más presente que la tabla.
+
+**Tres trampas de estos datos, y las tres publican mentiras si se ignoran:**
+
+1. **`status` NO significa lo que su nombre promete, y el sitio NO lo lee.** Dice `"active"`
+   en partidas que solo están **emparejadas y sin jugar** (sin `gameId`, sin marcador) y
+   `"complete"` en un BYE que nadie jugó. Los tres estados se derivan de campos que no
+   engañan, **y el orden importa porque un BYE también trae `winner`**:
+   `team2 === 'BYE'` → descansa · `winner === null` → **«Por jugar»** · si no → jugada.
+   Nada de «EN VIVO» ni de punto pulsante: **la API no expone ningún campo que marque una
+   partida en juego**, así que ese estado no es que no se pinte, es que no se puede.
+2. **El BYE cuenta como VICTORIA y suma 3 puntos.** Verificado cruzando los dos endpoints el
+   2026-09-15: los tres equipos que descansaron aparecen en `standings` con exactamente una
+   victoria más de las que tienen en el bracket. Por eso la tarjeta dice **«Sin rival ·
+   cuenta como victoria»** y no solo «descansa»: sin esa línea, quien compare las dos
+   secciones concluye que una miente.
+3. **`score1`/`score2` son `null`** en las pendientes y en los BYE. Todo el render lo
+   aguanta, y el marcador se comprueba con `!== null` y no con un truthy — **un 0 es un
+   marcador válido**.
+
+**Qué ronda se muestra: `max(round)`, siempre.** En suizo los emparejamientos de la ronda
+N+1 solo se publican cuando la N terminó, así que la más alta es la que se juega. Se
+descartó «la de mayor número con alguna partida sin ganador» porque **retrocede**: si a una
+ronda vieja le faltara cargar un resultado, presentaría una ronda ya cerrada como la actual.
+Con `max` el caso «el suizo terminó» se resuelve solo.
+
+**No se pintan `gameId` ni `gameRegion`** (solo vienen en las jugadas y no los muestra
+ninguna pantalla), ni el bracket completo de las 3 rondas.
 
 ### Lo que NO se pinta, y por qué
 
