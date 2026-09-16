@@ -8,4 +8,5 @@
 - [Acción en encabezado de tarjeta admin](project_admin-card-header-accion.md) — botón hermano (no anidado) en la banda del header: items-center, shrink-0, margen ≥ radio de esquina.
 - [Feedback no textual → aria-live](project_admin-feedback-no-textual.md) — descargas/copiar/refrescar del panel necesitan región sr-only role="status" que anuncie el resultado.
 - [Header md resuelto](project_deuda-header-md.md) — 6 ítems entran compactando nav+promo solo en md; un 7º exige remedir. lg intacto.
+- [Lienzo de fondo en main](project_lienzo-fondo-main.md) — `.lqc-lienzo` cuelga de `<main>` porque las 12 raíces opacas tapan `body`; mosaico+grano = paso 2 pendiente a propósito.
 - [Copy en tuteo mexicano](project_registro-espanol-tuteo.md) — el sitio usa "Recarga/inténtalo", no el voseo de mis instrucciones; no mezclar registros.
