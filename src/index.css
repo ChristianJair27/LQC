@@ -358,10 +358,13 @@
      este archivo ACELERA a 0.01ms en vez de apagar: con un keyframe abierto el fondo quedaría
      congelado a mitad de camino, justo en el estado que nadie diseñó.
 
-     Las tres capas son las únicas que van hoy: halo de acento arriba a la derecha, halo azul
-     abajo a la izquierda y el lavado vertical. El mosaico y el grano son un PASO 2
-     deliberadamente pendiente —puede que no se haga nunca—, no un olvido. Tres capas al 100%
-     no necesitan `background-size` ni `background-position`, por eso no están. */
+     Las tres capas de ESTE pseudo: halo de acento arriba a la derecha, halo azul abajo a la
+     izquierda y el lavado vertical. Tres capas al 100% no necesitan `background-size` ni
+     `background-position`, por eso no están.
+     El MOSAICO ya no es un pendiente: se hizo, y vive en el `::after` de más abajo, con su
+     propio posicionado y su propia máscara —ahí está explicado por qué no podía ser una capa
+     más de acá—. El GRANO quedó afuera a propósito y tampoco es un pendiente: el porqué
+     también está en ese comentario. */
   .lqc-lienzo::before {
     content: '';
     position: fixed;
@@ -372,6 +375,83 @@
       radial-gradient(60% 45% at 82% 12%, rgb(0 212 255 / 5%) 0%, transparent 70%),
       radial-gradient(70% 50% at 12% 88%, rgb(0 102 255 / 6%) 0%, transparent 70%),
       linear-gradient(180deg, rgb(0 102 255 / 3%) 0%, rgb(0 20 51 / 7%) 100%);
+  }
+
+  /* MOSAICO GEOMÉTRICO DE CABECERA — el tratamiento de los pósters oficiales de la liga,
+     denso arriba y disuelto donde empieza a vivir el texto. Es el PASO 2 del lienzo, y
+     completa al ::before de acá arriba sin tocarlo.
+
+     POR QUÉ UN SEGUNDO PSEUDO Y NO UNA CAPA MÁS DEL ::before. El mosaico necesita su propia
+     `mask-image` —denso arriba, ausente abajo— y una máscara se aplica al ELEMENTO ENTERO,
+     no a una de sus capas de fondo. Metido como cuarta capa del ::before, ese degradado de
+     máscara se llevaría puestos también los dos halos y el lavado vertical, que justamente
+     tienen que cubrir la ventana completa de arriba abajo. Son dos comportamientos
+     incompatibles en un mismo elemento, así que van en dos pseudos. No es capricho: es el
+     único reparto posible sin duplicar el nodo.
+
+     `position: absolute` Y NO `fixed` COMO EL PASO 1, Y ESA ES LA DIFERENCIA IMPORTANTE.
+     El ::before es atmósfera de VENTANA: acompaña el scroll quieto y por eso va fijo. Esto
+     otro es un tratamiento de CABECERA: en los pósters el mosaico está denso arriba y se
+     disuelve donde entra el texto, o sea que pertenece al principio del DOCUMENTO, no a la
+     pantalla. Con `fixed`, el tercio superior de la PANTALLA tendría mosaico para siempre y
+     al hacer scroll la tabla de clasificación de /torneos —19 filas— le pasaría por debajo,
+     leyéndose sobre los rectángulos. Con `absolute` queda anclado al tope de `main` y muere
+     mucho antes de que empiece el contenido denso. El bloque contenedor es el propio `main`,
+     que ya viene con `relative z-10` de LayoutPublico, así que `top/left/right: 0` es el
+     tope del contenido público y no el del viewport.
+     Por lo mismo `height: 100vh` en vez de `inset: 0`: `main` mide todo el documento, así
+     que estirarlo a la altura del padre pondría mosaico hasta el pie. Una pantalla de alto
+     es la medida del efecto, y lo que de verdad decide dónde se apaga es la máscara.
+
+     `z-index: 0` y `pointer-events: none`, igual que el ::before y por las mismas razones:
+     se pinta por encima del fondo opaco de cada página (paso 4 del orden de pintado) y por
+     debajo del `<div className="relative z-10">` en el que las 8 páginas envuelven su
+     contenido (paso 8). No subirlo, subirlo taparía el texto.
+
+     POR QUÉ UN SVG INLINE Y NO `repeating-linear-gradient`. El gesto del póster son
+     rectángulos de PROPORCIONES DISTINTAS con bordes duros: barras largas y finas, bloques
+     casi cuadrados, columnas verticales. Un `repeating-linear-gradient` solo sabe hacer
+     bandas paralelas, y cruzando dos, un damero uniforme; cualquiera de los dos lee como
+     TELA o como tramado de impresión, no como arquitectura. El SVG va como data-uri para
+     no sumar una petición ni un archivo en `public/` por un patrón de 600 bytes.
+
+     LOS TRES TONOS, CON SUS HEX ANOTADOS PARA PODER ACTUALIZARLOS SI CAMBIA LA PALETA (van
+     en el data-uri como `%23`, que es el `#` escapado, y no pueden ser `var()`):
+       · `%230066ff` al 4 %   — `lqc-500` (#0066ff), los rectángulos del frente.
+       · `%230066ff` al 2.6 % — `lqc-500` otra vez, la capa de atrás; el mismo azul a menos
+                                 alfa es lo que da profundidad sin meter un tercer hue.
+       · `%2300d4ff` al 2 %   — `lqc-accent` (#00d4ff), los pocos acentos cian.
+     Los tres alfas son de un dígito por una razón: sobre un fondo casi negro, el mosaico
+     tiene que sugerirse a contraluz, no dibujarse. Si se ve el patrón, está mal calibrado.
+
+     LA MÁSCARA VA DUPLICADA CON `-webkit-`, y no es prefijo de más: `mask-image` sin prefijo
+     recién es Safari 15.4+, y sin la versión prefijada un Safari anterior IGNORA la
+     declaración entera — o sea que no se queda sin degradado, se queda con el mosaico opaco
+     de punta a punta del `100vh`, encima del texto del hero. El respaldo prefijado es el
+     caso seguro. Las paradas (0–24 % sólido, 38 % a la mitad, transparente al 78 %) están
+     puestas para que el patrón desaparezca dentro de la primera pantalla.
+
+     EL GRANO QUEDÓ DELIBERADAMENTE AFUERA. Era la otra mitad del paso 2 y no va, por
+     matemática y no por gusto: `background-blend-mode: soft-light` sobre un lienzo
+     casi-negro es invisible — por la fórmula de soft-light del W3C, con un backdrop Cb = 0
+     el resultado es 0 sea cual sea el origen. Para que se viera habría que mezclarlo en
+     `normal` a ~2 %, que SÍ sube la luminancia media del fondo (soft-light es neutro por
+     diseño; `normal` no), y eso ya es una decisión de contraste aparte, no una textura. Si
+     algún día se retoma, se retoma como tal. */
+  .lqc-lienzo::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='%230066ff' opacity='.04'%3E%3Crect width='76' height='32'/%3E%3Crect x='112' y='48' width='36' height='108'/%3E%3Crect x='196' width='104' height='24'/%3E%3Crect y='140' width='44' height='44'/%3E%3Crect x='156' y='196' width='144' height='28'/%3E%3C/g%3E%3Cg fill='%230066ff' opacity='.026'%3E%3Crect x='84' width='20' height='40'/%3E%3Crect y='40' width='104' height='28'/%3E%3Crect x='156' y='36' width='64' height='64'/%3E%3Crect x='228' y='36' width='72' height='20'/%3E%3Crect x='56' y='188' width='88' height='36'/%3E%3Crect x='248' y='232' width='52' height='68'/%3E%3C/g%3E%3Cg fill='%2300d4ff' opacity='.02'%3E%3Crect y='76' width='60' height='52'/%3E%3Crect x='228' y='112' width='72' height='72'/%3E%3Crect x='112' y='164' width='72' height='20'/%3E%3Crect y='232' width='140' height='24'/%3E%3Crect x='180' y='240' width='56' height='44'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 300px 300px;
+    background-repeat: repeat;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgb(0 0 0 / 38%) 52%, transparent 78%);
+            mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgb(0 0 0 / 38%) 52%, transparent 78%);
   }
 
   /* Pills de marca del navbar — los dos enlaces externos de Header.tsx (ATAK.GG y
@@ -670,8 +750,11 @@ iframe:hover {
   }
 
   /* El lienzo de marca se apaga entero: son tintes del 3% al 6% cuyo único aporte es
-     atmósfera, y en alto contraste restan separación entre el fondo y el texto. */
-  .lqc-lienzo::before {
+     atmósfera, y en alto contraste restan separación entre el fondo y el texto. Los DOS
+     pseudos: el ::before (halos y lavado) y el ::after (mosaico de cabecera), que al 2–4 %
+     es exactamente el mismo tipo de ruido sobre el fondo del texto del hero. */
+  .lqc-lienzo::before,
+  .lqc-lienzo::after {
     display: none;
   }
 }

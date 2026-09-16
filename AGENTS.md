@@ -670,6 +670,46 @@ autocontenido con su markup y sus clases de Tailwind inline.
 - **Mobile-first**, con breakpoints `md` y `lg`.
 - Preferir clases de Tailwind inline; CSS suelto solo para tokens en `index.css`.
 
+### El lienzo de fondo (`.lqc-lienzo`) y su contrato de apilamiento
+
+**Hecho el 2026-09-15**, en dos pasos. El fondo atmosférico del sitio público son **dos
+pseudo-elementos** de la clase `lqc-lienzo`, que lleva el `<main>` de `LayoutPublico.tsx:12`:
+
+| | Qué | Posición | Por qué |
+| --- | --- | --- | --- |
+| `::before` | dos halos de marca + lavado vertical | `fixed` | atmósfera de ventana, cubre siempre |
+| `::after` | mosaico geométrico (SVG inline, 16 rectángulos, 3 tonos) | `absolute`, `100vh` | tratamiento de **cabecera**: con `fixed`, la tabla de 19 filas de `/torneos` le pasaría por debajo al scrollear |
+
+**Cuelga de `main` y no de `body` porque `body` está tapado.** Cada página se pinta en su raíz
+un `bg-gradient-to-b from-black via-gray-950 to-black` **opaco** — 12 ocurrencias en 11
+archivos — que oculta el fondo de `body` y su `body::before`. Por eso los halos que
+`index.css` declara **desde el commit inicial** nunca se habían visto. Repintar esas 12
+raíces fue el camino descartado.
+
+> **CONTRATO, y es lo único de esta sección que muerde: los dos pseudos van en `z-index: 0` y
+> cada página pública envuelve TODO su contenido en un `<div className="relative z-10">`.**
+> Una página nueva que no lo haga no queda tapada —los tintes son del 2 % al 6 %— pero recibe
+> el lienzo **encima** en vez de debajo. Ya pasó una vez: el 404 en línea de `App.tsx` era la
+> única ruta pública sin ese wrapper y hubo que ponérselo.
+
+Lo demás que conviene saber antes de tocarlo:
+
+- **`position: fixed`, nunca `background-attachment: fixed`**: el segundo repinta en cada
+  frame de scroll y iOS lo ignora.
+- **No se anima**, así que `prefers-reduced-motion` no tiene nada que apagar. Si alguna vez se
+  animara, tiene que ser ciclo cerrado tipo `hero-glow` — ver «Animación y movimiento».
+- **Los canales van literales** (`rgb(0 102 255 / 4%)`), no `var(--color-lqc-500)`, por lo
+  mismo que `.pill-marca`. Están anotados en el comentario de la regla.
+- **Se apaga entero en `prefers-contrast: high`.** Ojo: **ese media query no matchea en
+  Chromium**, que solo reconoce `more`. Es un defecto **preexistente** que afecta a todo ese
+  bloque —`body { background: #000 }` y los overrides de `.glass` incluidos—, no solo al
+  lienzo. Arreglarlo es un cambio propio.
+- **`/admin` no lo recibe**: sus rutas son hermanas de `LayoutPublico`, no hijas, así que
+  nunca montan ese `<main>`. El panel queda negro plano a propósito.
+- El **grano** de los pósters quedó afuera: `background-blend-mode: soft-light` sobre un
+  lienzo casi-negro es invisible por definición —con backdrop en 0 el resultado es 0—, y
+  forzarlo con blending `normal` sí sube la luminancia media. No es un pendiente.
+
 ## Morado heredado — ya migrado
 
 **No queda morado en el sitio.** Las 25 ocurrencias de `purple-*` que había en 6
