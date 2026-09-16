@@ -323,6 +323,57 @@
     animation: hero-glow 4s ease-in-out infinite;
   }
 
+  /* LIENZO DE FONDO DEL SITIO PÚBLICO — dos halos de marca y un lavado vertical, detrás de
+     todo el contenido de las páginas.
+
+     POR QUÉ CUELGA DE `main` Y NO DE `body`. El fondo de `body` y su `body::before` (arriba
+     en este archivo, desde el commit inicial) NUNCA se vieron: cada página se pinta en su
+     raíz un `bg-gradient-to-b from-black via-gray-950 to-black` OPACO que los tapa a los dos.
+     Son 12 raíces en 11 archivos y despintarlas una por una era el camino largo. El atajo es
+     el `<main>` de LayoutPublico, que ya venía con `relative z-10`, o sea que es contexto de
+     apilamiento: un pseudo POSICIONADO de `main` se pinta por encima del fondo de la página
+     —que es el de un bloque en flujo, paso 4 del orden de pintado— y por debajo del
+     contenido, que en las 8 páginas vive dentro de un `<div className="relative z-10">`
+     (paso 8). De ahí el `z-index: 0` de acá: no hay que subirlo, subirlo taparía el texto.
+     El `pointer-events: none` es lo que garantiza que una capa que cubre la ventana entera no
+     se coma un solo clic.
+
+     `position: fixed` Y NUNCA `background-attachment: fixed`. Las dos dejan el fondo quieto
+     al hacer scroll, pero la segunda obliga al navegador a repintar el área en cada frame
+     —es de los patrones más caros que hay— y iOS Safari directamente la ignora, así que ahí
+     el fondo scrollearía con la página. Con el pseudo fijo el elemento es uno solo, sale de
+     su propia capa y el scroll no lo toca.
+
+     POR QUÉ LOS CANALES VAN LITERALES Y NO `var(--color-lqc-500)`. Es la misma razón ya
+     documentada abajo para `.pill-marca`: Lightning CSS, el minificador de Vite, necesita el
+     color en tiempo de compilación para emitir sus respaldos, y `rgb(<canales> / <alfa>)` no
+     necesita respaldo de nada. Para que se puedan actualizar si cambia la paleta, quedan
+     anotados: `0 102 255` es `lqc-500` (#0066ff) y `0 212 255` es `lqc-accent` (#00d4ff). El
+     tercer valor, `0 20 51`, es el azul profundo del `--gradient-dark` de `:root`.
+
+     NO SE ANIMA, A PROPÓSITO, así que `prefers-reduced-motion` no tiene nada que apagar acá:
+     un fondo quieto ya es lo que pide quien reduce el movimiento. Si algún día se animara,
+     tiene que ser un ciclo cerrado tipo `hero-glow` —mismo estado en 0% y 100%, y el reposo
+     declarado también en la regla—, porque la manta de `prefers-reduced-motion` del final de
+     este archivo ACELERA a 0.01ms en vez de apagar: con un keyframe abierto el fondo quedaría
+     congelado a mitad de camino, justo en el estado que nadie diseñó.
+
+     Las tres capas son las únicas que van hoy: halo de acento arriba a la derecha, halo azul
+     abajo a la izquierda y el lavado vertical. El mosaico y el grano son un PASO 2
+     deliberadamente pendiente —puede que no se haga nunca—, no un olvido. Tres capas al 100%
+     no necesitan `background-size` ni `background-position`, por eso no están. */
+  .lqc-lienzo::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(60% 45% at 82% 12%, rgb(0 212 255 / 5%) 0%, transparent 70%),
+      radial-gradient(70% 50% at 12% 88%, rgb(0 102 255 / 6%) 0%, transparent 70%),
+      linear-gradient(180deg, rgb(0 102 255 / 3%) 0%, rgb(0 20 51 / 7%) 100%);
+  }
+
   /* Pills de marca del navbar — los dos enlaces externos de Header.tsx (ATAK.GG y
      Revolution505). Acá vive SOLO el mecanismo, que es idéntico para los dos; el color lo
      inyecta cada acento con `--pill-rgb`.
@@ -616,5 +667,11 @@ iframe:hover {
   .glass, .glass-dark {
     background: rgba(0, 0, 0, 0.9);
     border: 2px solid #0066ff;
+  }
+
+  /* El lienzo de marca se apaga entero: son tintes del 3% al 6% cuyo único aporte es
+     atmósfera, y en alto contraste restan separación entre el fondo y el texto. */
+  .lqc-lienzo::before {
+    display: none;
   }
 }

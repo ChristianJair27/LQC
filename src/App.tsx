@@ -74,9 +74,16 @@ export default function App() {
               <Route path="/reglamento" element={<Reglamento />} />
 
               {/* Ruta 404 básica (opcional pero recomendado). Va dentro del layout
-                  público para conservar header/footer en la página no encontrada. */}
+                  público para conservar header/footer en la página no encontrada.
+                  El `relative z-10` NO es decorativo: es el mismo wrapper que las 8 páginas
+                  ponen en su raíz, y es lo que deja al lienzo de fondo (`.lqc-lienzo` en el
+                  <main> de LayoutPublico, ver src/index.css) DEBAJO del contenido. Sin él este
+                  bloque queda en flujo y sin posicionar, o sea que se pinta ANTES que el
+                  pseudo del lienzo y termina con el lavado encima. El tinte es del 3 % al 7 %
+                  y no rompe nada a la vista, pero deja una capa mal puesta en la única ruta
+                  pública que no seguía el patrón. */}
               <Route path="*" element={
-                <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
+                <div className="relative z-10 min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
                   <h1 className="text-6xl md:text-8xl font-bold text-blue-500 mb-6">404</h1>
                   <p className="text-2xl md:text-3xl mb-8">Página no encontrada</p>
                   <a

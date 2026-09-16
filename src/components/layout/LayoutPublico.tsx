@@ -9,7 +9,7 @@ export default function LayoutPublico() {
   return (
     <>
       <Header />
-      <main className="flex-grow relative z-10">
+      <main className="flex-grow relative z-10 lqc-lienzo">
         <Outlet />
       </main>
       <Footer />
