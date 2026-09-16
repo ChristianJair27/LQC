@@ -437,7 +437,18 @@
      el resultado es 0 sea cual sea el origen. Para que se viera habría que mezclarlo en
      `normal` a ~2 %, que SÍ sube la luminancia media del fondo (soft-light es neutro por
      diseño; `normal` no), y eso ya es una decisión de contraste aparte, no una textura. Si
-     algún día se retoma, se retoma como tal. */
+     algún día se retoma, se retoma como tal. 
+
+     EL TILE ENVUELVE, Y ESO ES UN INVARIANTE — no lo rompas al retocar la composición.
+     NINGÚN rectángulo puede tener un borde en `x=0` ni en `x=300` salvo que sea la mitad de
+     un par que continúa del otro lado CON EL MISMO GRUPO y el MISMO rango de `y`. Hoy son
+     cinco pares (y 12-36, 52-78, 116-184, 200-228 y 244-288). Un rectángulo suelto tocando
+     un borde pone una arista vertical alineada en TODAS las costuras: a 1440px son 4,8
+     columnas de tile, y el patrón se lee como bandas verticales — exactamente lo contrario
+     de la textura que se busca. Fue el defecto de la primera versión.
+     Por lo mismo, NINGUNO toca `y=0` ni `y=300`: así la costura horizontal entre filas de
+     tiles tampoco tiene aristas alineadas, y no hace falta un sexto par para el eje Y.
+  */
   .lqc-lienzo::after {
     content: '';
     position: absolute;
@@ -447,7 +458,7 @@
     height: 100vh;
     z-index: 0;
     pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='%230066ff' opacity='.04'%3E%3Crect width='76' height='32'/%3E%3Crect x='112' y='48' width='36' height='108'/%3E%3Crect x='196' width='104' height='24'/%3E%3Crect y='140' width='44' height='44'/%3E%3Crect x='156' y='196' width='144' height='28'/%3E%3C/g%3E%3Cg fill='%230066ff' opacity='.026'%3E%3Crect x='84' width='20' height='40'/%3E%3Crect y='40' width='104' height='28'/%3E%3Crect x='156' y='36' width='64' height='64'/%3E%3Crect x='228' y='36' width='72' height='20'/%3E%3Crect x='56' y='188' width='88' height='36'/%3E%3Crect x='248' y='232' width='52' height='68'/%3E%3C/g%3E%3Cg fill='%2300d4ff' opacity='.02'%3E%3Crect y='76' width='60' height='52'/%3E%3Crect x='228' y='112' width='72' height='72'/%3E%3Crect x='112' y='164' width='72' height='20'/%3E%3Crect y='232' width='140' height='24'/%3E%3Crect x='180' y='240' width='56' height='44'/%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='%230066ff' opacity='.04'%3E%3Crect y='12' width='36' height='24'/%3E%3Crect x='208' y='12' width='92' height='24'/%3E%3Crect y='200' width='48' height='28'/%3E%3Crect x='188' y='200' width='112' height='28'/%3E%3Crect x='120' y='52' width='36' height='104'/%3E%3Crect x='64' y='236' width='52' height='52'/%3E%3C/g%3E%3Cg fill='%230066ff' opacity='.026'%3E%3Crect y='52' width='60' height='26'/%3E%3Crect x='244' y='52' width='56' height='26'/%3E%3Crect y='244' width='52' height='44'/%3E%3Crect x='252' y='244' width='48' height='44'/%3E%3Crect x='56' y='8' width='20' height='40'/%3E%3Crect x='172' y='40' width='60' height='60'/%3E%3Crect x='168' y='132' width='56' height='24'/%3E%3Crect x='136' y='240' width='76' height='28'/%3E%3C/g%3E%3Cg fill='%2300d4ff' opacity='.02'%3E%3Crect y='116' width='40' height='68'/%3E%3Crect x='236' y='116' width='64' height='68'/%3E%3Crect x='96' y='8' width='88' height='28'/%3E%3Crect x='68' y='76' width='40' height='40'/%3E%3Crect x='76' y='176' width='96' height='20'/%3E%3C/g%3E%3C/svg%3E");
     background-size: 300px 300px;
     background-repeat: repeat;
     -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgb(0 0 0 / 38%) 52%, transparent 78%);
