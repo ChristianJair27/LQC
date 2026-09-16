@@ -1715,10 +1715,13 @@ export default function Registro() {
         {/* Hero */}
         <section className="pt-28 pb-16 md:pt-40 md:pb-24">
           <div className="container mx-auto px-6 max-w-4xl">
-            {/* Encuadre tipo póster LQC: marca arriba, ubicación a la derecha */}
-            <div className="flex items-center justify-between mb-8 text-xs sm:text-sm font-heading tracking-[0.25em] text-lqc-accent/70">
+            {/* Encuadre tipo póster LQC. El «QRO, MX.» que iba a la derecha SE FUE el
+                2026-09-15: la tira de datos del layout ya dice «QRO · MX» en todas las
+                páginas, y acá quedaban las dos a ~110px una de otra. No lo reemplaces por
+                otra cosa «para que no quede vacío» — la marca sola, alineada a la
+                izquierda, es el encuadre. */}
+            <div className="mb-8 text-xs sm:text-sm font-heading tracking-[0.25em] text-lqc-accent/70">
               <span>LQC 2026</span>
-              <span>QRO, MX.</span>
             </div>
 
             {/* Título protagonista: pesado, mayúsculas, alineado a la izquierda */}

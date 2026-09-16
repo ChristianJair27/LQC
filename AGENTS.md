@@ -652,6 +652,7 @@ src/
   vite-env.d.ts            tipos de las variables de entorno (VITE_*)
   components/
     ScrollToTop.tsx        vuelve al tope en cada cambio de ruta (con guard de hash)
+    TiraHud.tsx            tira de datos (QRO · MX · coords · °C · hora) del layout público
     Reveal.tsx             animación de entrada al scroll (IntersectionObserver)
     Clasificacion.tsx      tabla de posiciones del split (variante completa / compacta);
                            solo presentación, y no se pinta si no hay datos
@@ -661,7 +662,12 @@ src/
   hooks/
     useTorneoAtak.ts       sondeo del torneo en ATAK cada 30 s; lo llama la PÁGINA, no
                            el componente (Torneos tiene dos consumidores del mismo dato)
+    useBracketAtak.ts      sondeo del bracket, 30 s; gemelo del anterior
+    useClimaQro.ts         sondeo de la temperatura (Open-Meteo), 15 min
+    useHoraLocal.ts        reloj de la tira: un tick por minuto, sin red
   lib/
+    clima.ts               temperatura de Querétaro (Open-Meteo, sin API key) + sus coordenadas
+    horaQro.ts             hora local de Querétaro con Intl; sin red, nunca lanza
     supabase.ts            cliente de Supabase (perezoso; devuelve null sin credenciales)
     atak.ts                API pública de ATAK.GG: valida un Riot ID y trae el torneo
                            con su clasificación; nunca lanza ni bloquea
@@ -753,6 +759,64 @@ Lo demás que conviene saber antes de tocarlo:
 - El **grano** de los pósters quedó afuera: `background-blend-mode: soft-light` sobre un
   lienzo casi-negro es invisible por definición —con backdrop en 0 el resultado es 0—, y
   forzarlo con blending `normal` sí sube la luminancia media. No es un pendiente.
+
+### La tira de datos (`TiraHud`)
+
+**Hecha el 2026-09-15.** La línea monoespaciada de los pósters, llevada a la web:
+
+```
+QRO · MX · 20.59°N 100.39°W · 22°C · 21:47 CST (UTC-6)
+```
+
+La monta **`LayoutPublico.tsx`, como primer hijo del `<main>`**. Un solo punto de inserción
+cubre las **8** páginas públicas más el 404 en línea de `App.tsx`, y deja fuera a `/admin`
+**por construcción** — sus rutas son hermanas del layout, no hijas. Y como el layout es el
+elemento de la ruta padre, **React Router no lo desmonta al navegar**: el reloj y el sondeo
+del clima se montan una vez. En cada página, cada clic del nav dispararía un fetch nuevo.
+
+- **Lleva `relative z-10`, y no es decorativo.** Un hijo de `main` sin posicionar se pinta
+  antes que los pseudos del lienzo y recibiría el lavado encima. Ver el contrato de
+  apilamiento más arriba.
+- **Al scrollear no hace nada, y eso es el efecto.** El header es `sticky` **y opaco**, así
+  que la tira se mete debajo y se funde con su negro sin ser una segunda barra. Sin listener
+  de scroll, sin animación, sin segunda fuente de verdad de la altura del header.
+  ⚠ **No lo «mejores» con `animation-timeline: scroll()`**: la manta de
+  `prefers-reduced-motion` pone `animation-duration: 0.01ms !important` y a una animación de
+  scroll no la acelera, la deja **plantada en su fotograma final** — quien reduce movimiento
+  vería la tira colapsada para siempre.
+- **En móvil se caen dos segmentos**, en este orden: las **coordenadas** (19 de 54
+  caracteres, y dicen lo mismo que «QRO» con más píxeles) y la abreviatura **`CST`** — lo
+  universal es el offset, no la forma anglosajona. Queda `QRO · MX · 22°C · 21:47 UTC-6`,
+  que entra hasta 320 px. Cada `<span>` **incluye el separador que lo precede**, así al
+  ocultarse se lleva su `·` y no queda ninguno colgando.
+- **Degradación DISTINTA a la de ATAK: acá no desaparece la sección.** Ubicación,
+  coordenadas y hora son locales —constantes + `Intl`— y funcionan sin conexión. Si falla el
+  clima se cae **solo ese segmento**. Nada de `--°C` ni «n/d»: un placeholder permanente es
+  un mensaje de error disfrazado.
+- **Accesibilidad:** la línea visible va `aria-hidden` y al lado hay un `sr-only` con la
+  forma larga en español. **Sin `aria-live`**: la hora cambia sola cada minuto y anunciarla
+  sería interrumpir.
+
+**Open-Meteo, sin API key, y es requisito duro** — esta SPA es estática y toda `VITE_*` viaja
+en el bundle. `access-control-allow-origin: *`, verificado. Refresco de **15 min**, que es el
+`interval: 900` del propio dato. `clima.ts` tiene el mismo contrato que `atak.ts`: nunca
+lanza, nunca escribe en consola, todo fallo colapsa en `null`.
+
+> **Las coordenadas son constantes NUESTRAS, no de la API.** La respuesta trae un
+> `latitude`/`longitude` que son los del centro de su celda de grilla: se pidió
+> `20.5888 / -100.3899` y contestó `20.56239 / -100.43347`, ~5 km al oeste. Leerlas de ahí
+> «para no repetirlas» publicaría coordenadas equivocadas.
+
+La hora **no** sale del clima aunque su respuesta traiga `utc_offset_seconds`: eso ataría la
+hora a la red. Sale de `Intl` con `America/Mexico_City`. Detalle: `timezone_abbreviation` de
+Open-Meteo devuelve `"GMT-6"`, y **`CST` solo lo da el locale `en-US`** — es la única
+concesión al inglés de la tira, y es deliberada. México abolió el horario de verano en 2022,
+así que el offset es constante (verificado en enero y julio).
+
+**JetBrains Mono se carga desde el 2026-09-15.** `--font-mono` la declaraba desde el commit
+inicial pero `index.html` solo pedía Inter y Orbitron, así que `font-mono` caía en la mono
+del sistema y medía distinto en cada aparato. Va en las **dos** líneas de `index.html`
+(`preload` y `stylesheet`): si difieren, se precarga un recurso que no se usa.
 
 ## Morado heredado — ya migrado
 
