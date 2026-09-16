@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { Twitch, Calendar, ChevronRight, UserPlus, IdCard } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Reveal from '../components/Reveal'
+import Clasificacion from '../components/Clasificacion'
+import { useTorneoAtak } from '../hooks/useTorneoAtak'
 import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
 
 /* Canon del CTA primario (AGENTS.md, "Canon del CTA primario"). Al ser un <a>/<Link> y no un
@@ -276,6 +278,10 @@ export default function Home() {
      esqueleto, así que el player no parpadea una vez por minuto. */
   const [streamStatus, setStreamStatus] = useState<'online' | 'offline' | 'cargando'>('cargando')
   const twitchChannel = "lqroc"
+
+  /* Clasificación en vivo del split, de la API pública de ATAK. Nunca lanza ni escribe en
+     consola; si falla, `torneo` se queda en null y la sección entera no se pinta. */
+  const { torneo, cargando: cargandoTorneo } = useTorneoAtak()
   
   const streamSchedule = [
     { day: 'Martes', time: '20:30 - 22:00', type: 'Grupos' },
@@ -618,22 +624,31 @@ export default function Home() {
           </section>
         </Reveal>
 
-        {/* ACÁ NO HAY BRACKETS, STANDINGS NI "EQUIPOS INSCRITOS". Eran tres secciones con
-            iframes de Battlefy y se fueron enteras —encabezado, caja y iframe—, no solo el
-            iframe: un <h2> sobre un contenedor vacío es peor que no tener la sección.
-            (Ubicación original, por si alguna se repone: Brackets y Standings iban justo acá;
-            «Equipos Inscritos» NO, iba después de Patrocinadores.)
-            Dos razones para que no vuelvan como estaban:
-            1. La liga se muda a ATAK.GG. Battlefy deja de ser la fuente.
-            2. Apuntaban a torneos YA TERMINADOS y los presentaban como si fueran lo actual;
-               mientras no haya torneo en curso no hay nada que mostrar ahí.
-            «Equipos Inscritos» además arrastraba un párrafo que prometía "Conoce a los
-            equipos… Actualizado en tiempo real": borrar solo el iframe dejaba ese texto
-            mintiendo en pantalla.
-            Vuelven cuando haya torneo en curso Y ATAK exponga brackets, clasificaciones y
-            equipos: hoy su única API pública documentada es la validación de Riot ID (ver
-            docs/INTEGRACION-ATAK.md), así que todavía no hay de dónde sacar los datos.
-            Con datos primero, no con el encabezado puesto de antemano. */}
+        {/* STANDINGS VOLVIÓ, acá abajo y en su ubicación original. BRACKETS Y "EQUIPOS
+            INSCRITOS" NO. Las tres eran secciones con iframes de Battlefy y se fueron enteras
+            —encabezado, caja e iframe—, no solo el iframe: un <h2> sobre un contenedor vacío
+            es peor que no tener la sección. (Ubicación original: Brackets y Standings iban
+            justo acá; «Equipos Inscritos» NO, iba después de Patrocinadores.)
+            La condición que este comentario puso para que volvieran era «torneo en curso Y
+            ATAK exponiendo los datos», y para la clasificación se cumplió el 2026-09-15: el
+            Split Otoño 2026 está en juego y la API pública sirve `standings` con las 19 filas
+            (ver src/lib/atak.ts y docs/INTEGRACION-ATAK.md). Con datos primero, como decía la
+            regla — y con datos propios, no con un iframe ajeno.
+            Las otras dos siguen sin volver, y por la misma razón de siempre:
+            1. Brackets — la API pública expone la clasificación y la lista de equipos, no el
+               cuadro. No hay de dónde sacarlo.
+            2. «Equipos Inscritos» — `teams` sí existe en la respuesta, pero esa sección
+               arrastraba un párrafo que prometía "Conoce a los equipos… Actualizado en tiempo
+               real" y una plantilla pensada para logos y rosters que la API no da. Reponerla
+               es una sección nueva, no destapar un iframe.
+            Lo que sí cambió para siempre: Battlefy dejó de ser la fuente, es ATAK. */}
+        {/* El <section>, el <h2> y el tinte viven DENTRO de <Clasificacion>: si la API falla,
+            la portada queda exactamente como si esta sección no existiera. El <Reveal> es por
+            consistencia con sus tres vecinas; envolviendo un null renderiza un <div> sin
+            clases ni contenido, que no ocupa nada. */}
+        <Reveal>
+          <Clasificacion variante="compacta" torneo={torneo} cargando={cargandoTorneo} />
+        </Reveal>
 
         {/* Segundo camino al registro. Existe por el móvil: arriba está el hero, pero entre
             medio quedó la sección de Transmisión, que es la más alta de la página (video 16:9
@@ -657,9 +672,13 @@ export default function Home() {
             Con la convocatoria cerrada la sección ENTERA se oculta, QR incluido: sin
             registro posible no hay «segundo camino al registro» que ofrecer, y dejar la
             tarjeta con el botón fuera sería un encabezado preguntando «¿Vas a competir?»
-            sin ninguna forma de responder que sí. El ritmo de fondos que describe el
-            párrafo de arriba se reacomoda solo —Transmisión (sin fondo) → Patrocinadores
-            (sin fondo)—: quedan dos seguidas sin tintar, no tres. */}
+            sin ninguna forma de responder que sí.
+            El ritmo de fondos lo retomó la CLASIFICACIÓN, que se sumó arriba el 2026-09-15
+            y es hoy la única sección tintada de la portada: Hero (sin fondo) → Transmisión
+            (sin fondo) → Clasificación (tintada) → Carta (sin fondo) → Patrocinadores (sin
+            fondo). Sin ella —y sin este CTA— eran cuatro seguidas sin tintar. Ojo con eso al
+            tocar fondos: la clasificación DESAPARECE si la API falla, así que el tinte no
+            está garantizado y ninguna otra sección puede depender de él para despegarse. */}
         {INSCRIPCIONES_ABIERTAS && (
         <section className="py-20 bg-black/20">
           <div className="container mx-auto px-6 max-w-4xl text-center">

@@ -8,25 +8,39 @@
    triggers (ver docs/INTEGRACION-ATAK.md). No mandes secretos por acá: todo lo
    que salga de este módulo viaja en el bundle.
 
-   CORS, verificado el 2026-07-27 y todavía incompleto: el backend responde
-   `Access-Control-Allow-Origin: *` en el 404 de esta ruta —que hoy no está
-   desplegada—, pero NO manda ningún header CORS en `/api/health`, la única ruta
-   suya que devuelve 200. O sea que la cobertura es inconsistente por ruta y
-   queda sin comprobar si la respuesta 200 real va a traer el header. Si no lo
-   trae, el navegador bloquea la respuesta, esto devuelve 'indeterminado' —el
-   registro sigue funcionando— pero la validación queda inerte y cada intento
-   imprime un error de CORS en consola que este código no puede atrapar.
-   Antes de dar la función por viva: comprobar el header en el 200, no en el 404.
+   CORS RESUELTO el 2026-09-15, y con él la incógnita que este comentario dejó
+   abierta desde el 2026-07-27. Entonces la ruta de validación todavía no estaba
+   desplegada (daba 404) y el único 200 del backend —`/api/health`— no mandaba
+   ningún header CORS, así que quedaba sin saber si el 200 real iba a traerlo.
+   Hoy los dos endpoints que el sitio consume responden 200 CON el header,
+   comprobado con curl desde `Origin: https://lqc.revolution505.com`:
+     · /validate-riot-id    → 200, `Access-Control-Allow-Origin: *`
+     · /tournaments/<slug>  → 200, `Access-Control-Allow-Origin: *`
+   Los dos son GET simples y el único header que mandamos es `Accept`, que está
+   en la lista segura de CORS: no hay preflight aparte que pueda fallar.
+   (La respuesta trae además `Cross-Origin-Resource-Policy: same-origin`, que
+   asusta al leerla y no aplica: CORP solo se comprueba en peticiones de modo
+   'no-cors', y un `fetch` normal va en modo 'cors'.)
+   Lo que NO cambia es la degradación: si el header desapareciera, el navegador
+   bloquea la respuesta y cada función de acá cae en su valor de fallo, dejando
+   en consola un error que este código no puede atrapar.
 
    CONTRATO: ninguna función de este módulo lanza ni escribe en consola. Todo
    fallo —red, CORS, timeout, HTTP no-2xx, JSON con otra forma, Riot caído— se
-   colapsa en 'indeterminado', que quien llama DEBE tratar como "seguí adelante".
+   colapsa en un valor de fallo que quien llama DEBE tratar como "seguí
+   adelante": 'indeterminado' en la validación, `null` en el torneo.
    La razón es de negocio, no técnica: perder una inscripción de $500 porque una
    API de terceros estaba caída es mucho peor que aceptar un Riot ID inválido,
    que además se corrige a mano desde el panel. */
 
-const URL_VALIDAR_RIOT_ID =
-  'https://atakback.revolution505.com/api/public/v1/validate-riot-id'
+/* La base va aparte porque ya son DOS rutas. Escribir el host completo en cada
+   una es el mismo defecto que hicieron nacer a reglamento.ts y a
+   inscripciones.ts: dos copias de una constante se desincronizan en silencio en
+   el primer cambio de dominio. */
+const BASE_ATAK = 'https://atakback.revolution505.com/api/public/v1'
+
+const URL_VALIDAR_RIOT_ID = `${BASE_ATAK}/validate-riot-id`
+const URL_TORNEOS = `${BASE_ATAK}/tournaments`
 
 /* 5 s, deliberadamente más corto que los 15 s del insert de Supabase. Esto corre
    mientras alguien llena el formulario y ya movió el cursor al campo siguiente:
@@ -85,5 +99,188 @@ export async function validarRiotId(riotId: string): Promise<ResultadoRiotId> {
     /* Red caída, DNS, CORS, aborto por timeout o cuerpo que no es JSON. Sin
        console.*: el invariante de cero salida por consola vale para todo src/. */
     return 'indeterminado'
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Torneo: clasificación pública                                      */
+/* ------------------------------------------------------------------ */
+
+/* 8 s, no los 5 del Riot ID. Aquel corre mientras alguien llena el formulario y ya
+   movió el cursor al campo siguiente: un indicador colgado ahí estorba. Este pinta
+   una sección entera, nadie lo está esperando con el teclado y el próximo intento
+   está a 30 s. Es el mismo número que el `CORTE_MS` del estado del stream en
+   Home.tsx, que es el otro sondeo periódico del sitio. */
+const TIEMPO_LIMITE_TORNEO_MS = 8_000
+
+/* Una fila de la clasificación, ya validada.
+
+   `position` es el puesto que ATAK asigna y NO es el número que el sitio pinta:
+   hoy numera 1…19 de corrido, o sea que publica un orden entre equipos que están
+   empatados. Se conserva porque es el campo que ORDENA la lista (ver más abajo);
+   el número visible lo deriva quien renderiza, agrupando por récord. */
+export type FilaClasificacion = {
+  position: number
+  team: string
+  wins: number
+  losses: number
+  points: number
+}
+
+/* SOLO los campos que el sitio pinta. El tipo no es un espejo de la respuesta: lo
+   que no se renderiza no entra, porque un campo que nadie lee es código muerto que
+   el próximo lector confunde con un pendiente.
+
+   La respuesta trae bastante más de lo que está acá (`id`, `name`, `region`, `prize`,
+   `description`, `logoUrl`, `bannerUrl`, `fearless`, `registrationUrl`, `teams`…). Estos
+   cuatro se listan porque son los que alguien podría querer pintar, y cada uno tiene su
+   motivo para no estar:
+     · `startDate` dice 2026-09-01 y el reglamento oficial dice 25 de agosto. Hay un
+       dato mal y no se arregla desde acá. NO lo pintes sin resolver eso primero.
+     · `rulesUrl` es una ruta RELATIVA ('/docs/reglamento-lqc.pdf') que un <a>
+       resolvería contra NUESTRO dominio y daría un 404. El PDF del reglamento ya
+       tiene una sola fuente y es src/lib/reglamento.ts.
+     · `phase` y `format` no los muestra ninguna pantalla hoy. Se agregan el día que
+       haya dónde ponerlos, no antes. */
+export type TorneoAtak = {
+  standings: FilaClasificacion[]
+  teamsRegistered: number | null
+  teamsMax: number | null
+}
+
+function numeroFinito(valor: unknown): number | null {
+  return typeof valor === 'number' && Number.isFinite(valor) ? valor : null
+}
+
+function textoONulo(valor: unknown): string | null {
+  return typeof valor === 'string' && valor ? valor : null
+}
+
+/* Mismo criterio que `normalizarItems` en Galeria.tsx: se itera, se valida campo por
+   campo y la fila que no tiene la forma exacta SE DESCARTA en vez de reventar la
+   tabla entera. Una fila sin nombre de equipo, o con un marcador que no es número,
+   no se puede pintar; perder esa fila es mucho mejor que perder la clasificación.
+
+   Devuelve `null` solo si `standings` ni siquiera es un arreglo, que es un cambio de
+   forma de la API y no una fila rota. Un arreglo VACÍO es válido: es un torneo que
+   todavía no jugó una jornada, y quien llama decide qué hacer con eso. */
+function leerClasificacion(cuerpo: unknown): FilaClasificacion[] | null {
+  if (!Array.isArray(cuerpo)) return null
+
+  const filas: FilaClasificacion[] = []
+  for (const cruda of cuerpo) {
+    if (typeof cruda !== 'object' || cruda === null) continue
+
+    const { position, team, wins, losses, points } = cruda as {
+      position?: unknown
+      team?: unknown
+      wins?: unknown
+      losses?: unknown
+      points?: unknown
+    }
+
+    const equipo = textoONulo(team)
+    const puesto = numeroFinito(position)
+    const ganados = numeroFinito(wins)
+    const perdidos = numeroFinito(losses)
+    const puntos = numeroFinito(points)
+
+    if (
+      equipo === null ||
+      puesto === null ||
+      ganados === null ||
+      perdidos === null ||
+      puntos === null
+    ) {
+      continue
+    }
+
+    filas.push({
+      position: puesto,
+      team: equipo,
+      wins: ganados,
+      losses: perdidos,
+      points: puntos
+    })
+  }
+
+  /* Por `position` y no por el orden del arreglo: es el campo que ATAK declara como
+     el orden, así que una respuesta que llegue desordenada se pinta igual de bien.
+     `sort` es estable desde ES2019, o sea que dos filas con el mismo `position`
+     conservan el orden en que vinieron. */
+  filas.sort((a, b) => a.position - b.position)
+  return filas
+}
+
+/* Gemela de `leerVeredicto`: el cuerpo entra como `unknown` y solo una forma exacta
+   produce un torneo. Devolver `null` acá es lo que hace DESAPARECER la sección del
+   sitio, así que el criterio es estricto a propósito. */
+function leerTorneo(cuerpo: unknown): TorneoAtak | null {
+  if (typeof cuerpo !== 'object' || cuerpo === null) return null
+
+  const { ok, data } = cuerpo as { ok?: unknown; data?: unknown }
+  if (ok !== true || typeof data !== 'object' || data === null) return null
+
+  const { standings, teamsRegistered, teamsMax } = data as {
+    standings?: unknown
+    teamsRegistered?: unknown
+    teamsMax?: unknown
+  }
+
+  const clasificacion = leerClasificacion(standings)
+  if (clasificacion === null) return null
+
+  return {
+    standings: clasificacion,
+    teamsRegistered: numeroFinito(teamsRegistered),
+    teamsMax: numeroFinito(teamsMax)
+  }
+}
+
+/* Trae un torneo por su slug (hoy 'lqc-2026'). Mismo CONTRATO que `validarRiotId`:
+   no lanza y no escribe en consola. `null` colapsa TODO fallo —red, DNS, CORS,
+   timeout, 4xx/5xx, `ok:false`, JSON con otra forma— igual que 'indeterminado' allá
+   y que el `null` de `obtenerSupabase()`.
+
+   Quien llama trata el `null` como "no hay nada que mostrar" y NO pinta un error:
+   esto alimenta una sección de un sitio público en día de partida, y un cartel rojo
+   sobre la clasificación es peor que no tener la sección.
+
+   El corte vive ACÁ y no en quien llama, para que la promesa siempre resuelva sola
+   —es el mismo contrato que ya tiene la validación del Riot ID—. `señal` es el
+   aborto EXTERNO (desmontar el componente, o un sondeo que pisa al anterior) y se
+   compone a mano con el del corte: `AbortSignal.any` haría esto en una línea, pero
+   es reciente de más para un sitio público y no vale estrenarlo por dos líneas. */
+export async function obtenerTorneo(
+  slug: string,
+  señal?: AbortSignal
+): Promise<TorneoAtak | null> {
+  const propio = new AbortController()
+  const corte = setTimeout(() => propio.abort(), TIEMPO_LIMITE_TORNEO_MS)
+  const alAbortarExterno = () => propio.abort()
+
+  /* El listener va ANTES del chequeo de `aborted`: sobre una señal ya abortada el
+     evento nunca vuelve a dispararse, así que sin esa segunda línea el fetch saldría
+     igual y recién se cortaría por timeout. */
+  señal?.addEventListener('abort', alAbortarExterno, { once: true })
+  if (señal?.aborted) propio.abort()
+
+  try {
+    const respuesta = await fetch(`${URL_TORNEOS}/${encodeURIComponent(slug)}`, {
+      headers: { Accept: 'application/json' },
+      signal: propio.signal
+    })
+
+    /* `fetch` NO rechaza por 4xx/5xx: sin este guard, un 500 con cuerpo HTML seguiría
+       a .json() y el error saldría por el catch como si fuera un fallo de red. */
+    if (!respuesta.ok) return null
+    return leerTorneo(await respuesta.json())
+  } catch {
+    /* Red caída, DNS, CORS, aborto (propio o externo) o cuerpo que no es JSON. Sin
+       console.*: el invariante de cero salida por consola vale para todo src/. */
+    return null
+  } finally {
+    clearTimeout(corte)
+    señal?.removeEventListener('abort', alAbortarExterno)
   }
 }

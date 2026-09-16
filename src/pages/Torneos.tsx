@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { Trophy, Calendar, Star, Users, UserPlus, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { INSCRIPCIONES_ABIERTAS } from '../lib/inscripciones'
+import Clasificacion from '../components/Clasificacion'
+import { useTorneoAtak, SLUG_TORNEO } from '../hooks/useTorneoAtak'
 
 /* Los dos CTA del bloque destacado, con el canon de AGENTS.md. Son copia de las constantes
    homónimas de Home.tsx —no están exportadas allá y el cambio no podía tocar ese archivo—,
@@ -71,6 +73,12 @@ const BTN_TEMPORADA_ACTIVA =
 
 export default function Torneos() {
   const [activeSeason, setActiveSeason] = useState("Otoño 2025")
+
+  /* El torneo en curso, de la API pública de ATAK. Se pide UNA vez acá y no dentro de
+     <Clasificacion> porque esta página tiene dos consumidores del mismo dato: la tabla
+     y el conteo de equipos del bloque destacado. Nunca lanza y nunca escribe en
+     consola; si falla, `torneo` se queda en null y cada consumidor degrada solo. */
+  const { torneo, cargando } = useTorneoAtak()
 
   const tournaments = [
     {
@@ -234,8 +242,17 @@ export default function Torneos() {
               {/* Los dos datos duros, con el mismo separador «•» que ya usan las filas de
                   metadatos de esta página. El punto va con `aria-hidden`: es decoración, y sin
                   eso un lector de pantalla lo lee como «bala» entre dos frases.
-                  «Hasta 32 equipos» dice el TECHO y no un conteo: no hay nada en el repo que
-                  sepa cuántos equipos van inscritos, y un número en vivo pediría una fuente. */}
+                  El conteo de equipos YA NO es el techo escrito a mano. El comentario que
+                  ocupaba este lugar decía que «Hasta 32 equipos» era el TECHO y no un conteo
+                  «porque no hay nada en el repo que sepa cuántos equipos van inscritos, y un
+                  número en vivo pediría una fuente». La fuente apareció: `teamsRegistered` y
+                  `teamsMax` de la API pública de ATAK.
+                  El techo sigue escrito como RESPALDO, y es lo único de esta página que
+                  duplica un dato de la API: si la petición falla, un bloque destacado sin el
+                  renglón de equipos se vería roto, y «Hasta 32» era exactamente lo que decía
+                  antes. Es un respaldo, no la fuente — si ATAK cambia el cupo, manda ATAK.
+                  La fecha NO sale de la API a propósito: `startDate` responde 2026-09-01 y el
+                  reglamento oficial dice 25 de agosto. Hay un dato mal y no se resuelve acá. */}
               <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-gray-300">
                 <span className="inline-flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
@@ -244,7 +261,9 @@ export default function Torneos() {
                 <span className="text-gray-600" aria-hidden="true">•</span>
                 <span className="inline-flex items-center gap-2">
                   <Users className="w-4 h-4 text-blue-400 shrink-0" aria-hidden="true" />
-                  Hasta 32 equipos
+                  {torneo?.teamsRegistered != null && torneo.teamsMax != null
+                    ? `${torneo.teamsRegistered} de ${torneo.teamsMax} equipos`
+                    : 'Hasta 32 equipos'}
                 </span>
               </div>
 
@@ -268,7 +287,7 @@ export default function Torneos() {
                     por voz (WCAG 2.5.3, «Label in Name») y recién después avisa lo que el texto
                     no dice. Misma fórmula que los enlaces externos del footer y del header. */}
                 <a
-                  href="https://atakgg.revolution505.com/tournaments/lqc-2026"
+                  href={`https://atakgg.revolution505.com/tournaments/${SLUG_TORNEO}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Ver en ATAK (abre en pestaña nueva)"
@@ -282,6 +301,15 @@ export default function Torneos() {
             </div>
           </div>
         </section>
+
+        {/* CLASIFICACIÓN EN VIVO. Va acá por la misma razón que el bloque de arriba: es
+            presente, y todo lo que sigue —el selector, el podio, el historial— es archivo.
+            Pegada al split y antes de que empiece el pasado.
+            Fuera de la tarjeta destacada y no adentro: esa tarjeta es un bloque de CTA
+            centrado y 19 filas tabulares la convierten en un contenedor.
+            El <section> y el <h2> viven DENTRO del componente: si la API falla no queda un
+            encabezado colgado sobre un hueco, no se pinta nada. Ver Clasificacion.tsx. */}
+        <Clasificacion variante="completa" torneo={torneo} cargando={cargando} />
 
         {/* Selector de Temporada */}
         <section className="py-16 bg-black/20">
@@ -393,8 +421,13 @@ export default function Torneos() {
             temporada, `currentTournament`, las tarjetas de stats, el podio y este historial
             salen del array `tournaments`, que es local (el CTA de más abajo está hardcodeado
             en el JSX, ni siquiera pasa por ahí).
-            Cuando ATAK exponga brackets y clasificaciones, la barra vuelve con contenido
-            detrás — no antes. */}
+            AL DÍA 2026-09-15: de las tres, «Clasificaciones» ya volvió — con datos reales de
+            la API pública de ATAK y no con un iframe, en su propia sección pegada al split
+            (ver más arriba), que es mejor lugar que una pestaña. La barra NO vuelve por eso:
+            una barra de tres pestañas con una sola viva es peor que una sección sola.
+            «Brackets» sigue sin fuente: la API pública expone la clasificación y los equipos,
+            no el cuadro. «Estadísticas» nunca tuvo contenido. Cuando ATAK exponga el bracket,
+            se decide ahí si vuelve la barra o si va otra sección al lado de esta. */}
 
         {/* Historial resumido */}
         <section className="py-20 bg-black/20">

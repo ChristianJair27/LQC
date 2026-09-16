@@ -31,9 +31,10 @@ repo.** Está implementada **dentro de Supabase**, en PL/pgSQL: en parte como un
 código del sitio.
 
 Cuidado con generalizar eso: el sitio habla con ATAK por **dos vías distintas**.
-Lo de Supabase (esta sección y las que siguen) no está en el repo. La **validación
-del Riot ID** contra la API pública sí está, en `src/lib/atak.ts`, y se documenta
-[más abajo](#api-pública-validación-de-riot-id-esto-sí-vive-en-el-repo).
+Lo de Supabase (esta sección y las que siguen) no está en el repo. Lo que consume la
+**API pública** sí está, en `src/lib/atak.ts` —la validación del Riot ID de
+`/registro` y la clasificación del split que pintan `/` y `/torneos`—, y se documenta
+[más abajo](#api-pública-esto-sí-vive-en-el-repo).
 
 Eso ya causó un error de diagnóstico: un agente grepeó el repo entero buscando
 `atak`, `webhook`, `functions.invoke` y una carpeta `supabase/`, no encontró nada
@@ -357,12 +358,21 @@ el de ATAK.
 
 ---
 
-## API pública: validación de Riot ID (esto SÍ vive en el repo)
+## API pública (esto SÍ vive en el repo)
 
-Aparte de los triggers, ATAK expone un endpoint **público** que el sitio llama
+Aparte de los triggers, ATAK expone endpoints **públicos** que el sitio llama
 directo desde el navegador. Es la única parte de la integración que sí está en el
-código: **[`src/lib/atak.ts`](../src/lib/atak.ts)**, y la usa el campo Riot ID de
-`/registro` al perder el foco.
+código: **[`src/lib/atak.ts`](../src/lib/atak.ts)**.
+
+Hoy son **dos**, y los dos cuelgan de la misma base —que por eso es una constante,
+`BASE_ATAK`—: `https://atakback.revolution505.com/api/public/v1`.
+
+| Endpoint | Quién lo usa | Función |
+| --- | --- | --- |
+| `GET /validate-riot-id?riotId=…` | el campo Riot ID de `/registro`, al perder el foco | `validarRiotId()` |
+| `GET /tournaments/<slug>` | la clasificación de `/` y `/torneos` | `obtenerTorneo()` |
+
+### Validación de Riot ID
 
 ```
 GET https://atakback.revolution505.com/api/public/v1/validate-riot-id?riotId=<encodeURIComponent>
@@ -385,24 +395,66 @@ comprobar" y el registro sigue. Perder una inscripción de $500 porque una API d
 terceros estaba caída es peor que aceptar un Riot ID inválido, que además se
 corrige a mano desde el panel.
 
-**Estado al 2026-07-27, verificado con `curl`:**
+**Estado al 2026-09-15, verificado con `curl`. Las dos incógnitas que este
+documento dejó abiertas el 2026-07-27 están CERRADAS:**
 
-- La ruta **todavía no está desplegada**: devuelve **404**. El backend sí está
-  vivo (`/api/health` responde 200). O sea que hoy la validación está inerte —el
-  formulario funciona igual, que es justamente el punto del diseño— y se activa
-  sola cuando la ruta exista.
-- **CORS incompleto.** El 404 de esa ruta manda `Access-Control-Allow-Origin: *`,
-  pero `/api/health` —la única ruta que hoy responde 200— **no manda ningún
-  header CORS**. La cobertura es inconsistente por ruta, así que **queda sin
-  comprobar si la respuesta 200 real va a traer el header**. Si no lo trae, el
-  navegador bloquea la respuesta y la validación queda muda para siempre, además
-  de imprimir un error de CORS en consola que el código no puede atrapar.
-  **Antes de dar la función por viva, comprobar el header en el 200, no en el 404:**
+- **La ruta ya está desplegada.** Responde **200**, no el 404 de entonces. La
+  validación de Riot ID dejó de estar inerte.
+- **CORS confirmado en el 200**, que era exactamente lo que faltaba comprobar. El
+  2026-07-27 el `Access-Control-Allow-Origin: *` solo se había visto en el **404**
+  de esta ruta, y `/api/health` —el único 200 de entonces— no mandaba ningún header
+  CORS, así que la cobertura parecía inconsistente por ruta. Hoy **los dos endpoints
+  públicos responden 200 CON el header**:
 
 ```bash
 curl -s -D - -o /dev/null -H "Origin: https://lqc.revolution505.com" \
   "https://atakback.revolution505.com/api/public/v1/validate-riot-id?riotId=Jugador%23MX1"
+curl -s -D - -o /dev/null -H "Origin: https://lqc.revolution505.com" \
+  "https://atakback.revolution505.com/api/public/v1/tournaments/lqc-2026"
+# HTTP/1.1 200 OK
+# Access-Control-Allow-Origin: *
 ```
+
+Los dos son **GET simples** y el único header que manda el sitio es `Accept`, que está
+en la lista segura de CORS: **no hay preflight** que pueda fallar aparte.
+
+> Ojo con un header que asusta al leerlo y no aplica: la respuesta trae
+> `Cross-Origin-Resource-Policy: same-origin`. CORP solo se comprueba en peticiones de
+> modo `no-cors`, y un `fetch` normal va en modo `cors`.
+
+La degradación no cambia: si el header desapareciera, el navegador bloquea la
+respuesta, cada función cae en su valor de fallo —`'indeterminado'` en la validación,
+`null` en el torneo— y queda en consola un error que el código no puede atrapar.
+
+---
+
+## Torneo y clasificación (API pública, desde el 2026-09-15)
+
+```
+GET https://atakback.revolution505.com/api/public/v1/tournaments/lqc-2026
+```
+
+Pública, sin credenciales. **Caché de 15 s del lado del servidor según ATAK** — no es
+observable desde afuera (la respuesta trae `ETag`, pero ni `Cache-Control` ni `Age`).
+Responde
+`{ ok:true, data:{ standings:[{position, team, wins, losses, points}], teamsRegistered,
+teamsMax, … } }`. La pintan `/` y `/torneos`; el sitio la sondea cada **30 s**.
+
+**Contrato del cliente, el mismo en espíritu que el de la validación: `obtenerTorneo()`
+nunca lanza y nunca escribe en consola.** Todo fallo —red, CORS, timeout, 4xx/5xx,
+`ok:false`, un JSON con otra forma— colapsa en `null`, y quien llama lo trata como «no
+hay nada que mostrar»: **la sección desaparece en silencio**, sin cartel de error. Es un
+sitio público en día de partida, y ahí un cartel rojo sobre la clasificación es peor que
+no tener la sección.
+
+Tres cosas de la respuesta que el sitio **NO** pinta, a propósito:
+
+- **`startDate`** dice `2026-09-01` y el reglamento oficial dice **25 de agosto**.
+- **`rulesUrl`** es una ruta **relativa** que resolvería contra *nuestro* dominio.
+- **el orden 1…19 de `position`**, que declara un ranking entre equipos empatados.
+
+El detalle completo —incluido cómo se agrupan los empates para no publicar un ranking
+que no existe— está en [AGENTS.md](../AGENTS.md), «Clasificación en vivo».
 
 ---
 

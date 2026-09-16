@@ -5,10 +5,17 @@ de **Revolution505** en Querétaro. Es un sitio **estático de presentación**: 
 galería, información de la liga y contacto. **No hay backend propio** y casi todo el
 contenido **público** vive en los componentes.
 
-**La excepción es la galería.** Desde el **2026-08-08**, `/galeria` lee la tabla
-`public.galeria_media` y arma las URLs contra el bucket `galeria` de Storage — ver
-[Galería dinámica](#galería-dinámica-galeria--panel). Las demás páginas públicas siguen
-sin leer ninguna base.
+**Hay dos excepciones, y leen de fuentes distintas.**
+
+1. **La galería.** Desde el **2026-08-08**, `/galeria` lee la tabla
+   `public.galeria_media` y arma las URLs contra el bucket `galeria` de Storage — ver
+   [Galería dinámica](#galería-dinámica-galeria--panel).
+2. **La clasificación del split.** Desde el **2026-09-15**, `/` y `/torneos` pintan la
+   tabla de posiciones real del torneo en curso leyendo la **API pública de ATAK.GG**
+   —no una base nuestra— con `obtenerTorneo()` de `src/lib/atak.ts` — ver
+   [Clasificación en vivo](#clasificación-en-vivo-desde-el-2026-09-15).
+
+Ninguna otra página pública lee nada.
 
 > **LEER ANTES DE TOCAR `/registro`: las inscripciones están CERRADAS desde el
 > 2026-08-25.** El formulario existe y está entero, pero no se renderiza: lo apaga la
@@ -454,6 +461,97 @@ repo:
   = **524288000** (500 MB), **hardcodeadas en el `docker-compose.yml`** del servicio. Para
   `galeria` el techo que de verdad manda es el del bucket (10 MB), muy por debajo.
 
+## Clasificación en vivo (desde el 2026-09-15)
+
+**Hecho el 2026-09-15.** `/` y `/torneos` pintan la tabla de posiciones **real** del split
+en curso, leída de la **API pública de ATAK.GG**. Es la primera vez que una página pública
+muestra datos de un servicio externo (la galería lee Supabase; esto no).
+
+```
+GET https://atakback.revolution505.com/api/public/v1/tournaments/<slug>
+```
+
+Pública, sin credenciales. Slug del split actual: `lqc-2026` (`SLUG_TORNEO`, exportada
+desde el hook porque el botón «Ver en ATAK» de `/torneos` usa el mismo). Según el backend
+de ATAK hay **caché de 15 s del lado del servidor** — no es observable desde afuera: la
+respuesta trae `ETag` pero ni `Cache-Control` ni `Age`. Responde `{ ok:true, data:{ standings:[{position, team, wins, losses,
+points}], teamsRegistered, teamsMax, … } }`.
+
+### Las tres piezas
+
+| Archivo | Qué hace |
+| --- | --- |
+| `src/lib/atak.ts` | Transporte: `obtenerTorneo(slug, señal)`. Mismo CONTRATO que `validarRiotId` — **nunca lanza, nunca escribe en consola**, todo fallo colapsa en `null`. |
+| `src/hooks/useTorneoAtak.ts` | Sondeo cada **30 s** (con 15 s de caché del lado del servidor, más seguido no traería nada nuevo). Exporta también `SLUG_TORNEO`. |
+| `src/components/Clasificacion.tsx` | **Solo presentación.** Variantes `completa` (tabla de los 19) y `compacta` (bloque de portada). |
+
+**El hook lo llama la PÁGINA, no el componente.** En `/torneos` hay dos consumidores del
+mismo torneo —la tabla y el conteo de equipos del bloque destacado—, y con el fetch dentro
+del componente esa página pediría lo mismo dos veces cada 30 s. La página lo pide una vez y
+lo reparte por props. Vive en `hooks/` y no junto al componente porque
+`react-refresh/only-export-components` —que el eslint del repo trata como **error**—
+prohíbe exportar un hook desde un archivo que también exporta un componente.
+
+### La degradación es la regla, no un detalle
+
+**Si la API falla, la sección DESAPARECE EN SILENCIO.** Nada de tarjeta roja tipo
+`ErrorGaleria`, nada de «no se pudieron cargar los datos». Es un sitio público en día de
+partida y un cartel de error sobre la clasificación es peor que no tener la sección.
+
+- El `<section>` y el `<h2>` viven **dentro** del componente. Si vivieran en la página
+  quedaría un encabezado colgado sobre un hueco.
+- Lo único visible sin datos es el **esqueleto de la primera carga**.
+- **Un sondeo fallido NO borra lo que ya está en pantalla.** Es la diferencia con
+  `Galeria.tsx`, que carga una sola vez y puede permitirse un enum con estado `'error'`:
+  acá un 502 de tres segundos haría parpadear la clasificación a vacío y volver.
+- **También se oculta si no se jugó ninguna jornada**, y la condición es
+  `standings.some(f => f.wins + f.losses > 0)`, no `standings.length > 0`. Un split recién
+  sembrado puede devolver las 19 filas en `0-0 / 0 pts`: eso no es una clasificación, es la
+  lista de inscritos con ceros, y pintada dejaría a los 19 equipos compartiendo el 1º puesto
+  y a la portada diciendo «19 equipos en la punta — 0 pts». (Qué devuelve ATAK antes de la
+  primera jornada **no está verificado** — el torneo ya estaba empezado cuando se hizo esto;
+  la condición cubre las dos formas.)
+
+### Empates: NO se publica un ranking que no existe
+
+ATAK numera las filas **1…19 de corrido**, o sea que declara un orden entre equipos que
+están empatados. Pintar eso tal cual publica un ranking que la liga no hizo. Dos reglas,
+las dos en `marcarFilas()`:
+
+1. **Se reordena.** Dentro de un mismo puntaje, ATAK no agrupa por récord: al 2026-09-15,
+   RAKU (1-2) le quedaba en medio a ocho equipos de 1-1. Respetando ese orden, dos equipos
+   con el **mismo récord** terminaban con números distintos —uno 7º y otro 13º—. Se ordena
+   por **puntos desc, y a igual puntaje por derrotas asc**; `sort` es estable, así que
+   dentro de un récord se conserva el orden de ATAK (su desempate, que no conocemos).
+2. **El número se suprime en el empate, y el empate se mide por RÉCORD V-D, no por
+   puntos.** En suizo a 3 puntos por victoria `points` es 3 × `wins`: no sabe nada de las
+   derrotas, así que agrupar por puntos metería a un 2-1 en el mismo cajón que los 2-0.
+   Solo la primera fila de cada récord lleva número; las demás llevan «=». El **tinte de
+   fondo sí alterna por puntos**, que es la lectura gruesa.
+
+En la portada el bloque compacto muestra **el grupo puntero completo**, no «el top 5»:
+cortar en cinco partiría un empate al medio. Pasado un tope de **8** no nombra a nadie —
+dice cuántos son y enlaza a `/torneos`.
+
+**Ese bloque dice «N equipos en la punta», nunca «N equipos empatados».** El grupo puntero
+se arma por PUNTOS, y por puntos hoy entran cinco 2-0 y un 2-1; llamarlos empatados diría
+lo contrario de lo que `/torneos` declara a dos clics, donde ese 2-1 lleva su propio
+número. Las dos pantallas se contradecirían y la que más se ve es la portada.
+
+### Lo que NO se pinta, y por qué
+
+- **`startDate`** dice `2026-09-01` y el reglamento oficial dice **25 de agosto**. Hay un
+  dato mal y no se resuelve desde el sitio. La fecha del bloque destacado de `/torneos`
+  sigue escrita a mano a propósito.
+- **`rulesUrl`** es una ruta **relativa** (`/docs/reglamento-lqc.pdf`) que un `<a>`
+  resolvería contra **nuestro** dominio y daría 404. El PDF ya tiene una sola fuente:
+  `src/lib/reglamento.ts`.
+- **`phase`** y **`format`** no los muestra ninguna pantalla, así que no están en el tipo.
+
+`teamsRegistered` / `teamsMax` **sí** se usan: son el «19 de 32 equipos» del bloque
+destacado de `/torneos`, que hasta el 2026-09-15 era un «Hasta 32 equipos» escrito a mano.
+Ese texto sobrevive como **respaldo** si la petición falla — es respaldo, no fuente.
+
 ## Carta de jugador (`/carta`)
 
 **Hecho el 2026-08-14.** Generador de "carta de jugador": el usuario elige un campeón y la
@@ -501,12 +599,18 @@ src/
   components/
     ScrollToTop.tsx        vuelve al tope en cada cambio de ruta (con guard de hash)
     Reveal.tsx             animación de entrada al scroll (IntersectionObserver)
+    Clasificacion.tsx      tabla de posiciones del split (variante completa / compacta);
+                           solo presentación, y no se pinta si no hay datos
     layout/
       Header.tsx           navegación (arreglo navItems) + menú móvil
       Footer.tsx
+  hooks/
+    useTorneoAtak.ts       sondeo del torneo en ATAK cada 30 s; lo llama la PÁGINA, no
+                           el componente (Torneos tiene dos consumidores del mismo dato)
   lib/
     supabase.ts            cliente de Supabase (perezoso; devuelve null sin credenciales)
-    atak.ts                API pública de ATAK.GG: valida un Riot ID; nunca lanza ni bloquea
+    atak.ts                API pública de ATAK.GG: valida un Riot ID y trae el torneo
+                           con su clasificación; nunca lanza ni bloquea
     datadragon.ts          catálogo y arte de campeones (Riot Data Dragon) para la carta
     reglamento.ts          ruta, nombre de descarga y peso del PDF del reglamento
     inscripciones.ts       bandera INSCRIPCIONES_ABIERTAS: estado de la convocatoria
