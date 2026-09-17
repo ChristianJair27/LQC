@@ -139,7 +139,7 @@ export default function Panel() {
           <div className="flex items-center gap-3 md:gap-4 min-w-0">
             <div className="relative w-11 h-11 md:w-12 md:h-12 rounded-xl overflow-hidden bg-gradient-to-br from-blue-950 to-blue-900 border-2 border-blue-700/70 shadow-lqc flex items-center justify-center shrink-0">
               <img
-                src="/assets/LOGO COPA.png"
+                src="/assets/logo-copa.webp"
                 alt="LQC"
                 className="w-9 h-9 md:w-10 md:h-10 object-contain p-0.5"
               />

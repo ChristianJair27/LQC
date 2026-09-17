@@ -132,7 +132,7 @@ export default function Header() {
           >
             <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden bg-gradient-to-br from-blue-950 to-blue-900 border-2 border-blue-700/70 shadow-xl shadow-blue-900/50 flex items-center justify-center">
               <img 
-                src="/assets/LOGO COPA.png"
+                src="/assets/logo-copa.webp"
                 alt="LQC Trophy"
                 className="w-10 h-10 md:w-12 md:h-12 object-contain p-1"
               />

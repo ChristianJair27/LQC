@@ -144,7 +144,7 @@ export default function Login() {
             className="inline-block transition-transform duration-300 hover:scale-105"
           >
             <img
-              src="/assets/LOGO COPA.png"
+              src="/assets/logo-copa.webp"
               alt=""
               className="w-20 h-20 md:w-24 md:h-24 mx-auto mb-5 object-contain drop-shadow-lg"
             />

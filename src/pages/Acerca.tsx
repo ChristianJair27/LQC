@@ -44,7 +44,7 @@ export default function Acerca() {
           <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
         </div>
         <img
-          src="/assets/LOGO COPA.png"
+          src="/assets/logo-copa.webp"
           alt="LQC Trophy Logo"
           className="
             absolute 
