@@ -531,7 +531,7 @@ export default function Carta() {
                   />
                 </div>
 
-                <p className="mt-4 text-center text-sm text-gray-500">
+                <p className="mt-4 text-center text-sm text-gray-400">
                   {MEDIDAS[modo].ancho} × {MEDIDAS[modo].alto} px
                 </p>
               </div>
@@ -544,7 +544,7 @@ export default function Carta() {
             No compite con la feature, pero tampoco se esconde — es un requisito. */}
         <section className="border-t border-white/5 py-12">
           <div className="container mx-auto px-6 max-w-3xl">
-            <p className="text-center text-xs leading-relaxed text-gray-500">
+            <p className="text-center text-xs leading-relaxed text-gray-400">
               {AVISO_RIOT}
             </p>
           </div>

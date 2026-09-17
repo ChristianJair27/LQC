@@ -322,7 +322,7 @@ export default function Reglamento() {
               ))}
             </ol>
 
-            <p className="mt-8 flex items-start gap-2 text-sm text-gray-500">
+            <p className="mt-8 flex items-start gap-2 text-sm text-gray-400">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
               <span>
                 Esta lista es solo el índice de títulos, no el reglamento. El PDF es la
