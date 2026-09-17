@@ -702,6 +702,11 @@ puesto para un cambio de favicon. Si nadie lo usa, se borra sin más análisis.
 comprobá que no esté ya en otra carpeta: la copia sin usar se publica igual a `dist/` y se
 sirve por nginx sin que nadie la pida.
 
+**`public/galeria/` se llama igual que la ruta `/galeria`**, y eso rompía la ruta en carga
+directa hasta que se sacó `$uri/` del `nginx.conf`. Antes de tocar esa línea o de agregar
+algo en la raíz de `public/`, leé «nginx: una carpeta de `public/` con el nombre de una
+ruta» en Trampas conocidas.
+
 Las páginas se cargan con `lazy()` + `<Suspense>`. Cada página es un archivo
 autocontenido con su markup y sus clases de Tailwind inline.
 
@@ -1048,6 +1053,70 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   elimina `supabase-js` entero como código muerto, así que ese build tampoco
   sirve para probar la ruta real (el chunk de `/registro` pasa de ~238 kB a
   ~25 kB).
+
+### nginx: una carpeta de `public/` con el nombre de una ruta, y por qué `$uri/` no va
+
+**Arreglado el 2026-09-16.** `/galeria` daba **403 en carga directa** —abrirla desde un link,
+con F5 o escribiendo la URL— durante meses sin que nadie lo viera, porque navegando
+**dentro** del sitio React cambia de ruta sin pedirle nada al servidor. Solo fallaba esa
+ruta.
+
+**La causa eran dos cosas juntas:**
+
+1. `nginx.conf` tenía `try_files $uri $uri/ /index.html;`.
+2. Existe `public/galeria/` —las fotos viejas de antes del bucket— y Vite la copia a
+   `dist/galeria/`. O sea, en el servidor hay un **directorio real** con el mismo nombre que
+   la ruta de React.
+
+Con eso:
+
+- **`/galeria/`**: `$uri` ya es ese directorio → nginx busca `galeria/index.html`, no
+  existe, y sin `autoindex` responde **403**. Nunca llega al `/index.html` de la SPA.
+- **`/galeria`**: `$uri/` encuentra el directorio → nginx manda **301 a
+  `http://…/galeria/`** —`http` porque escucha en el 80 detrás del proxy de Coolify—, el
+  proxy lo sube a https y termina en el mismo 403.
+
+> **REGLA: en `nginx.conf` va `try_files $uri /index.html;` y NUNCA `$uri/`.** Una SPA no
+> tiene directorios con su propio `index.html`; lo único que hace `$uri/` es meterse en las
+> carpetas de assets y devolver 301/403 donde tendría que responder React. Es la forma que
+> traen casi todos los ejemplos de «nginx para SPA» copiados de internet, y por eso es fácil
+> de reintroducir. Si vuelve, `/galeria` se rompe al instante: la carpeta sigue ahí.
+
+- **Con la regla puesta, una CARPETA homónima ya no rompe nada**, pero un **ARCHIVO** sí:
+  `$uri` sirve primero lo que exista, así que un `public/carta` sin extensión taparía la ruta
+  `/carta`. Antes de agregar algo en la raíz de `public/`, comparalo contra las `<Route>` de
+  `App.tsx`.
+- **No se reproduce en local.** `npm run dev` y `vite preview` no usan nginx: los dos
+  responden `/galeria/` con la SPA y 200 (verificado). Para probar algo de nginx hay que
+  construir la imagen con el `Dockerfile` y pedir las rutas **con `curl`, en carga
+  directa y con y sin barra**. Clickear en el sitio no prueba nada.
+- **Producción usa ESTE `nginx.conf`**, con el build pack Dockerfile y no con la config que
+  Coolify genera para Nixpacks. Verificado desde afuera: `/50x.html` se sirve —la de Coolify
+  lo marca `internal`— y `/50x` cae al index —la de Coolify probaría `$uri.html`—.
+- **Finales de línea.** En git `nginx.conf` está en **LF**, y así lo clona Coolify. El CRLF
+  que se ve en Windows lo pone `core.autocrlf=true` al hacer checkout. Ojo: `sed -i` de Git
+  Bash convierte la copia de trabajo a LF sin avisar. Al commitear da igual, porque git
+  guarda LF, pero `cat -A` lo delata.
+
+#### Pendientes de nginx (detectados el 2026-09-16, sin tocar a propósito)
+
+Salieron en la misma batería de pruebas y quedan **fuera** de ese arreglo. Cada uno va en su
+propio commit, con su propio análisis:
+
+1. **Un archivo que no existe responde el `index.html` con 200.** `/assets/no-existe.js`
+   devuelve `200 text/html`: el mismo fallback que hace andar las rutas de React se lo
+   aplica también a los assets. Es el más importante de los tres. Lo esperable, **sin
+   verificar todavía**: un navegador con el `index.html` viejo en caché que pide un chunk
+   con hash de un deploy anterior recibe HTML en vez de un 404, y la importación dinámica
+   falla con un error de MIME en vez de uno de red. Antes de arreglarlo hay que ver qué hace
+   hoy `ErrorBoundary.tsx` con un chunk que falla (tiene un botón de recarga manual) y cómo
+   se cachea `index.html`.
+2. **`/favicon.ico` y `/robots.txt` devuelven la SPA** (200 `text/html`) por la misma vía:
+   no existen en `public/`. El favicon real es `/LOGO-COPA.ico`, declarado en `index.html`.
+   Pero hay navegadores y lectores de feeds que piden `/favicon.ico` igual, y un crawler que
+   pide `robots.txt` recibe HTML.
+3. **`site.webmanifest` sale como `application/octet-stream`** en vez de
+   `application/manifest+json`: los `mime.types` de nginx no conocen esa extensión.
 
 ### Animación y movimiento
 
