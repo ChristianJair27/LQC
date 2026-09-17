@@ -727,20 +727,43 @@ pseudo-elementos** de la clase `lqc-lienzo`, que lleva el `<main>` de `LayoutPub
 
 | | Qué | Posición | Por qué |
 | --- | --- | --- | --- |
-| `::before` | dos halos de marca + lavado vertical | `fixed` | atmósfera de ventana, cubre siempre |
-| `::after` | mosaico geométrico (SVG inline, 16 rectángulos, 3 tonos) | `absolute`, `100vh` | tratamiento de **cabecera**: con `fixed`, la tabla de 19 filas de `/torneos` le pasaría por debajo al scrollear |
+| **el fondo de `main`** | `background-color: #001433` (`lqc-900`) | — | **el color del sitio**, desde el 2026-09-16 |
+| `::before` | dos halos de marca | `fixed` | atmósfera de ventana, cubre siempre |
+| `::after` | mosaico geométrico (SVG inline, 19 rectángulos, 3 tonos) | `absolute`, `100vh` | tratamiento de **cabecera**: con `fixed`, la tabla de 19 filas de `/torneos` le pasaría por debajo al scrollear |
 
-**Cuelga de `main` y no de `body` porque `body` está tapado.** Cada página se pinta en su raíz
-un `bg-gradient-to-b from-black via-gray-950 to-black` **opaco** — 12 ocurrencias en 11
-archivos — que oculta el fondo de `body` y su `body::before`. Por eso los halos que
-`index.css` declara **desde el commit inicial** nunca se habían visto. Repintar esas 12
-raíces fue el camino descartado.
+**EL SITIO PÚBLICO ES AZUL, y el color vive en el fondo de `main`.** Hasta el 2026-09-16 cada
+página se pintaba en su raíz un `bg-gradient-to-b from-black via-gray-950 to-black` **opaco**
+que tapaba el fondo de `body` y su `body::before` — por eso los halos que `index.css` declara
+**desde el commit inicial** nunca se habían visto. Las **8 raíces públicas se vaciaron**;
+conservan el degradado negro las **4 que no son públicas** (`admin/Login` ×2, `admin/Panel`,
+`ErrorBoundary`), a propósito: el panel es modo herramienta.
+
+Por qué el color va ahí y no en los tres lugares obvios:
+
+- **No en `body`:** `--gradient-dark` corre a 135° sobre el **documento** entero, así que en
+  una página larga el azul queda en una esquina y el 98 % del alto es `#0a0a0f`. Y obligaría
+  a tocar el `bg-black` de `App.tsx`, cuyo `<div>` envuelve **también `/admin`**.
+- **No repintando las raíces:** la rampa sería **por página** sobre un `min-h-screen` que no
+  es el alto real, o sea que el mismo token daría colores distintos según el largo del
+  documento. Y deja 8 fuentes de verdad: la próxima página nace negra otra vez.
+- **No como capa opaca en el `::before`:** ese pseudo es `fixed` dentro del contexto `z-10`
+  de `main`, y **`<footer>` no está posicionado**. Con tintes del 3–7 % da igual, pero una
+  capa **opaca** taparía el pie entero al scrollear hasta abajo.
+
+El fondo del elemento que **establece** el contexto se pinta por debajo de todo lo de adentro
+y **nunca fuera de su caja**: el pie queda intocable sin tocarle el `z-index`.
+
+**Header y pie quedan NEGROS** (`bg-black`, los dos fuera de `main`) contra un `main` azul.
+Es deliberado: el encuadre de póster de la liga, y es lo que la `TiraHud` ya asumía.
 
 > **CONTRATO, y es lo único de esta sección que muerde: los dos pseudos van en `z-index: 0` y
 > cada página pública envuelve TODO su contenido en un `<div className="relative z-10">`.**
-> Una página nueva que no lo haga no queda tapada —los tintes son del 2 % al 6 %— pero recibe
-> el lienzo **encima** en vez de debajo. Ya pasó una vez: el 404 en línea de `App.tsx` era la
-> única ruta pública sin ese wrapper y hubo que ponérselo.
+> Una página nueva que no lo haga recibe el lienzo **encima** en vez de debajo. Hoy los tintes
+> son del 2 % al 6 % y no rompe nada a la vista, pero **el margen es más fino de lo que
+> parece**: el día que se probó una capa al 30 %, el texto del pie —que está exactamente en
+> ese caso— cayó bajo AA. El wrapper es lo que separa «tinte inofensivo» de «texto atenuado».
+> Ya pasó una vez: el 404 en línea de `App.tsx` era la única ruta pública sin ese wrapper y
+> hubo que ponérselo.
 
 Lo demás que conviene saber antes de tocarlo:
 
@@ -750,7 +773,21 @@ Lo demás que conviene saber antes de tocarlo:
   animara, tiene que ser ciclo cerrado tipo `hero-glow` — ver «Animación y movimiento».
 - **Los canales van literales** (`rgb(0 102 255 / 4%)`), no `var(--color-lqc-500)`, por lo
   mismo que `.pill-marca`. Están anotados en el comentario de la regla.
-- **Se apaga entero en `prefers-contrast: high`.** Ojo: **ese media query no matchea en
+- **⚠ NO agregues una capa oscura al `::before`.** Se intentó —un oscurecedor vertical a
+  30 % de negro, para recuperar contraste en la mitad inferior— y **rompía el pie**: el
+  pseudo es `fixed` y cubre la ventana entera, y sobre el `<footer>`, que no está
+  posicionado, el velo cae **encima** del texto en vez de debajo. Medido: `text-gray-400` del
+  pie a **4,27:1** y `text-blue-400` a **3,28:1**, ocho elementos bajo AA, a cambio de +0,2
+  de contraste en el cuerpo. Subir el pie a `z-20` tampoco sirve: el lightbox de `/galeria`
+  es `fixed z-50` pero vive **dentro** del `relative z-10` de la página, o sea atrapado en el
+  contexto de `main`, y el pie se le pintaría encima.
+- **Contrastes sobre `#001433`** (L 0,00739 contra 0,00316 del negro anterior; paleta v4 en
+  **oklch**, no los hex de v3 — `gray-400` es `#99a1af`, `gray-500` es `#6a7282`):
+  `white` 18,3:1 · `gray-300` 12,4:1 · `gray-400` 7,0:1 · `gray-500` **3,8:1**.
+  **Nada bajó de AA que no estuviera ya debajo.** Los `bg-black/NN` **mejoran** sobre azul (un
+  negro translúcido lo oscurece), y el «ritmo de fondos» alternado pasa de 1,012:1 a 1,038:1,
+  o sea que por fin se distingue.
+- **Se apaga entero en `prefers-contrast: high`**, color de fondo incluido. Ojo: **ese media query no matchea en
   Chromium**, que solo reconoce `more`. Es un defecto **preexistente** que afecta a todo ese
   bloque —`body { background: #000 }` y los overrides de `.glass` incluidos—, no solo al
   lienzo. Arreglarlo es un cambio propio.

@@ -319,7 +319,7 @@ export default function Galeria() {
   }, [seleccionado, visibles, indiceActual])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-950 to-black text-white">
+    <div className="min-h-screen text-white">
       {/* Fondo decorativo */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03]">

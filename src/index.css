@@ -323,14 +323,55 @@
     animation: hero-glow 4s ease-in-out infinite;
   }
 
-  /* LIENZO DE FONDO DEL SITIO PÚBLICO — dos halos de marca y un lavado vertical, detrás de
-     todo el contenido de las páginas.
+  /* EL COLOR DEL SITIO PÚBLICO. Va en el FONDO DE `main` y no en `body`, ni en las raíces
+     de cada página, ni en una capa por encima. Las tres alternativas se probaron y fallan:
+
+     · En `body`: `--gradient-dark` es un gradiente a 135° sobre el DOCUMENTO entero, así que
+       en una página larga el azul queda en una esquina y el 98 % del alto es #0a0a0f. Y
+       obligaría a tocar el `bg-black` de App.tsx, cuyo <div> envuelve TAMBIÉN /admin.
+     · Repintando las 8 raíces: la rampa sería por página sobre un `min-h-screen` que no es
+       el alto real, o sea que el MISMO token daría colores distintos según el largo del
+       documento y navegar se vería como un salto de color. Y deja 8 fuentes de verdad: la
+       próxima página nace negra otra vez, que es lo que ya pasó con /carta y /reglamento.
+     · Como capa opaca en el ::before: ese pseudo es `fixed` y vive dentro del contexto de
+       apilamiento `z-10` de `main`, mientras que <footer> NO está posicionado. Con tintes
+       del 2–6 % da igual, pero una capa oscura de verdad ATENÚA EL PIE ENTERO al scrollear
+       hasta abajo: sobre el pie el velo queda ENCIMA del texto, no debajo, así que baja
+       texto y fondo a la vez. Medido: a 30 % de negro el `text-gray-400` del pie cae a
+       4,27:1 y el `text-blue-400` a 3,28:1, los dos bajo AA. Pasó de verdad en la primera
+       versión de este cambio y lo atrapó el review. Habría que subir el footer a z-20, y eso
+       rompe otra cosa: el lightbox de /galeria es `fixed z-50` pero vive DENTRO del
+       `relative z-10` de la página, o sea atrapado en el contexto de `main` — con el pie en
+       z-20 se pintaría por encima del lightbox.
+
+     El fondo del elemento que ESTABLECE el contexto de apilamiento se pinta en el paso 2 de
+     ese contexto: por debajo de todo lo de adentro (los dos pseudos incluidos) y nunca fuera
+     de su caja. El pie es intocable por construcción y no hace falta tocarle el z-index.
+
+     Va en CSS y no como utilidad `bg-lqc-900` en el JSX por dos razones mecánicas: esta
+     regla vive en `@layer utilities`, igual que la utilidad de Tailwind, así que con las dos
+     puestas gana la que el bundle emita última — y HOY es esta: verificado en dist/, las
+     utilidades `bg-*` salen ~68 kB antes que `.lqc-lienzo`. O sea que un `bg-*` puesto en el
+     <main> de LayoutPublico no tendría efecto y tampoco daría error, que es peor que fallar.
+     Y el bloque `prefers-contrast` está FUERA de toda capa, así que puede devolver el negro
+     sin `!important`.
+
+     #001433 es `--color-lqc-900`. Va literal por lo mismo que los canales de abajo. */
+  .lqc-lienzo {
+    background-color: #001433;
+  }
+
+  /* LIENZO DE FONDO DEL SITIO PÚBLICO — los dos halos de marca, detrás de todo el contenido
+     de las páginas.
 
      POR QUÉ CUELGA DE `main` Y NO DE `body`. El fondo de `body` y su `body::before` (arriba
-     en este archivo, desde el commit inicial) NUNCA se vieron: cada página se pinta en su
-     raíz un `bg-gradient-to-b from-black via-gray-950 to-black` OPACO que los tapa a los dos.
-     Son 12 raíces en 11 archivos y despintarlas una por una era el camino largo. El atajo es
-     el `<main>` de LayoutPublico, que ya venía con `relative z-10`, o sea que es contexto de
+     en este archivo, desde el commit inicial) NUNCA se vieron: cada página se pintaba en su
+     raíz un `bg-gradient-to-b from-black via-gray-950 to-black` OPACO que los tapaba a los
+     dos. El 2026-09-16, con la llegada del fondo azul, esas 8 raíces PÚBLICAS se vaciaron y
+     el color pasó a `.lqc-lienzo` (ver la regla de acá arriba); quedan con el degradado negro
+     las 4 que NO son públicas —`admin/Login` ×2, `admin/Panel` y `ErrorBoundary`—, a
+     propósito: el panel es modo herramienta y se queda en negro plano.
+     El `<main>` de LayoutPublico ya venía con `relative z-10`, o sea que es contexto de
      apilamiento: un pseudo POSICIONADO de `main` se pinta por encima del fondo de la página
      —que es el de un bloque en flujo, paso 4 del orden de pintado— y por debajo del
      contenido, que en las 8 páginas vive dentro de un `<div className="relative z-10">`
@@ -358,9 +399,18 @@
      este archivo ACELERA a 0.01ms en vez de apagar: con un keyframe abierto el fondo quedaría
      congelado a mitad de camino, justo en el estado que nadie diseñó.
 
-     Las tres capas de ESTE pseudo: halo de acento arriba a la derecha, halo azul abajo a la
-     izquierda y el lavado vertical. Tres capas al 100% no necesitan `background-size` ni
-     `background-position`, por eso no están.
+     DOS capas y nada más: halo de acento arriba a la derecha y halo azul abajo a la
+     izquierda. Al 100 % no necesitan `background-size` ni `background-position`.
+
+     HUBO UNA TERCERA Y SE FUE, no la repongas sin leer esto. Era un lavado azul
+     (`rgb(0 102 255 / 3%)` → `rgb(0 20 51 / 7%)`) que con el fondo negro tenía sentido y con
+     el fondo azul dejó de tenerlo —azul sobre azul no hace nada—, así que se probó cambiarla
+     por un oscurecedor vertical a 30 % de negro para recuperar contraste en la mitad
+     inferior. ROMPÍA EL PIE: este pseudo es `fixed` y cubre la ventana entera, y sobre el
+     <footer> —que no está posicionado— el velo cae ENCIMA del texto en vez de debajo.
+     Medido: `text-gray-400` del pie a 4,27:1 y `text-blue-400` a 3,28:1, ocho elementos bajo
+     AA, a cambio de +0,2 de contraste en el cuerpo. Mal negocio.
+     No hace falta: el `#001433` pelado ya da blanco a 18,3:1 y `gray-400` a 7,0:1.
      El MOSAICO ya no es un pendiente: se hizo, y vive en el `::after` de más abajo, con su
      propio posicionado y su propia máscara —ahí está explicado por qué no podía ser una capa
      más de acá—. El GRANO quedó afuera a propósito y tampoco es un pendiente: el porqué
@@ -373,8 +423,7 @@
     pointer-events: none;
     background-image:
       radial-gradient(60% 45% at 82% 12%, rgb(0 212 255 / 5%) 0%, transparent 70%),
-      radial-gradient(70% 50% at 12% 88%, rgb(0 102 255 / 6%) 0%, transparent 70%),
-      linear-gradient(180deg, rgb(0 102 255 / 3%) 0%, rgb(0 20 51 / 7%) 100%);
+      radial-gradient(70% 50% at 12% 88%, rgb(0 102 255 / 6%) 0%, transparent 70%);
   }
 
   /* MOSAICO GEOMÉTRICO DE CABECERA — el tratamiento de los pósters oficiales de la liga,
@@ -384,8 +433,8 @@
      POR QUÉ UN SEGUNDO PSEUDO Y NO UNA CAPA MÁS DEL ::before. El mosaico necesita su propia
      `mask-image` —denso arriba, ausente abajo— y una máscara se aplica al ELEMENTO ENTERO,
      no a una de sus capas de fondo. Metido como cuarta capa del ::before, ese degradado de
-     máscara se llevaría puestos también los dos halos y el lavado vertical, que justamente
-     tienen que cubrir la ventana completa de arriba abajo. Son dos comportamientos
+     máscara se llevaría puestos también los dos halos, que justamente tienen que cubrir la
+     ventana completa de arriba abajo. Son dos comportamientos
      incompatibles en un mismo elemento, así que van en dos pseudos. No es capricho: es el
      único reparto posible sin duplicar el nodo.
 
@@ -760,10 +809,18 @@ iframe:hover {
     border: 2px solid #0066ff;
   }
 
-  /* El lienzo de marca se apaga entero: son tintes del 3% al 6% cuyo único aporte es
-     atmósfera, y en alto contraste restan separación entre el fondo y el texto. Los DOS
-     pseudos: el ::before (halos y lavado) y el ::after (mosaico de cabecera), que al 2–4 %
-     es exactamente el mismo tipo de ruido sobre el fondo del texto del hero. */
+  /* El lienzo de marca se apaga ENTERO: el color de fondo vuelve a negro y los dos pseudos
+     desaparecen. Los tintes son del 2 % al 6 % y su único aporte es atmósfera; en alto
+     contraste restan separación entre el fondo y el texto.
+     Esta regla puede pisar a `.lqc-lienzo` sin `!important` porque el bloque está FUERA de
+     toda `@layer`, y lo que está fuera de capas gana sobre lo que está dentro.
+     ⚠ DEFECTO PREEXISTENTE: este media query NO matchea en Chromium, que solo reconoce
+     `more`. Afecta a TODO el bloque —el `body { background: #000 }` y los overrides de
+     `.glass` incluidos—, no solo al lienzo. Arreglarlo es un cambio propio. */
+  .lqc-lienzo {
+    background: #000000;
+  }
+
   .lqc-lienzo::before,
   .lqc-lienzo::after {
     display: none;

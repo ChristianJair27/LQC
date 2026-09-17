@@ -20,8 +20,9 @@ import { useHoraLocal } from '../hooks/useHoraLocal'
 
    EL `relative z-10` NO ES DECORATIVO. `<main>` lleva `lqc-lienzo`, cuyos dos pseudos son
    hijos suyos posicionados en `z-index: 0`. Un hijo de `main` SIN posicionar se pinta antes
-   que ellos y recibiría el lavado del lienzo por encima. Es el mismo defecto que tuvo el 404
-   y que está anotado en App.tsx. Ver AGENTS.md, «contrato de apilamiento».
+   que ellos y recibiría los tintes del lienzo POR ENCIMA en vez de por debajo — sobre un
+   texto eso lo atenúa, no lo realza. Es el mismo defecto que tuvo el 404 y que está anotado
+   en App.tsx. Ver AGENTS.md, «contrato de apilamiento».
 
    AL SCROLLEAR no hace nada, y eso es el efecto. El header es `sticky top-0 z-50` y OPACO,
    y esta tira está en el flujo dentro de `main` (z-10): al subir el scroll se mete debajo

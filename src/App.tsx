@@ -78,10 +78,12 @@ export default function App() {
                   El `relative z-10` NO es decorativo: es el mismo wrapper que las 8 páginas
                   ponen en su raíz, y es lo que deja al lienzo de fondo (`.lqc-lienzo` en el
                   <main> de LayoutPublico, ver src/index.css) DEBAJO del contenido. Sin él este
-                  bloque queda en flujo y sin posicionar, o sea que se pinta ANTES que el
-                  pseudo del lienzo y termina con el lavado encima. El tinte es del 3 % al 7 %
-                  y no rompe nada a la vista, pero deja una capa mal puesta en la única ruta
-                  pública que no seguía el patrón. */}
+                  bloque queda en flujo y sin posicionar, o sea que se pinta ANTES que los
+                  pseudos del lienzo y termina con ellos encima. Hoy son tintes del 2 % al 6 %
+                  y no rompen nada a la vista, pero la capa queda mal puesta — y el margen es
+                  más fino de lo que parece: el día que se probó subir una de esas capas a
+                  30 % de negro, el texto del pie —que está en el mismo caso— cayó por debajo
+                  de AA. El wrapper es lo que separa «tinte inofensivo» de «texto atenuado». */}
               <Route path="*" element={
                 <div className="relative z-10 min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
                   <h1 className="text-6xl md:text-8xl font-bold text-blue-500 mb-6">404</h1>
