@@ -79,7 +79,7 @@ export default function App() {
                   ponen en su raíz, y es lo que deja al lienzo de fondo (`.lqc-lienzo` en el
                   <main> de LayoutPublico, ver src/index.css) DEBAJO del contenido. Sin él este
                   bloque queda en flujo y sin posicionar, o sea que se pinta ANTES que los
-                  pseudos del lienzo y termina con ellos encima. Hoy son tintes del 2 % al 6 %
+                  pseudos del lienzo y termina con ellos encima. Hoy son tintes del 5 % al 6,5 %
                   y no rompen nada a la vista, pero la capa queda mal puesta — y el margen es
                   más fino de lo que parece: el día que se probó subir una de esas capas a
                   30 % de negro, el texto del pie —que está en el mismo caso— cayó por debajo

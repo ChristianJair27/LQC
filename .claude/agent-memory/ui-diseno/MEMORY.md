@@ -8,6 +8,6 @@
 - [Acción en encabezado de tarjeta admin](project_admin-card-header-accion.md) — botón hermano (no anidado) en la banda del header: items-center, shrink-0, margen ≥ radio de esquina.
 - [Feedback no textual → aria-live](project_admin-feedback-no-textual.md) — descargas/copiar/refrescar del panel necesitan región sr-only role="status" que anuncie el resultado.
 - [Header md resuelto](project_deuda-header-md.md) — 6 ítems entran compactando nav+promo solo en md; un 7º exige remedir. lg intacto.
-- [Lienzo de fondo en main](project_lienzo-fondo-main.md) — dos pseudos: `::before` fijo (halos) y `::after` absoluto (mosaico); el grano quedó afuera por matemática de blending.
+- [Lienzo de fondo en main](project_lienzo-fondo-main.md) — dos pseudos: `::before` fijo (halos) y `::after` absoluto (letras LQC); el grano quedó afuera por matemática de blending.
 - [Medir con navegador real](feedback_medir-con-navegador-real.md) — alturas y solapamientos se miden con playwright-core + Chrome del sistema; ojo con el root de 14px a 375px.
 - [Copy en tuteo mexicano](project_registro-espanol-tuteo.md) — el sitio usa "Recarga/inténtalo", no el voseo de mis instrucciones; no mezclar registros.

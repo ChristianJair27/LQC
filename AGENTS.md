@@ -737,7 +737,7 @@ pseudo-elementos** de la clase `lqc-lienzo`, que lleva el `<main>` de `LayoutPub
 | --- | --- | --- | --- |
 | **el fondo de `main`** | `background-color: #001433` (`lqc-900`) | — | **el color del sitio**, desde el 2026-09-16 |
 | `::before` | dos halos de marca | `fixed` | atmósfera de ventana, cubre siempre |
-| `::after` | mosaico geométrico (SVG inline, 19 rectángulos, 3 tonos) | `absolute`, `100vh` | tratamiento de **cabecera**: con `fixed`, la tabla de 19 filas de `/torneos` le pasaría por debajo al scrollear |
+| `::after` | **el wordmark LQC gigante**, condensado y repetido en vertical (SVG inline, desde el 2026-09-16) | `absolute`, `100vh` | tratamiento de **cabecera**: con `fixed`, la tabla de 19 filas de `/torneos` le pasaría por debajo al scrollear. Ver «Las letras de fondo» |
 
 **EL SITIO PÚBLICO ES AZUL, y el color vive en el fondo de `main`.** Hasta el 2026-09-16 cada
 página se pintaba en su raíz un `bg-gradient-to-b from-black via-gray-950 to-black` **opaco**
@@ -755,7 +755,7 @@ Por qué el color va ahí y no en los tres lugares obvios:
   es el alto real, o sea que el mismo token daría colores distintos según el largo del
   documento. Y deja 8 fuentes de verdad: la próxima página nace negra otra vez.
 - **No como capa opaca en el `::before`:** ese pseudo es `fixed` dentro del contexto `z-10`
-  de `main`, y **`<footer>` no está posicionado**. Con tintes del 3–7 % da igual, pero una
+  de `main`, y **`<footer>` no está posicionado**. Con tintes del 5–6,5 % da igual, pero una
   capa **opaca** taparía el pie entero al scrollear hasta abajo.
 
 El fondo del elemento que **establece** el contexto se pinta por debajo de todo lo de adentro
@@ -767,7 +767,7 @@ Es deliberado: el encuadre de póster de la liga, y es lo que la `TiraHud` ya as
 > **CONTRATO, y es lo único de esta sección que muerde: los dos pseudos van en `z-index: 0` y
 > cada página pública envuelve TODO su contenido en un `<div className="relative z-10">`.**
 > Una página nueva que no lo haga recibe el lienzo **encima** en vez de debajo. Hoy los tintes
-> son del 2 % al 6 % y no rompe nada a la vista, pero **el margen es más fino de lo que
+> son del 5 % al 6,5 % y no rompe nada a la vista, pero **el margen es más fino de lo que
 > parece**: el día que se probó una capa al 30 %, el texto del pie —que está exactamente en
 > ese caso— cayó bajo AA. El wrapper es lo que separa «tinte inofensivo» de «texto atenuado».
 > Ya pasó una vez: el 404 en línea de `App.tsx` era la única ruta pública sin ese wrapper y
@@ -820,7 +820,7 @@ exactamente el mismo fondo.
 | --- | --- | --- |
 | Tamaño | `min(58vw,45vh)` en base, `min(32vw,45vh)` desde `xl` | **405 px a 1440×900, 217 px a 375×812.** El tope en `vh` la mantiene entera en una ventana ancha y baja |
 | Posición | `fixed`, `top-[20vh]`, centrada con `inset-x-0 mx-auto` | **completa en pantalla en todo el recorrido**, rotación incluida: medido de 320×568 a 2560×1440 y en 1920×600. Único roce: teléfono apaisado (375 de alto), donde la CAJA entra hasta 22 px bajo el header en el tope del balanceo — pero el dibujo empieza ~20 px adentro de la caja |
-| Opacidad | `0.07` + `blur-[1px]` | techo medido 0,08: la copa es **blanco puro**, y es lo que más sube la luminancia detrás del texto |
+| Opacidad | `0.07` + `blur-[1px]` | es **blanco puro**, lo que más sube la luminancia detrás del texto. Con las letras de fondo al 6,5 %, **0,07 ya es el techo**: el peor punto de `gray-400` queda en 5,01:1 (ver «Las letras de fondo») |
 | Deriva (el `<div>`) | `translateX` ±6vw, **97 s** | |
 | Balanceo (la `<img>`) | `translateY` ±3,5vh y `rotate` ±2,5°, **61 s** | 97 y 61 son primos entre sí: la figura no se repite hasta 1 h 39 min |
 
@@ -846,7 +846,7 @@ exactamente el mismo fondo.
   centro. **`prefers-contrast: high`** la oculta junto con los pseudos del lienzo (con el mismo
   defecto de Chromium de arriba).
 - **Apilamiento:** `z-0`, igual que los pseudos. Orden de árbol dentro de ese nivel:
-  `::before` (halos) → copa → `::after` (mosaico). Todo por debajo del `relative z-10` de cada
+  `::before` (halos) → copa → `::after` (letras). Todo por debajo del `relative z-10` de cada
   página, así que el **contrato de arriba no cambia**.
 - **⚠ Va dentro de un `<div className="absolute inset-0 z-0 [clip-path:inset(0)]">`, y ese
   recorte es lo que la saca del pie.** Es el mismo caso que el `::before`: `fixed` dentro del
@@ -859,9 +859,86 @@ exactamente el mismo fondo.
   `main`**: recortaría también el lightbox de `/galeria`, que vive adentro. Verificado en
   Chromium; Safari y Firefox, no.
 - **La retícula de puntos blancos del fondo se retiró en este mismo cambio y no vuelve**, a
-  propósito: blanco al 3 % sobre azul sube la luminancia de toda la pantalla, y el mosaico ya
-  hace de textura. La trama que sigue en `BloqueSinTransmision` de `Home.tsx` es otra cosa:
+  propósito: blanco al 3 % sobre azul sube la luminancia de toda la pantalla, y las letras de fondo
+  ya hacen de textura. La trama que sigue en `BloqueSinTransmision` de `Home.tsx` es otra cosa:
   vive dentro del bloque, sobre su propio negro.
+
+### Las letras de fondo (el `::after` de `.lqc-lienzo`)
+
+**Hechas el 2026-09-16.** Reemplazan al mosaico de 19 rectángulos. Son el **wordmark LQC real
+a escala de póster**, calibrado contra un póster oficial de la liga: **«Top Visión · Ronda 3»**,
+del material de Instagram de LQC. Todo lo de esta sección se midió contra esa imagen; si se
+retoca, se vuelve a medir contra ella, no a ojo.
+
+> **El póster NO está versionado, a propósito.** Muestra los gamertags reales de diez jugadores
+> con sus estadísticas, el repo es **público** e incluye menores inscritos: lo que entra al
+> historial de git no se borra aunque la liga baje el post. La copia de trabajo vive en local
+> como `docs/referencia-letras-lqc.jpg` y está en `.gitignore`. Para volver a calibrar, se pide
+> el póster a la organización. **No lo commitees**, ni pixelado sin preguntar antes.
+
+| | Valor | De dónde sale |
+| --- | --- | --- |
+| Forma | el path de `public/assets/2 LQC.png` vectorizado: 4 contornos, 71 puntos | difiere del PNG en el 0,68 % de los píxeles de su recuadro, comparando los dos ya condensados |
+| Proporción | palabra de ancho/alto **1,64** (el logo es 2,96) | ajuste del wordmark sobre el fondo del póster, correlación 0,61 |
+| Tamaño | `background-size: 112% auto`, centrada | en el póster la palabra es más ancha que el cuadro |
+| Repetición | `repeat-y`, junta del **14 %** del alto de la letra | tile de 410 × 284 (letra de 250 + junta de 34) |
+| Fase vertical | `calc(-0.397 * 112vw * 284 / 410)` | la del póster: arriba la base de una fila, debajo el arranque de la siguiente |
+| Intensidad | `#0066ff` con `fill-opacity` **.065** | el techo medido, ver abajo |
+| Peso | data-uri de **545 B** | la mitad que el mosaico (1 133 B) |
+
+**Lo que parece un defecto y NO lo es:**
+
+- **Está cortada por los costados.** Un wordmark gigante recortado es lenguaje de póster. (Con
+  la **copa** no se acepta lo mismo: la copa es un objeto, y cortado a la mitad parece un error.)
+- **En una pantalla horizontal no se lee «LQC» entero.** Cada letra mide más que la ventana y
+  la máscara solo deja ver la parte de arriba: es textura de marca, a propósito. En móvil sí se
+  leen las filas. Achicarla para que se lea la convierte en un logo de fondo, que es otra cosa.
+- **No se desvanece a los costados.** El póster corta en seco; lo que se apaga es la iluminación
+  de arriba hacia abajo, y ese papel lo hace la máscara vertical de siempre.
+
+> **LA INTENSIDAD ES UN TECHO, NO UN GUSTO.** El póster tiene **1,10:1** entre letra y hueco
+> (el 10,4 % de `#0066ff`). Acá encima pasa texto, y la regla es que **`gray-400` nunca baje de
+> 5:1 en el PEOR punto**: la copa pasando justo sobre el píxel más claro del lienzo, donde se
+> suman el halo cian y una letra. Se mide con la copa **en esa posición**, no en reposo (en
+> reposo el número sale más optimista). Medido **en Chromium**, en 1440, 1920, 375 y 390 px. El
+> margen es de 0,014, así que en Safari o Firefox el redondeo podría dejarlo apenas bajo 5:1
+> (AA, 4,5:1, no corre riesgo):
+>
+> | alfa | letra/hueco | peor punto con copa |
+> | --- | --- | --- |
+> | 4 % (techo del mosaico viejo) | 1,035:1 | 5,15:1 |
+> | **6,5 %** | **~1,058:1** | **5,01:1** |
+> | 7 % | — | 4,996:1 ✗ |
+> | 10,4 % (el póster) | 1,10:1 | 4,80:1 ✗ |
+>
+> **Tres cosas suman en ese píxel y cualquiera que se toque obliga a volver a medir:** el alfa
+> de la copa (`opacity-[0.07]`), los halos del `::before` y el color de fondo de `main`. La
+> luminancia media de la primera pantalla sube ~8 % respecto del mosaico.
+
+**Una sola regla para todas las páginas, sin `:has()`.** Se evaluó apagar las letras donde el
+hero ya lleva el logo LQC (Home, Torneos y Acerca) con `:has()` y un segundo SVG, y **se
+descartó**. La hipótesis era que había «tres marcas en el mismo centro», pero medido: el logo
+del hero mide **~24–32 px** de alto en móvil y escritorio (el wordmark ocupa el 25 % de su PNG
+cuadrado) contra letras de **~260 px en móvil y ~970–1 300 px en escritorio** (1440–1920 px de
+ancho; el alto de letra es 0,683 × el ancho de `main`), más separación de escala que el propio
+póster (~8 a 1). **Lo que competía era
+la copa**, de 405 px en el mismo centro, y a esta escala las letras ya la contienen. **No
+reintroduzcas la regla condicional sin volver a mirar ese número.**
+
+**Otras decisiones que se midieron y quedaron afuera** —para no repetirlas—:
+
+- **Bloques rectangulares formando «LQC»** (el primer plan): era una aproximación hecha sin el
+  póster. El original usa las letras reales.
+- **Mover las letras en vertical para esquivar el logo:** la máscara está anclada a la primera
+  pantalla. Arriba del logo hay 197 px fijos y las letras de aquel prototipo ya medían
+  329–494 px en escritorio (las de hoy, más todavía); abajo, la máscara dejaba entre el 16 % y
+  el 39 % de ellas.
+- **Grano:** el póster lo tiene, pero `soft-light` sobre un lienzo casi negro es invisible por
+  definición y `normal` sube la luminancia media. Mismo motivo que en el lienzo.
+
+⚠ **La fase va en `vw` y el tamaño en `%` de `main`.** En escritorio `main` es el viewport
+menos la barra de scroll, así que con una barra de 17 px la fase se corre ~5 px. En una textura
+no se ve; no lo persigas como bug.
 
 ### La tira de datos (`TiraHud`)
 

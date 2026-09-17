@@ -332,7 +332,7 @@
        próxima página nace negra otra vez, que es lo que ya pasó con /carta y /reglamento.
      · Como capa opaca en el ::before: ese pseudo es `fixed` y vive dentro del contexto de
        apilamiento `z-10` de `main`, mientras que <footer> NO está posicionado. Con tintes
-       del 2–6 % da igual, pero una capa oscura de verdad ATENÚA EL PIE ENTERO al scrollear
+       del 5–6,5 % da igual, pero una capa oscura de verdad ATENÚA EL PIE ENTERO al scrollear
        hasta abajo: sobre el pie el velo queda ENCIMA del texto, no debajo, así que baja
        texto y fondo a la vez. Medido: a 30 % de negro el `text-gray-400` del pie cae a
        4,27:1 y el `text-blue-400` a 3,28:1, los dos bajo AA. Pasó de verdad en la primera
@@ -408,10 +408,10 @@
      Medido: `text-gray-400` del pie a 4,27:1 y `text-blue-400` a 3,28:1, ocho elementos bajo
      AA, a cambio de +0,2 de contraste en el cuerpo. Mal negocio.
      No hace falta: el `#001433` pelado ya da blanco a 18,3:1 y `gray-400` a 7,0:1.
-     El MOSAICO ya no es un pendiente: se hizo, y vive en el `::after` de más abajo, con su
-     propio posicionado y su propia máscara —ahí está explicado por qué no podía ser una capa
-     más de acá—. El GRANO quedó afuera a propósito y tampoco es un pendiente: el porqué
-     también está en ese comentario. */
+     Las LETRAS de cabecera viven en el `::after` de más abajo, con su propio posicionado y
+     su propia máscara —ahí está explicado por qué no podían ser una capa más de acá—. El
+     GRANO quedó afuera a propósito y tampoco es un pendiente: el porqué también está en ese
+     comentario. */
   .lqc-lienzo::before {
     content: '';
     position: fixed;
@@ -423,77 +423,94 @@
       radial-gradient(70% 50% at 12% 88%, rgb(0 102 255 / 6%) 0%, transparent 70%);
   }
 
-  /* MOSAICO GEOMÉTRICO DE CABECERA — el tratamiento de los pósters oficiales de la liga,
-     denso arriba y disuelto donde empieza a vivir el texto. Es el PASO 2 del lienzo, y
-     completa al ::before de acá arriba sin tocarlo.
+  /* LAS LETRAS DE CABECERA — el wordmark LQC a escala de póster, detrás de todo. Es el PASO 2
+     del lienzo y completa al ::before de acá arriba sin tocarlo.
 
-     POR QUÉ UN SEGUNDO PSEUDO Y NO UNA CAPA MÁS DEL ::before. El mosaico necesita su propia
-     `mask-image` —denso arriba, ausente abajo— y una máscara se aplica al ELEMENTO ENTERO,
-     no a una de sus capas de fondo. Metido como cuarta capa del ::before, ese degradado de
-     máscara se llevaría puestos también los dos halos, que justamente tienen que cubrir la
-     ventana completa de arriba abajo. Son dos comportamientos
-     incompatibles en un mismo elemento, así que van en dos pseudos. No es capricho: es el
-     único reparto posible sin duplicar el nodo.
+     LA REFERENCIA ES UN PÓSTER OFICIAL DE LA LIGA («Top Visión · Ronda 3», del Instagram de
+     LQC) y todo lo de acá está medido contra él, no a ojo. El póster NO está en el repo: lleva
+     gamertags reales y el repo es público (ver AGENTS.md). Lo que hace y por eso hace esto:
+       · son las letras REALES del logo, no bloques: el path es `public/assets/2 LQC.png`
+         vectorizado (4 contornos, 71 puntos; difiere del PNG en el 0,68 % de los píxeles de
+         su recuadro, comparando los dos ya condensados);
+       · CONDENSADAS: ancho/alto de la palabra 1,64 contra 2,96 del logo. Salió de ajustar el
+         wordmark sobre el fondo del póster por correlación (0,61; la lectura a ojo daba 0,40);
+       · ENORMES y cortadas por los costados: la palabra mide el 112 % del ancho;
+       · REPETIDAS en vertical, con una junta del 14 % del alto de la letra;
+       · SIN desvanecido lateral: el póster corta la L y la C en seco contra el borde.
+     Un wordmark gigante recortado es lenguaje de póster, no un defecto. Por lo mismo, en una
+     pantalla horizontal NO SE LEE "LQC" entero —cada letra mide más que la ventana y la
+     máscara solo deja ver la parte de arriba—: es textura de marca, a propósito. Achicarlo
+     para que se lea lo convierte en un logo de fondo, que es otra cosa. En móvil sí se leen
+     las filas, igual que en el póster.
+
+     LA INTENSIDAD, `fill-opacity='.065'`, ES UN TECHO MEDIDO Y NO UN GUSTO. El póster tiene
+     1,10:1 entre letra y hueco (#0066ff al 10,4 % sobre #001433), pero acá encima pasa texto:
+     la regla es que `gray-400` nunca baje de 5:1 en el PEOR punto, que es la copa de
+     LayoutPublico.tsx pasando justo sobre el píxel más claro del lienzo —halo cian + letra—,
+     medido con la copa en esa posición y no en reposo. Medido en Chromium: al 6,5 % da 5,01:1
+     (1440, 1920, 375 y 390 px); al 7 % ya da 4,996:1; al 10,4 % del póster, 4,80:1. Queda en
+     ~1,058:1. El margen es de 0,014: otro motor podría redondearlo apenas bajo 5:1.
+     ⚠ Si se toca el alfa de la copa, los halos del ::before o el color de fondo de `main`,
+     este número hay que volver a medirlo: los tres suman en ese píxel.
+
+     UN SOLO SVG PARA TODAS LAS PÁGINAS, sin reglas por página. Se evaluó apagar las letras
+     donde el hero ya lleva el logo LQC (Home, Torneos, Acerca) con `:has()` y un segundo SVG, y
+     se descartó: el logo del hero mide ~24–32 px de alto (móvil–escritorio) contra letras de
+     ~260 px en móvil y ~970–1 300 px en escritorio (1440–1920 px de ancho) —el alto de letra
+     es 0,683 × el ancho de `main`—, más separación de escala que el propio póster (~8 a 1),
+     así que nunca competían. Lo que
+     competía era la copa a escala parecida, y a este tamaño las letras ya la contienen.
+
+     POR QUÉ UN SEGUNDO PSEUDO Y NO UNA CAPA MÁS DEL ::before. Esto necesita su propia
+     `mask-image` —presente arriba, ausente abajo— y una máscara se aplica al ELEMENTO ENTERO,
+     no a una de sus capas de fondo. Metido como otra capa del ::before, ese degradado se
+     llevaría puestos también los dos halos, que tienen que cubrir la ventana completa de arriba
+     abajo. Son dos comportamientos incompatibles en un mismo elemento, así que van en dos
+     pseudos.
 
      `position: absolute` Y NO `fixed` COMO EL PASO 1, Y ESA ES LA DIFERENCIA IMPORTANTE.
-     El ::before es atmósfera de VENTANA: acompaña el scroll quieto y por eso va fijo. Esto
-     otro es un tratamiento de CABECERA: en los pósters el mosaico está denso arriba y se
-     disuelve donde entra el texto, o sea que pertenece al principio del DOCUMENTO, no a la
-     pantalla. Con `fixed`, el tercio superior de la PANTALLA tendría mosaico para siempre y
-     al hacer scroll la tabla de clasificación de /torneos —19 filas— le pasaría por debajo,
-     leyéndose sobre los rectángulos. Con `absolute` queda anclado al tope de `main` y muere
-     mucho antes de que empiece el contenido denso. El bloque contenedor es el propio `main`,
-     que ya viene con `relative z-10` de LayoutPublico, así que `top/left/right: 0` es el
-     tope del contenido público y no el del viewport.
-     Por lo mismo `height: 100vh` en vez de `inset: 0`: `main` mide todo el documento, así
-     que estirarlo a la altura del padre pondría mosaico hasta el pie. Una pantalla de alto
-     es la medida del efecto, y lo que de verdad decide dónde se apaga es la máscara.
+     El ::before es atmósfera de VENTANA: acompaña el scroll quieto y por eso va fijo. Esto es
+     un tratamiento de CABECERA: pertenece al principio del DOCUMENTO, no a la pantalla. Con
+     `fixed`, las letras quedarían para siempre en la pantalla y la tabla de clasificación de
+     /torneos —19 filas— les pasaría por debajo al scrollear. Con `absolute` queda anclado al
+     tope de `main` y muere antes de que empiece el contenido denso. El bloque contenedor es el
+     propio `main`, que ya viene con `relative z-10` de LayoutPublico.
+     Por lo mismo `height: 100vh` en vez de `inset: 0`: `main` mide todo el documento, así que
+     estirarlo a la altura del padre pondría letras hasta el pie. Por eso `repeat-y` repite
+     dentro de UNA pantalla: en escritorio entra una sola fila, en móvil dos o tres.
 
-     `z-index: 0` y `pointer-events: none`, igual que el ::before y por las mismas razones:
-     se pinta por encima del fondo opaco de cada página (paso 4 del orden de pintado) y por
-     debajo del `<div className="relative z-10">` en el que las 8 páginas envuelven su
-     contenido (paso 8). No subirlo, subirlo taparía el texto.
+     `z-index: 0` y `pointer-events: none`, igual que el ::before y por las mismas razones: por
+     encima del fondo de `main` y por debajo del `<div className="relative z-10">` en el que las
+     páginas envuelven su contenido. No subirlo, subirlo taparía el texto.
 
-     POR QUÉ UN SVG INLINE Y NO `repeating-linear-gradient`. El gesto del póster son
-     rectángulos de PROPORCIONES DISTINTAS con bordes duros: barras largas y finas, bloques
-     casi cuadrados, columnas verticales. Un `repeating-linear-gradient` solo sabe hacer
-     bandas paralelas, y cruzando dos, un damero uniforme; cualquiera de los dos lee como
-     TELA o como tramado de impresión, no como arquitectura. El SVG va como data-uri para
-     no sumar una petición ni un archivo en `public/` por un patrón de 600 bytes.
-
-     LOS TRES TONOS, CON SUS HEX ANOTADOS PARA PODER ACTUALIZARLOS SI CAMBIA LA PALETA (van
-     en el data-uri como `%23`, que es el `#` escapado, y no pueden ser `var()`):
-       · `%230066ff` al 4 %   — `lqc-500` (#0066ff), los rectángulos del frente.
-       · `%230066ff` al 2.6 % — `lqc-500` otra vez, la capa de atrás; el mismo azul a menos
-                                 alfa es lo que da profundidad sin meter un tercer hue.
-       · `%2300d4ff` al 2 %   — `lqc-accent` (#00d4ff), los pocos acentos cian.
-     Los tres alfas son de un dígito por una razón: sobre un fondo casi negro, el mosaico
-     tiene que sugerirse a contraluz, no dibujarse. Si se ve el patrón, está mal calibrado.
+     LA GEOMETRÍA, Y QUÉ SE MUEVE JUNTO:
+       · `background-size: 112% auto`: el ancho de la palabra. El alto sale solo de la
+         proporción del SVG, así que el SVG TIENE que llevar `width` y `height` además del
+         `viewBox`; sin ellos algunos navegadores no resuelven el `auto`.
+       · El tile es de 410 × 284: la letra mide 250 de alto y los 34 restantes son la junta. Si
+         se cambia la junta, cambia el alto del tile, y con él la fase de abajo.
+       · `background-position` vertical: la fila arranca −0,397 períodos arriba, que es la fase
+         del póster —arriba se ve la base de una fila y debajo el comienzo de la siguiente—.
+         Va en `vw` porque el período depende del ANCHO: 112vw × 284 / 410. El `112%` del
+         tamaño se mide sobre `main`, que en escritorio es el viewport MENOS la barra de
+         scroll, y el `vw` la incluye: con una barra de 17 px la fase se corre ~5 px. Irrelevante
+         en una textura; queda dicho para que nadie lo persiga como bug.
+       · Centrado en X (`50%`): la Q al medio, la L y la C cortadas por igual.
+     El color va literal (`%230066ff`, que es `lqc-500` con el `#` escapado) porque dentro de
+     un data-uri no hay `var()`.
 
      LA MÁSCARA VA DUPLICADA CON `-webkit-`, y no es prefijo de más: `mask-image` sin prefijo
      recién es Safari 15.4+, y sin la versión prefijada un Safari anterior IGNORA la
-     declaración entera — o sea que no se queda sin degradado, se queda con el mosaico opaco
-     de punta a punta del `100vh`, encima del texto del hero. El respaldo prefijado es el
-     caso seguro. Las paradas (0–24 % sólido, 38 % a la mitad, transparente al 78 %) están
-     puestas para que el patrón desaparezca dentro de la primera pantalla.
+     declaración entera — o sea que no se queda sin degradado, se queda con las letras de punta
+     a punta del `100vh`, detrás del texto. Las paradas (0–24 % sólido, 38 % a la mitad,
+     transparente al 78 %) hacen que el fondo se apague dentro de la primera pantalla, que es
+     también lo que hace la iluminación del póster.
 
-     EL GRANO QUEDÓ DELIBERADAMENTE AFUERA. Era la otra mitad del paso 2 y no va, por
-     matemática y no por gusto: `background-blend-mode: soft-light` sobre un lienzo
-     casi-negro es invisible — por la fórmula de soft-light del W3C, con un backdrop Cb = 0
-     el resultado es 0 sea cual sea el origen. Para que se viera habría que mezclarlo en
-     `normal` a ~2 %, que SÍ sube la luminancia media del fondo (soft-light es neutro por
-     diseño; `normal` no), y eso ya es una decisión de contraste aparte, no una textura. Si
-     algún día se retoma, se retoma como tal. 
-
-     EL TILE ENVUELVE, Y ESO ES UN INVARIANTE — no lo rompas al retocar la composición.
-     NINGÚN rectángulo puede tener un borde en `x=0` ni en `x=300` salvo que sea la mitad de
-     un par que continúa del otro lado CON EL MISMO GRUPO y el MISMO rango de `y`. Hoy son
-     cinco pares (y 12-36, 52-78, 116-184, 200-228 y 244-288). Un rectángulo suelto tocando
-     un borde pone una arista vertical alineada en TODAS las costuras: a 1440px son 4,8
-     columnas de tile, y el patrón se lee como bandas verticales — exactamente lo contrario
-     de la textura que se busca. Fue el defecto de la primera versión.
-     Por lo mismo, NINGUNO toca `y=0` ni `y=300`: así la costura horizontal entre filas de
-     tiles tampoco tiene aristas alineadas, y no hace falta un sexto par para el eje Y.
+     EL GRANO QUEDÓ DELIBERADAMENTE AFUERA. El póster lo tiene, y acá no va, por matemática y
+     no por gusto: `background-blend-mode: soft-light` sobre un lienzo casi negro es invisible —
+     por la fórmula de soft-light del W3C, con un backdrop Cb = 0 el resultado es 0 sea cual
+     sea el origen—. Para que se viera habría que mezclarlo en `normal` a ~2 %, que SÍ sube la
+     luminancia media, y eso ya es una decisión de contraste aparte, no una textura.
   */
   .lqc-lienzo::after {
     content: '';
@@ -504,9 +521,10 @@
     height: 100vh;
     z-index: 0;
     pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='%230066ff' opacity='.04'%3E%3Crect y='12' width='36' height='24'/%3E%3Crect x='208' y='12' width='92' height='24'/%3E%3Crect y='200' width='48' height='28'/%3E%3Crect x='188' y='200' width='112' height='28'/%3E%3Crect x='120' y='52' width='36' height='104'/%3E%3Crect x='64' y='236' width='52' height='52'/%3E%3C/g%3E%3Cg fill='%230066ff' opacity='.026'%3E%3Crect y='52' width='60' height='26'/%3E%3Crect x='244' y='52' width='56' height='26'/%3E%3Crect y='244' width='52' height='44'/%3E%3Crect x='252' y='244' width='48' height='44'/%3E%3Crect x='56' y='8' width='20' height='40'/%3E%3Crect x='172' y='40' width='60' height='60'/%3E%3Crect x='168' y='132' width='56' height='24'/%3E%3Crect x='136' y='240' width='76' height='28'/%3E%3C/g%3E%3Cg fill='%2300d4ff' opacity='.02'%3E%3Crect y='116' width='40' height='68'/%3E%3Crect x='236' y='116' width='64' height='68'/%3E%3Crect x='96' y='8' width='88' height='28'/%3E%3Crect x='68' y='76' width='40' height='40'/%3E%3Crect x='76' y='176' width='96' height='20'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: 300px 300px;
-    background-repeat: repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='410' height='284' viewBox='0 0 410 284'%3E%3Cpath fill='%230066ff' fill-opacity='.065' fill-rule='evenodd' d='M296 2l-4 3-4 7-4 8-3 13-11 180 1 10 2 10 1 4 4 7 3 3 6 3 92 0 2-1 4-2 6-7 3-6 4-10 2-12 3-61-49 0-2 37-31 0 0-5 7-121 31 0 0 22 48 0 3-46 0-9-2-12-2-5-4-7-3-3-6-2-92 0zM149 0l-4 3-4 3-6 10-3 10-2 9-10 177 0 14 4 11 5 8 4 4 3 1 119 0 6-99-8 0 6-113 0-13-4-12-5-9-3-3-4-1-92 0zM209 62l-5 89-17 0-2 36-1 1-14 0 8-126zM15 0l-15 250 107 0 3-62-57 0 10-188z'/%3E%3C/svg%3E");
+    background-size: 112% auto;
+    background-repeat: repeat-y;
+    background-position: 50% calc(-0.397 * 112vw * 284 / 410);
     -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgb(0 0 0 / 38%) 52%, transparent 78%);
             mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgb(0 0 0 / 38%) 52%, transparent 78%);
   }
@@ -862,8 +880,8 @@ iframe:hover {
   }
 
   /* El lienzo de marca se apaga ENTERO: el color de fondo vuelve a negro y los dos pseudos
-     desaparecen, y con ellos la copa de fondo de LayoutPublico.tsx. Los tintes del lienzo son
-     del 2 % al 6 % y la copa, blanca, va al 7 %; su único aporte es atmósfera, y en alto
+     desaparecen, y con ellos la copa de fondo de LayoutPublico.tsx. Los tintes del lienzo van
+     del 5 % al 6,5 % y la copa, blanca, al 7 %; su único aporte es atmósfera, y en alto
      contraste restan separación entre el fondo y el texto.
      Esta regla puede pisar a `.lqc-lienzo` sin `!important` porque el bloque está FUERA de
      toda `@layer`, y lo que está fuera de capas gana sobre lo que está dentro.

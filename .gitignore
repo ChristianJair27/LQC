@@ -141,3 +141,7 @@ vite.config.ts.timestamp-*
 # Claude Code
 # Ignorar configuración local, pero versionar agentes, memoria y AGENTS.md
 .claude/settings.local.json
+
+# Póster de referencia de las letras de fondo: lleva gamertags reales y el repo es PÚBLICO, así
+# que no se versiona. Vive solo en local. Ver AGENTS.md, «Las letras de fondo».
+docs/referencia-letras-lqc.jpg
