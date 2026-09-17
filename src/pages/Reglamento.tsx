@@ -227,13 +227,6 @@ export default function Reglamento() {
 
   return (
     <div className="min-h-screen text-white">
-      {/* Fondo decorativo, igual que el resto de las páginas públicas. */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
-        </div>
-      </div>
-
       <div className="relative z-10">
         {/* Hero. El h1 toma Orbitron de la regla base de index.css (h1–h6). */}
         <section className="pt-24 pb-12 md:pt-32 md:pb-16">

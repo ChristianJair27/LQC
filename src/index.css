@@ -36,15 +36,16 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
   
   /* Animaciones personalizadas */
-  --animate-float: float 6s ease-in-out infinite;
   --animate-pulse-slow: pulse-slow 3s ease-in-out infinite;
   --animate-shimmer: shimmer 3s ease-in-out infinite;
-  /* `hero-glow` NO va acá, y es la única de las animaciones del proyecto que no está en este
-     catálogo. El motivo es mecánico: Tailwind 4 genera una utilidad `animate-X` por cada
-     `--animate-X`, y esa utilidad solo sabe declarar `animation`. La del hero necesita ADEMÁS
-     un `filter` de reposo (ver `.animate-hero-glow` más abajo para el porqué), así que la
+  /* `hero-glow` NO va acá. El motivo es mecánico: Tailwind 4 genera una utilidad `animate-X`
+     por cada `--animate-X`, y esa utilidad solo sabe declarar `animation`. La del hero necesita
+     ADEMÁS un `filter` de reposo (ver `.animate-hero-glow` más abajo para el porqué), así que la
      generada y la escrita a mano salían las dos al CSS con el mismo nombre y el resultado
-     quedaba atado a cuál emitía última el bundle. Vive entera en su regla, en una sola pieza. */
+     quedaba atado a cuál emitía última el bundle. Vive entera en su regla, en una sola pieza.
+     Las dos de la copa de fondo (`.lqc-copa-deriva` y `.lqc-copa-balanceo`) TAMPOCO van acá:
+     no son utilidades para reusar sino una pieza única, con los periodos atados a los de
+     LayoutPublico.tsx y su propio bloque de `prefers-reduced-motion`. Viven junto al lienzo. */
   
   /* Sombras premium */
   --shadow-lqc: 0 10px 40px -10px rgba(0, 102, 255, 0.2);
@@ -287,10 +288,6 @@
     animation: var(--animate-shimmer);
   }
 
-  .animate-float {
-    animation: var(--animate-float);
-  }
-
   .animate-pulse-slow {
     animation: var(--animate-pulse-slow);
   }
@@ -514,6 +511,37 @@
             mask-image: linear-gradient(180deg, #000 0%, #000 24%, rgb(0 0 0 / 38%) 52%, transparent 78%);
   }
 
+  /* LA COPA DE FONDO — el nodo vive en LayoutPublico.tsx, una sola vez para todo el sitio
+     público. Acá están solo sus dos animaciones; el tamaño y la posición son clases inline.
+
+     DOS ANIMACIONES EN DOS ELEMENTOS, porque las dos escriben `transform` y un elemento lleva
+     una sola: el `<div>` exterior DERIVA en X (±6vw, 97 s) y la `<img>` se BALANCEA en Y y
+     rota (±3,5vh y ±2,5°, 61 s). 97 y 61 son primos entre sí, así que la figura combinada no
+     se repite hasta las 1 h 39 min. Solo se anima `transform`: el compositor mueve una capa
+     del tamaño de la copa, sin layout ni repintado por frame.
+
+     LOS PERIODOS ESTÁN DUPLICADOS en LayoutPublico.tsx (`PERIODO_DERIVA_S`,
+     `PERIODO_BALANCEO_S`), que los usa para calcular el `animation-delay` negativo que hace
+     que la trayectoria sobreviva a F5. Si se cambia uno acá sin tocar el otro, la copa salta
+     al recargar. No van en una variable CSS porque el JS los necesita como número.
+
+     La curva va POR FOTOGRAMA en el keyframe y no en el shorthand, que queda en `linear` solo
+     por prolijidad: con un `ease-in-out` global la copa se FRENARÍA en el centro al cerrar cada
+     vuelta, porque 0 % y 100 % son centro. Con media senoide por tramo (sale del centro
+     frenando, vuelve acelerando) la velocidad es continua y máxima al cruzar el centro, que es
+     como se mueve algo que flota. Las pendientes de las dos curvas coinciden en el centro.
+
+     `prefers-reduced-motion` la deja QUIETA y en el centro con su propio `animation: none` al
+     final del archivo, no con la manta. Y aunque la manta llegara a actuar, 0 % y 100 % son el
+     reposo, así que el último fotograma es el centro y no una pose que nadie diseñó. */
+  .lqc-copa-deriva {
+    animation: lqc-copa-deriva 97s linear infinite;
+  }
+
+  .lqc-copa-balanceo {
+    animation: lqc-copa-balanceo 61s linear infinite;
+  }
+
   /* Pills de marca del navbar — los dos enlaces externos de Header.tsx (ATAK.GG y
      Revolution505). Acá vive SOLO el mecanismo, que es idéntico para los dos; el color lo
      inyecta cada acento con `--pill-rgb`.
@@ -664,21 +692,36 @@
 }
 
 /* Definiciones de animaciones */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
+
+/* La copa de fondo: ver `.lqc-copa-deriva` arriba. Centro en 0 %, 50 % y 100 %; extremos en 25 %
+   y 75 %. Del centro al extremo, `ease-out` senoidal; del extremo al centro, `ease-in`. */
+@keyframes lqc-copa-deriva {
+  0%, 50%, 100% {
+    transform: translateX(0);
+    animation-timing-function: cubic-bezier(0.61, 1, 0.88, 1);
   }
-  50% {
-    transform: translateY(-20px) rotate(1deg);
+  25% {
+    transform: translateX(-6vw);
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+  }
+  75% {
+    transform: translateX(6vw);
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
   }
 }
 
-@keyframes float-slow {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
+@keyframes lqc-copa-balanceo {
+  0%, 50%, 100% {
+    transform: translateY(0) rotate(0deg);
+    animation-timing-function: cubic-bezier(0.61, 1, 0.88, 1);
   }
-  50% {
-    transform: translateY(-40px) rotate(2deg);
+  25% {
+    transform: translateY(-3.5vh) rotate(-2.5deg);
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
+  }
+  75% {
+    transform: translateY(3.5vh) rotate(2.5deg);
+    animation-timing-function: cubic-bezier(0.12, 0, 0.39, 0);
   }
 }
 
@@ -791,6 +834,15 @@ iframe:hover {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* La copa de fondo se APAGA, no se acelera: sin `animation-name` el `transform` queda en
+     identidad, que es el centro del recorrido. Gana sobre las clases de `@layer utilities`
+     sin `!important` porque este bloque está fuera de toda capa. El `animation-delay` inline
+     de LayoutPublico.tsx queda sin nada a qué aplicarse. */
+  .lqc-copa-deriva,
+  .lqc-copa-balanceo {
+    animation: none;
+  }
 }
 
 /* Estilos para modo alto contraste */
@@ -810,7 +862,8 @@ iframe:hover {
   }
 
   /* El lienzo de marca se apaga ENTERO: el color de fondo vuelve a negro y los dos pseudos
-     desaparecen. Los tintes son del 2 % al 6 % y su único aporte es atmósfera; en alto
+     desaparecen, y con ellos la copa de fondo de LayoutPublico.tsx. Los tintes del lienzo son
+     del 2 % al 6 % y la copa, blanca, va al 7 %; su único aporte es atmósfera, y en alto
      contraste restan separación entre el fondo y el texto.
      Esta regla puede pisar a `.lqc-lienzo` sin `!important` porque el bloque está FUERA de
      toda `@layer`, y lo que está fuera de capas gana sobre lo que está dentro.
@@ -822,7 +875,8 @@ iframe:hover {
   }
 
   .lqc-lienzo::before,
-  .lqc-lienzo::after {
+  .lqc-lienzo::after,
+  .lqc-copa-deriva {
     display: none;
   }
 }

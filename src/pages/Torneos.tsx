@@ -143,25 +143,6 @@ export default function Torneos() {
 
   return (
     <div className="min-h-screen text-white">
-      {/* Fondo decorativo sutil - igual que Home */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
-        </div>
-        <img
-          src="/assets/logo-copa.webp"
-          alt="LQC Trophy Logo"
-          className="
-            absolute 
-            -left-[60%] sm:-left-[40%] md:-left-[30%] lg:-left-[20%] xl:-left-[10%]
-            top-[10%] sm:top-[5%]
-            w-[110%] sm:w-[90%] md:w-[80%] lg:w-[70%] xl:w-[60%]
-            max-w-none opacity-10
-            animate-float-slow pointer-events-none blur-[1px]
-          "
-        />
-      </div>
-
       <div className="relative z-10">
         {/* Hero */}
         <section className="pt-28 pb-16 md:py-40">
@@ -526,16 +507,6 @@ export default function Torneos() {
             bloque de arriba dice «Hasta 32 equipos» —el techo, que es un dato de reglamento— y
             no un conteo de inscritos, que nadie en el repo sabe. */}
       </div>
-
-      <style>{`
-        @keyframes float-slow {
-          0%, 100% { transform: translateY(0) rotate(0deg); }
-          50% { transform: translateY(-40px) rotate(2deg); }
-        }
-        .animate-float-slow {
-          animation: float-slow 14s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   )
 }

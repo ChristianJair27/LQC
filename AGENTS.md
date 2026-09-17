@@ -629,6 +629,9 @@ legal de Riot** obligatorio (contenido no endosado por Riot). Se llega desde el 
 - **Glow del hero.** Glow animado sutil en los logos del hero. Efecto de 3 capas pensado
   para reusarse; **no colgarlo de `.pill-marca`** — ver la trampa correspondiente.
 
+El 2026-09-16 se sumó una cuarta: la **copa de fondo**, una sola en `LayoutPublico`, con la
+trayectoria continua entre páginas y recargas — ver «La copa de fondo» en el sistema de diseño.
+
 ## Stack
 
 - **React 19** + **TypeScript** (strict) + **Vite 7**
@@ -796,6 +799,64 @@ Lo demás que conviene saber antes de tocarlo:
 - El **grano** de los pósters quedó afuera: `background-blend-mode: soft-light` sobre un
   lienzo casi-negro es invisible por definición —con backdrop en 0 el resultado es 0—, y
   forzarlo con blending `normal` sí sube la luminancia media. No es un pendiente.
+
+### La copa de fondo (`.lqc-copa-deriva` / `.lqc-copa-balanceo`)
+
+**Hecha el 2026-09-16.** La copa blanca que flota detrás del contenido vive **una sola vez**,
+en `LayoutPublico.tsx`, como primer hijo del `<main>`. Antes eran **8 capas `fixed inset-0`
+copiadas por página** —con la copa y una retícula de puntos— y **6 `<style>` que redefinían
+`@keyframes float-slow`** cada uno; al navegar, la capa se remontaba y el movimiento
+reiniciaba. Las 14 se borraron, y con ellas los keyframes `float` y `float-slow` de
+`index.css`, que quedaron sin consumidores. Efectos buscados: **Reglamento gana copa** (no
+tenía), **Registro pierde su movimiento de 6 s**, y las 8 públicas más el 404 tienen
+exactamente el mismo fondo.
+
+| | Valor | Por qué |
+| --- | --- | --- |
+| Tamaño | `min(58vw,45vh)` en base, `min(32vw,45vh)` desde `xl` | **405 px a 1440×900, 217 px a 375×812.** El tope en `vh` la mantiene entera en una ventana ancha y baja |
+| Posición | `fixed`, `top-[20vh]`, centrada con `inset-x-0 mx-auto` | **completa en pantalla en todo el recorrido**, rotación incluida: medido de 320×568 a 2560×1440 y en 1920×600. Único roce: teléfono apaisado (375 de alto), donde la CAJA entra hasta 22 px bajo el header en el tope del balanceo — pero el dibujo empieza ~20 px adentro de la caja |
+| Opacidad | `0.07` + `blur-[1px]` | techo medido 0,08: la copa es **blanco puro**, y es lo que más sube la luminancia detrás del texto |
+| Deriva (el `<div>`) | `translateX` ±6vw, **97 s** | |
+| Balanceo (la `<img>`) | `translateY` ±3,5vh y `rotate` ±2,5°, **61 s** | 97 y 61 son primos entre sí: la figura no se repite hasta 1 h 39 min |
+
+- **Dos nodos porque son dos animaciones de `transform`**, y un elemento lleva una sola. Por
+  lo mismo **se centra con `inset-x-0 mx-auto` y nunca con `-translate-x-1/2`**: la deriva
+  pisaría el `transform` y la copa quedaría corrida media anchura.
+- **La trayectoria sobrevive a navegar, a F5 y a volver de `/admin`.** Navegar entre hijas
+  no remonta el layout (el mismo mecanismo que `TiraHud`). Para lo demás, cada animación
+  lleva un **`animation-delay` negativo** igual a `(Date.now()/1000) % periodo`: arranca en la
+  fase que le tocaría si hubiera corrido desde siempre. Cero rAF, cero timers. Es **aproximado**:
+  en carga en frío la animación arranca ~0,35 s después del `Date.now()` (medido), o sea que
+  la copa retrocede menos de 2 px al recargar. Con el chunk en caché son ~0,01 s.
+  ⚠ **Los periodos están DOS veces**: en los keyframes de `index.css` y en
+  `PERIODO_DERIVA_S` / `PERIODO_BALANCEO_S` de `LayoutPublico.tsx`. **Si cambiás uno sin el
+  otro, la copa salta al recargar** y nada falla. La fase va en un `useState` con
+  inicializador perezoso: recalcularla en un re-render movería la copa de golpe, y como
+  constante de módulo arrastraría la fase vieja al volver de `/admin`.
+- **La curva va por fotograma, no en el shorthand.** 0 %, 50 % y 100 % son el centro; 25 % y
+  75 %, los extremos. Con un `ease-in-out` global la copa se **frenaría en el centro** cada
+  vuelta; con media senoide por tramo la velocidad es continua.
+- **`prefers-reduced-motion`: QUIETA y en el centro**, por su propio `animation: none` fuera
+  de capas, no por la manta de `0.01ms`. Y aunque la manta actuara, el último fotograma ES el
+  centro. **`prefers-contrast: high`** la oculta junto con los pseudos del lienzo (con el mismo
+  defecto de Chromium de arriba).
+- **Apilamiento:** `z-0`, igual que los pseudos. Orden de árbol dentro de ese nivel:
+  `::before` (halos) → copa → `::after` (mosaico). Todo por debajo del `relative z-10` de cada
+  página, así que el **contrato de arriba no cambia**.
+- **⚠ Va dentro de un `<div className="absolute inset-0 z-0 [clip-path:inset(0)]">`, y ese
+  recorte es lo que la saca del pie.** Es el mismo caso que el `::before`: `fixed` dentro del
+  contexto `z-10` de `main`, con un `<footer>` sin posicionar. Sin el recorte, al scrollear
+  hasta abajo la copa se pinta **encima** del pie negro — medido: la silueta se ve clara, y
+  `gray-400` del pie baja de 8,1:1 a 7,8:1. No rompe AA, rompe el encuadre de póster. Las 8
+  capas viejas tenían el mismo defecto, tapado porque estaban medio fuera de pantalla.
+  `clip-path` recorta también a los descendientes `fixed` —`overflow: hidden` **no**—, y no
+  crea bloque contenedor, así que la copa sigue anclada a la ventana. **No lo subas a
+  `main`**: recortaría también el lightbox de `/galeria`, que vive adentro. Verificado en
+  Chromium; Safari y Firefox, no.
+- **La retícula de puntos blancos del fondo se retiró en este mismo cambio y no vuelve**, a
+  propósito: blanco al 3 % sobre azul sube la luminancia de toda la pantalla, y el mosaico ya
+  hace de textura. La trama que sigue en `BloqueSinTransmision` de `Home.tsx` es otra cosa:
+  vive dentro del bloque, sobre su propio negro.
 
 ### La tira de datos (`TiraHud`)
 
@@ -1005,6 +1066,12 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   clase `animate-slide-in-up` y deja la animación al CSS— pero **no toca lo animado por JS
   puro** (canvas, rAF/WAAPI): eso necesita su propio chequeo con
   `matchMedia('(prefers-reduced-motion: reduce)')`.
+- **Fase continua con `animation-delay` negativo inline: el shorthand no la pisa, un cambio
+  de valor sí la rompe.** El `style={{ animationDelay }}` de la copa de `LayoutPublico` gana
+  sobre el `animation:` de la clase porque un estilo inline le gana a cualquier selector. Lo
+  que la rompe es **recalcular** el delay con la animación en curso: el navegador reubica la
+  animación en el acto y la copa salta. Por eso va en un inicializador perezoso de
+  `useState`, y por eso los periodos duplicados entre CSS y TS tienen que coincidir.
 - **Reveal seguro: el estado oculto va en el keyframe, nunca en una clase base
   `opacity-0`.** Si el `opacity: 0` inicial vive en una clase base y el observer no dispara
   (JS desactivado, error, elemento que nunca entra al viewport), el contenido queda

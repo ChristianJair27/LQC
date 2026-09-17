@@ -192,8 +192,11 @@ const CORTE_MS = 8000
 function BloqueSinTransmision() {
   return (
     <div className="relative aspect-video overflow-hidden bg-gradient-to-br from-lqc-900/60 via-black to-black">
-      {/* Trama de puntos: el mismo motivo del fondo de la portada (más arriba en este archivo),
-          para que el bloque se lea como parte del sitio y no como un cuadro pegado. */}
+      {/* Trama de puntos: era el motivo del fondo de todas las páginas públicas, y queda acá
+          para que el bloque se lea como parte del sitio y no como un cuadro pegado. Del fondo
+          se retiró el 2026-09-16, junto con la copa continua, por el lienzo azul —blanco al 3 %
+          sobre azul sube la luminancia de toda la pantalla—; acá vive sobre el negro propio del
+          bloque y no tiene ese problema. */}
       <div
         className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:22px_22px]"
         aria-hidden="true"
@@ -347,25 +350,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen text-white">
-      {/* Fondo decorativo sutil */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
-        </div>
-        <img
-          src="/assets/logo-copa.webp"
-          alt="LQC Trophy Logo"
-          className="
-            absolute 
-            -left-[60%] sm:-left-[40%] md:-left-[30%] lg:-left-[20%] xl:-left-[10%]
-            top-[15%] sm:top-[10%]
-            w-[120%] sm:w-[90%] md:w-[80%] lg:w-[70%] xl:w-[60%]
-            max-w-none opacity-10
-            animate-float-slow pointer-events-none blur-[2px]
-          "
-        />
-      </div>
-
       {/* Contenido principal */}
       <div className="relative z-10">
         {/* Hero - más limpio y centrado */}
@@ -378,8 +362,9 @@ export default function Home() {
                   dependería del orden de compilación. El glow azul es lo que se quiere
                   dominante, así que es el único filtro.
                   La clase vive en index.css —keyframe, token y utilidad— y NO en un <style>
-                  al final de este archivo, que es como quedó `animate-float-slow` repetido en
-                  seis páginas. Ver el comentario de la regla allá. */}
+                  al final de este archivo, que es como estuvo `animate-float-slow`, repetido en
+                  seis páginas hasta que la copa de fondo se mudó a LayoutPublico. Ver el
+                  comentario de la regla allá. */}
               <div className="flex items-center justify-center gap-6 flex-wrap">
                 <img
                   src="/assets/2 LQC.png"
@@ -896,17 +881,6 @@ export default function Home() {
         </Reveal>
 
       </div>
-
-      {/* Animación flotante */}
-      <style>{`
-        @keyframes float-slow {
-          0%, 100% { transform: translateY(0) rotate(0deg); }
-          50% { transform: translateY(-40px) rotate(2deg); }
-        }
-        .animate-float-slow {
-          animation: float-slow 14s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   )
 }

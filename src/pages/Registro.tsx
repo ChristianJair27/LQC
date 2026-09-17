@@ -1691,26 +1691,6 @@ export default function Registro() {
 
   return (
     <div className="min-h-screen text-white">
-      {/* Fondo decorativo */}
-      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="h-full w-full bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:30px_30px]" />
-        </div>
-        <img
-          src="/assets/logo-copa.webp"
-          alt=""
-          aria-hidden="true"
-          className="
-            absolute
-            -left-[60%] sm:-left-[40%] md:-left-[30%] lg:-left-[20%] xl:-left-[10%]
-            top-[15%] sm:top-[10%]
-            w-[110%] sm:w-[90%] md:w-[80%] lg:w-[70%] xl:w-[60%]
-            max-w-none opacity-10 blur-[1px]
-            animate-float pointer-events-none
-          "
-        />
-      </div>
-
       <div className="relative z-10">
         {/* Hero */}
         <section className="pt-28 pb-16 md:pt-40 md:pb-24">
