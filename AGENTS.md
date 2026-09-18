@@ -1503,3 +1503,80 @@ Definidos en `.claude/agents/`:
 - **ui-diseno** — UI, layout, responsive y estilo, con el sistema de diseño de arriba.
 - **contenido** — copy y textos en español.
 - **revisor** — revisión de código de solo lectura, antes de commitear.
+
+## Seguridad de la base — endurecimiento del 2026-09-18
+
+### Qué se revocó y por qué
+Se quitó EXECUTE a `anon` (y a PUBLIC) en cinco funciones de `public`:
+`atak_enviar`, `armar_roster_atak`, `editar_jugador`, `purgar_equipo`,
+`sincronizar_capitan`.
+
+Motivo: la cadena `buscar_equipos(texto)` -> `armar_roster_atak(id)` permitía
+a cualquiera con la anon key (va en el bundle) obtener nombre, correo,
+celular, municipio, escolaridad y género de todos los jugadores inscritos,
+sin sesión. Las policies "solo admins leen" NO protegían: esas funciones son
+SECURITY DEFINER con dueño `supabase_admin` (superusuario), que se salta RLS
+siempre. **El único candado real sobre una función SECURITY DEFINER es el
+EXECUTE, no la policy.**
+
+No romper esto: las llamadas internas (registrar_jugador -> sincronizar_capitan
+-> atak_enviar) siguen funcionando porque corren con los permisos del dueño.
+
+### Estado verificado ese día
+- RLS activo en `equipos` y `jugadores`; `anon` NO tiene SELECT en ninguna.
+- El INSERT de `anon` sobre ambas tablas es inofensivo hoy (no hay policy de
+  INSERT) pero sobra; pendiente revocarlo.
+- `authenticated` conserva lo que el panel usa: SELECT en ambas tablas,
+  UPDATE en `equipos`, EXECUTE en `editar_jugador`. Nada más se le necesita.
+- La service_role NO está en el frontend, ni en el repo, ni en el historial
+  de ninguna rama (verificado decodificando JWT, no solo buscando texto).
+- RutaProtegida protege /admin solo del lado del cliente. La barrera real son
+  los grants.
+
+### Integración con ATAK
+- El secreto `X-LQC-Secret` se rotó el 2026-09-18 (quedó expuesto en logs de
+  una sesión). Verificado funcionando de ambos lados.
+- **`atak_enviar` dispara y se olvida**: usa `net.http_post` y nadie lee la
+  respuesta. Cualquier fallo de la integración es invisible.
+  Para diagnosticar: `select id, status_code, content, created from
+  net._http_response order by created desc limit 10;`
+  Leer SIEMPRE `content`, no solo `status_code`. Las filas expiran en horas.
+- Falla encontrada: desde que el torneo pasó a fase `active` (ronda 1), ATAK
+  rechazaba con 409 toda llamada a `/register`. Es decir, ninguna edición de
+  nombre o correo hecha en el panel llegó a ATAK en ese periodo.
+  Kister lo corrigió; con el torneo en marcha `/register` ahora responde:
+  `player_updated` al corregir nombre/correo, y `player_added` al dar de alta
+  un refuerzo en un equipo existente. Un equipo nuevo sigue dando 409 a
+  propósito (el bracket ya está generado).
+- **Trampa de `codesRefreshed`**: al agregar un jugador a un equipo existente,
+  ATAK regenera los códigos de lobby y los devuelve en el cuerpo. Como nadie
+  lee el cuerpo, esos códigos se pierden y el equipo se queda con uno que ya
+  no sirve. Tras agregar a alguien, leer `content` de esa llamada y pasarle
+  los códigos nuevos al capitán. No hacerlo justo antes de una partida.
+- **La llave del upsert de ATAK es el gamertag.** Editarlo en LQC crearía un
+  jugador nuevo en ATAK en vez de renombrarlo. Hoy es imposible por diseño:
+  `editar_jugador` solo acepta las claves `correo` y `nombre`, y
+  `authenticated` no tiene UPDATE sobre `jugadores`. No aflojar ninguna de
+  las dos cosas sin hablar con Kister.
+
+### Pendiente de esta línea de trabajo
+1. Pasada 2 de revokes: quitar INSERT/TRIGGER a `anon` y
+   INSERT/REFERENCES/TRIGGER/TRUNCATE a `authenticated` en ambas tablas, más
+   EXECUTE de `atak_enviar`, `armar_roster_atak`, `purgar_equipo` y
+   `sincronizar_capitan` a `authenticated`. Ojo: TRUNCATE no dispara el
+   trigger BEFORE DELETE, así que rodea el guardia de `equipos`.
+   Dejar a `authenticated` las RPC del formulario público: un admin logueado
+   que abra /registro entra como `authenticated`, no como `anon`.
+2. Candado `inscripciones_abiertas` en la base, consultado por
+   `registrar_jugador` Y `registrar_equipo`, para que reabrir sea un UPDATE
+   de una fila y no un build+deploy.
+3. Privilegios por defecto: `postgres` y `supabase_admin` conceden EXECUTE a
+   anon/authenticated en cada función nueva de `public`. Por eso nacen
+   públicas. Cambiarlo y documentar que desde entonces hay que exponerlas a
+   mano.
+4. `atak_enviar` y `purgar_equipo` son SECURITY DEFINER sin `SET search_path`.
+   Ponérselo.
+5. `notificar_atak()` no aparece en ningún trigger de `equipos` ni
+   `jugadores`. Confirmar si es huérfana.
+6. `registrar_equipo` no valida tope de 32 equipos ni gamertag duplicado,
+   a diferencia de `registrar_jugador`.
