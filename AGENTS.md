@@ -1066,11 +1066,146 @@ Convenciones que dejó esa migración, a respetar en páginas nuevas:
   "Variables de entorno".
 - **Verificación independiente.** El reporte de un agente no alcanza como prueba.
   Confirmá por tu cuenta con `grep`, con el build y **leyendo el diff**.
+- **Un cambio de UI se verifica MIRÁNDOLO.** Corré `npm run capturas` y abrí la hoja.
+  El build, el lint, los contrastes y las medidas pueden dar todos verde con la página
+  rota: pasó el 2026-09-16 con la copa de fondo cortada por el borde, que ningún número
+  detectó y que se vio de un vistazo. Los números dicen *qué* cambió; solo la imagen dice
+  si está **bien**. Ver [Capturas antes/después](#capturas-antesdespués-npm-run-capturas).
 - **Pasá los cambios visibles por el agente `revisor`** antes de commitear.
 - **Un commit por propósito.** Nunca mezcles un fix de infraestructura con
   cambios de UI.
 - **Mantené este archivo al día.** Si cambia un conteo o un canon de diseño,
   actualizalo **en el mismo commit** que introduce el cambio.
+
+## Capturas antes/después (`npm run capturas`)
+
+**Qué es.** `scripts/capturas.mjs` arma una **hoja de contactos**: para las 8 rutas
+públicas y en dos anchos (1440 y 375), pone lado a lado cómo se veía la página **antes**
+de tus cambios y cómo se ve **después**. Sale en `capturas/index.html` y se abre sola en
+el navegador. La carpeta `capturas/` está en `.gitignore`: se regenera en cada corrida y
+**nunca** se versiona.
+
+**Cómo se corre.**
+
+```bash
+npm run capturas              # árbol de trabajo contra HEAD  ← el caso normal
+npm run capturas -- HEAD~3    # contra otro commit
+npm run capturas -- --no-abrir
+```
+
+**Tarda unos 15 minutos** (medido: 871s con las 8 rutas en los dos anchos). No es rápido y
+conviene saber en qué se va, porque casi todo es deliberado: son **tres cargas completas por
+celda** —dos del «antes» para medir el piso de ruido, una del «después»— y cada carga espera
+a que la página se asiente de verdad antes de disparar. Los dos builds son apenas 15
+segundos del total. La ruta más cara con diferencia es **`/carta`**, que monta el catálogo
+entero de campeones y se toma hasta 55s por carga esperando iconos de un CDN ajeno: ella
+sola son unos 5 minutos.
+
+Construye los dos lados (el «antes» en un `git worktree` aparte, así tu árbol de trabajo no
+se toca), los sirve a la vez en dos puertos y los recorre con un solo Chrome. Necesita
+`playwright-core` —ya está como devDependency— y el **Chrome del sistema**; no descarga
+ningún navegador.
+
+**LA REGLA: un cambio de UI se aprueba MIRANDO la hoja, no leyendo números.** El
+2026-09-16 el build, el lint, los contrastes y las medidas daban todos verde y la copa de
+fondo estaba **cortada por el borde**. Ningún número lo detectó, y se vio de un vistazo al
+abrir el navegador. La verificación de entonces sí sacaba capturas, pero las metía en un
+Buffer, las convertía en estadísticas y las tiraba: nunca hubo una imagen que un humano
+pudiera abrir. Los números dicen *qué* cambió; solo la imagen dice si está **bien**.
+`npm run build` sigue siendo obligatorio — esto no lo reemplaza, lo completa.
+
+**Tres reglas del script que no son negociables** (están comentadas en el código, cada una
+pagada con un día de depuración):
+
+1. **Nunca se guardan imágenes «golden» de referencia.** Los dos lados se generan siempre
+   juntos, en la misma corrida y con el mismo Chrome. El navegador se autoactualiza y
+   cambia cómo antialiasea: una referencia vieja compara dos Chromes distintos y el diff
+   se llena de falsos positivos que parecen bugs.
+2. **El sondeo de red se congela antes de capturar.** `/torneos` consulta ATAK en
+   intervalos; si una respuesta cae entre dos capturas, la página repinta sola y el diff
+   reporta un cambio que no causó tu código.
+3. **El piso de ruido se mide, no se supone.** De cada ruta se toman **tres** fotos: dos
+   del «antes» —que dan el ruido de base— y una del «después». El umbral para declarar un
+   cambio real sale de esa medición, con un piso mínimo de 20 px por fila.
+   **La segunda foto del «antes» es una carga NUEVA, no un segundo disparo sobre la misma
+   página ya congelada.** Al principio era lo segundo, y así medía la repetibilidad del
+   screenshot —que da cero— en vez de la varianza de carga a carga, que es la que de verdad
+   contamina la comparación. Medía algo cierto y completamente inútil.
+
+**Trampas que ya se pagaron acá, para no repetirlas:**
+
+- **La copa de fondo se mueve con el reloj, así que hay que capturar con movimiento
+  reducido.** `lqc-copa-deriva` (97 s) y `lqc-copa-balanceo` (61 s) son infinitas y su
+  `animation-delay` negativo se calcula en JS desde la hora real —a propósito, para que la
+  trayectoria sobreviva a los cambios de página—, o sea que la posición de la copa es
+  función del momento en que mirás. Entre la captura del «antes» y la del «después» pasan
+  segundos: la primera corrida de esta herramienta acusó **14 de 16 rutas «con cambios»**
+  cuando el único cambio era el propio script. Fijar `currentTime` a mano no alcanza, porque
+  cada carga arranca con un delay distinto. El contexto se abre con
+  `reducedMotion: 'reduce'`, que el sitio ya implementa dejando la copa quieta y centrada.
+  **Consecuencia: la hoja no sirve para revisar la animación en movimiento.** Para eso, a
+  mano en el navegador.
+- **La carga perezosa y el revelado por scroll se desactivan durante la captura.**
+  `fullPage` fotografía más allá del viewport **sin** disparar el `IntersectionObserver`,
+  así que las fotos de `/galeria` salían como placeholders vacíos —y, peor, cargadas de un
+  lado y vacías del otro, con la hoja reportando esa diferencia como si fuera tuya—.
+  Pasear el scroll ayudaba pero no convergía siempre. El script reemplaza el observador por
+  uno que declara todo visible apenas lo observan: es agnóstico de la librería y da el mismo
+  resultado en los dos lados. De paso arregla `Reveal.tsx`, que sin esto capturaba sus
+  bloques en su estado previo a la animación. Si aun así queda una imagen a medio bajar, la
+  celda lo dice en la hoja (**«OJO: N imágenes sin terminar de cargar»**) en vez de fingir
+  que la comparación vale.
+- **El visor de PDF de `/reglamento` se captura con la caja pero sin el contenido.** El
+  `<object>` lo pinta un plugin del navegador cuando quiere y no hay evento que avise: salía
+  gris en una carga y azul en la siguiente, con un piso de ruido de 228 px que se comía
+  cualquier cambio real de esa página. Se le pone `visibility: hidden`, que apaga el pintado
+  **conservando la caja**, así que el marco, el tamaño y la posición del visor —que sí son
+  nuestra UI— se siguen comparando. Lo que se deja de mirar es el PDF adentro.
+- **`/carta` monta el catálogo entero de campeones (400+ iconos del CDN de Riot).** Como la
+  captura fuerza todo a cargar de una, depende de una red ajena y a veces no termina. No se
+  disimula: la celda sale marcada **«OJO: N imágenes sin terminar de cargar»** y su veredicto
+  no vale. Si te pasa, volvé a correrlo.
+- **El reloj de `TiraHud` cambia solo cada minuto, y está en todas las páginas.** Si el
+  minuto avanza entre la captura del «antes» y la del «después», las ocho rutas acusan un
+  cambio que no existe. El script inyecta un `Date` fijado en un único instante —la hora
+  real del arranque, para que la hoja siga siendo creíble— de modo que los dos lados vean
+  el mismo «ahora». Lo mismo cubre cualquier otra cosa que se derive del reloj.
+- **Los `.env` no están en git, y `git worktree` solo saca lo versionado.** Sin copiarlos a
+  mano, el lado «antes» se construye sin `VITE_SUPABASE_*` y `/galeria` cae a su estado de
+  error mientras el «después» trae las fotos reales: el diff deja de comparar código y pasa
+  a comparar entornos. El script los copia (`copiarEntorno`) y **avisa por consola si algún
+  lado se construyó sin variables**. Si ves ese aviso, la hoja no es confiable.
+- **Las rutas son `React.lazy`: cuando se dispara `load` el `<body>` todavía está vacío** y
+  lo único montado es el spinner del Suspense. Sin esperar a que aparezca contenido, las
+  capturas salen en blanco. Por eso `esperarAppRenderizada` espera a que haya texto —el
+  spinner no tiene, así que no da falsos positivos— y a que el alto deje de moverse.
+- **Todo bucle que corre dentro de la página lleva tope de vueltas.** `page.evaluate` no
+  respeta los timeouts de Playwright: la primera versión se colgó quince minutos en
+  `/carta` sin avanzar ni fallar.
+- **Las imágenes de la galería son lazy** y `fullPage` captura más allá del viewport sin
+  disparar el IntersectionObserver. Hay que pasear la página y repetir hasta que la cuenta
+  de imágenes se estabilice.
+
+**Cómo lee los veredictos de la hoja.** Cada celda dice una de estas cosas, y la diferencia
+importa:
+
+- **«sin cambios visibles»** — ni un píxel distinto.
+- **«N filas cambian»** — cambio por encima del umbral. Mirá qué es.
+- **«cambios muy chicos (N px) — miralo igual»** — hay diferencia pero no llega al umbral.
+  Un ícono de 12 px o un borde de 1 px caen acá: el chip NO afirma que esté bien.
+- **«la página crece/encoge N px»** y **«se ensancha N px (¿desborde horizontal?)»** — lo
+  segundo es la pista de un desborde lateral, que es justo lo que el diff no vería solo,
+  porque compara hasta el menor de los dos anchos.
+- **«OJO: N imágenes sin terminar de cargar»** — el veredicto de esa celda no vale, diga lo
+  que diga. Volvé a correrlo.
+
+**Con el árbol limpio** (nada sin commitear) no hay «después» que comparar, así que el
+script compara **HEAD contra HEAD~1** y lo avisa por consola.
+
+**Lo que NO cubre.** `/admin` (está tras login y no es UI pública), los estados que piden
+interacción (menú móvil abierto, formulario con errores, lightbox de la galería), la
+animación en movimiento (se captura con movimiento reducido) y cualquier cosa que dependa
+de datos que cambian solos. Para eso, mirá a mano.
 
 ## Trampas conocidas (técnicas)
 
@@ -1328,6 +1463,7 @@ npm run dev       # servidor de desarrollo (Vite)
 npm run build     # tsc -b && vite build  ← la verificación obligatoria
 npm run lint      # eslint
 npm run preview   # sirve el build de producción
+npm run capturas  # hoja de contactos ANTES/DESPUÉS ← la verificación de todo cambio de UI
 ```
 
 ## Equipo de agentes

@@ -145,3 +145,7 @@ vite.config.ts.timestamp-*
 # Póster de referencia de las letras de fondo: lleva gamertags reales y el repo es PÚBLICO, así
 # que no se versiona. Vive solo en local. Ver AGENTS.md, «Las letras de fondo».
 docs/referencia-letras-lqc.jpg
+
+# Hoja de contactos de scripts/capturas.mjs: se regenera en cada corrida, nunca se versiona.
+# Guardar capturas en el repo sería justo lo que la herramienta prohíbe (ver AGENTS.md).
+capturas/
