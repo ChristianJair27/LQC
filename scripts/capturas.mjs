@@ -74,6 +74,12 @@ const PUERTOS = { antes: 18491, despues: 18492, hoja: 18493 }
    el reloj del encabezado no se mueva entre el antes y el después. Ver `addInitScript`. */
 const AHORA = Date.now()
 
+/* Lo mismo para la temperatura de la tira: una sola respuesta de Open-Meteo por corrida,
+   compartida por los dos anchos. Una por URL y no una sola: si el cambio en revisión toca la
+   consulta de src/lib/clima.ts, el «después» tiene que recibir SU respuesta y no la del
+   «antes», o una regresión real quedaría tapada. Ver `ctx.route` en el recorrido. */
+const climaPorUrl = new Map()
+
 const log = (...a) => console.log(...a)
 
 /* OJO: esto LANZA, no llama a `process.exit`. Parece un detalle y no lo es: `process.exit`
@@ -257,11 +263,11 @@ const conLimite = (promesa, ms, que) => {
   ]).finally(() => clearTimeout(reloj))
 }
 
-/* Las imágenes de la galería son lazy y el `fullPage` de Playwright captura más allá del
-   viewport sin disparar el IntersectionObserver: sin este paseo, la galería sale llena de
-   placeholders. Se repite hasta que la cuenta de imágenes se estabiliza en vez de pasear una
-   sola vez, porque una imagen que todavía está bajando no está «completa» y capturarla a
-   medias produce una diferencia que no existe en el código.
+/* Espera a que las imágenes que VAN A SALIR EN LA FOTO terminen de bajar. Se repite hasta
+   que la cuenta se estabiliza en vez de mirar una sola vez, porque una imagen que todavía
+   está bajando no está «completa» y capturarla a medias produce una diferencia que no
+   existe en el código. Qué imágenes cuentan y por qué se fuerzan a `eager`: ver
+   `__imagenesEnCaptura` en el contexto.
    Los dos bucles tienen tope de vueltas a propósito: se ejecutan DENTRO de la página, y ahí
    un `while` que no termina no lo salva ningún timeout de afuera. */
 async function asentarImagenes(page) {
@@ -274,6 +280,7 @@ async function asentarImagenes(page) {
   for (let vuelta = 0; vuelta < 2; vuelta++) {
     const estado = await conLimite(
       page.evaluate(async () => {
+        for (const img of window.__imagenesEnCaptura()) if (img.loading === 'lazy') img.loading = 'eager'
         const paso = Math.max(400, Math.round(window.innerHeight * 1.5))
         const TOPE = 40
         for (let i = 0; i < TOPE; i++) {
@@ -284,32 +291,36 @@ async function asentarImagenes(page) {
         }
         window.scrollTo(0, 0)
         await new Promise((r) => setTimeout(r, 80))
-        const imgs = Array.from(document.images)
+        const imgs = window.__imagenesEnCaptura()
         return { total: imgs.length, completas: imgs.filter((i) => i.complete && i.naturalWidth > 0).length }
       }),
       45000,
       'el paseo para cargar imágenes',
     )
-    /* Esperar a que las que YA están en el DOM terminen de bajar. Esto no estaba y era la
-       diferencia entre una galería completa y una a medio pintar. */
-    /* El presupuesto escala con la cantidad de imágenes. Un fijo de 25s alcanzaba para las
-       ocho fotos de la portada y se quedaba cortísimo en /carta, que monta el catálogo
-       entero de campeones —más de 400 iconos, y encima del CDN de Riot, o sea red ajena—.
-       Cuando ni así terminan, no se disimula: el recuento final de abajo lo reporta y la
-       celda sale marcada como no confiable. */
+    /* Esperar a que las que salen en la foto terminen de bajar. El presupuesto escala con
+       su cantidad. Cuando ni así terminan, no se disimula: el recuento final de abajo lo
+       reporta y la celda sale marcada como no confiable. */
     const presupuesto = Math.min(55000, 15000 + estado.total * 100)
     await page
-      .waitForFunction(() => Array.from(document.images).every((i) => i.complete), null, { timeout: presupuesto, polling: 250 })
+      .waitForFunction(() => window.__imagenesEnCaptura().every((i) => i.complete), null, { timeout: presupuesto, polling: 250 })
       .catch(() => {})
     /* Estable = ya no aparecen imágenes nuevas Y todas las que hay terminaron. */
     if (estado.total === estado.completas && estado.total === previo) break
     previo = estado.total
   }
+  /* NO se fuerza `img.decode()` acá, y parece que faltara. Se probó el 2026-09-17: el
+     revisor vio en una reproducción aparte una foto de /galeria salir como rectángulo liso
+     con `complete: true`, y propuso esperar la decodificación. En ESTE pipeline hizo lo
+     contrario de lo buscado: la misma foto salía con dos remuestreos distintos entre cargas
+     (90 070 px en la galería de teléfono, 287 en el logo del pie), con o sin
+     `decoding = 'sync'`. Sin él, ruido 0 en esas dos celdas y ninguna foto vacía en seis
+     cargas revisadas. Si alguna vez ves un rectángulo liso con el recuento en 0, esa es la
+     hipótesis a retomar, pero medí antes de volver a meterlo. */
   /* Recuento final HONESTO. Si algo quedó colgando, quien llama tiene que decirlo en la
      hoja: rendirse en silencio y fotografiar igual fue exactamente el bug que produjo una
      comparación inventada en /galeria. */
   return page.evaluate(() => {
-    const imgs = Array.from(document.images)
+    const imgs = window.__imagenesEnCaptura()
     return { total: imgs.length, pendientes: imgs.filter((i) => !i.complete).length }
   })
 }
@@ -352,6 +363,10 @@ async function prepararYCapturar(page, url, destino) {
   await page.goto(url, { waitUntil: 'load' })
   await esperarAppRenderizada(page)
   await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {})
+  /* La primera carga de la corrida es la que dispara la consulta real a Open-Meteo, que
+     puede tardar hasta 7s: sin esto, la temperatura podía llegar después de la foto del
+     primer «antes» y faltar solo ahí. */
+  await Promise.all(climaPorUrl.values())
   /* `.then(() => true)`: `document.fonts.ready` resuelve con el FontFaceSet, que Playwright
      no puede serializar de vuelta a Node. Devolver un booleano evita el error. */
   await conLimite(page.evaluate(() => document.fonts.ready.then(() => true)), 15000, 'la carga de fuentes').catch(() => {})
@@ -651,15 +666,16 @@ try {
       Falso.UTC = Real.UTC
       window.Date = Falso
     }, AHORA)
-    /* La carga perezosa deja de ser perezosa mientras fotografiamos. `fullPage` captura más
-       allá del viewport sin disparar el IntersectionObserver, así que las fotos de /galeria
-       salían como placeholders vacíos — y peor: salían cargadas de un lado y vacías del
-       otro, o sea que la hoja comparaba una galería llena contra una vacía y lo reportaba
-       como si fuera tu cambio. Pasear el scroll ayudaba pero no convergía siempre. Esto sí:
-       se reemplaza el observador por uno que declara TODO visible apenas lo observan, que es
-       exactamente lo que quiere una captura estática. Es agnóstico de la librería y da el
-       mismo resultado en los dos lados. Efecto secundario buscado: cualquier revelado por
-       scroll también aparece ya revelado, en vez de capturarse a medias. */
+    /* El revelado por scroll deja de esperar al scroll mientras fotografiamos. `fullPage`
+       captura más allá del viewport sin disparar el IntersectionObserver, así que lo que se
+       revela al entrar en pantalla (`Reveal.tsx`) salía en su estado previo a la animación.
+       Se reemplaza el observador por uno que declara TODO visible apenas lo observan, que es
+       exactamente lo que quiere una captura estática: es agnóstico de la librería y da el
+       mismo resultado en los dos lados.
+       Esto NO alcanza al `loading="lazy"` nativo del <img>, que Chrome resuelve por dentro
+       sin pasar por esta clase: eso lo cubre `__imagenesEnCaptura`, acá abajo. Una versión
+       anterior de este comentario decía que el observador arreglaba las fotos de /galeria;
+       no era cierto, la galería nunca usó uno. */
     await ctx.addInitScript(() => {
       window.IntersectionObserver = class {
         constructor(cb) {
@@ -686,6 +702,75 @@ try {
           return [0]
         }
       }
+    })
+    /* Las imágenes que salen en la foto, y solo esas. Dos casos que se descubrieron MIRANDO
+       la hoja, con el recuento diciendo otra cosa:
+       - /galeria usa `loading="lazy"` NATIVO (y también el pie, Home y /carta), que no pasa
+         por el IntersectionObserver reemplazado arriba. En teléfono, más de la mitad de las
+         fotos salían como rectángulos vacíos EN LOS DOS LADOS. La celda sí salía marcada
+         como no confiable, pero se le echó la culpa a la red; mirando la captura se vio que
+         esas fotos nunca se habían pedido. Por eso `asentarImagenes` las pasa a `eager`.
+       - /carta monta el catálogo de campeones entero en una lista con scroll propio de 288px
+         (`max-h-72 overflow-y-auto`). Los que quedan fuera de esa caja no salen en la
+         captura, y como son lazy y nadie scrollea la caja, nunca se piden. Se contaban igual
+         como «sin terminar de cargar» (146 por carga; el «438» de la hoja era la suma de las
+         tres), la celda salía marcada como no confiable y cada carga esperaba dos vueltas de
+         33s algo que no podía pasar. Se atribuyó al CDN de Riot y no era eso.
+       Recortada = fuera de la caja de un ancestro que recorta en ese eje. `html` y `body` no
+       cuentan: `fullPage` captura el documento entero. Una imagen `absolute` o `fixed` puede
+       escapar del recorte de sus ancestros, así que ante la duda cuenta: esperar de más
+       cuesta segundos, y contar de menos da un «todo cargado» falso. */
+    await ctx.addInitScript(() => {
+      window.__imagenesEnCaptura = () =>
+        Array.from(document.images).filter((img) => {
+          if (img.getClientRects().length === 0) return false
+          const r = img.getBoundingClientRect()
+          const raiz = (el) => el === document.body || el === document.documentElement
+          for (let el = img; el.parentElement && !raiz(el.parentElement); ) {
+            const pos = getComputedStyle(el).position
+            if (pos === 'absolute' || pos === 'fixed') return true
+            el = el.parentElement
+            const cs = getComputedStyle(el)
+            const c = el.getBoundingClientRect()
+            if (cs.overflowY !== 'visible' && (r.bottom <= c.top || r.top >= c.bottom)) return false
+            if (cs.overflowX !== 'visible' && (r.right <= c.left || r.left >= c.right)) return false
+          }
+          return true
+        })
+    })
+    /* La temperatura de la tira (`TiraHud`, en todas las páginas) viene de Open-Meteo: un
+       dato ajeno que cambia solo y que a veces no llega. Pasó en la corrida que validaba
+       esta herramienta: /galeria en teléfono acusó «10 filas cambian» porque el «antes»
+       mostraba «22°C» y en el «después» la consulta falló y el segmento desapareció. Mismo
+       remedio que el reloj: se pide UNA vez por corrida y se sirve esa misma respuesta
+       —o el mismo fallo— a los dos lados. El corte de 7s queda por debajo de los 8s con que
+       el sitio aborta, para que una respuesta lenta cuente como fallo desde la primera
+       carga y no aparezca recién en la segunda.
+       Efecto colateral: interceptar cualquier cosa apaga la caché HTTP del contexto, así que
+       Supabase y Data Dragon se vuelven a bajar en cada carga. Los tiempos medidos de
+       AGENTS.md ya lo incluyen. */
+    await ctx.route('https://api.open-meteo.com/**', async (route) => {
+      const url = route.request().url()
+      /* `.catch` y no el segundo argumento de `.then`, que no atrapa un fallo de `r.body()`.
+         Un rechazo dentro de este handler no lo agarra nadie: el proceso muere sin pasar por
+         el `finally` y deja tirados el worktree, la junction y la copia del .env. */
+      if (!climaPorUrl.has(url)) {
+        climaPorUrl.set(
+          url,
+          route
+            .fetch({ timeout: 7000 })
+            .then(async (r) => ({ status: r.status(), body: await r.body() }))
+            .catch(() => null),
+        )
+      }
+      const clima = await climaPorUrl.get(url)
+      if (!clima) return route.abort()
+      return route.fulfill({
+        status: clima.status,
+        body: clima.body,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+      })
     })
     ctx.setDefaultTimeout(30000)
     ctx.setDefaultNavigationTimeout(45000)
@@ -724,11 +809,11 @@ try {
             const d = await prepararYCapturar(page, srvDespues.url + ruta, path.join(SALIDA, fDespues))
             return a.pendientes + r.pendientes + d.pendientes
           })(),
-          /* Seis minutos por celda. Suena enorme y es a propósito: son TRES cargas completas,
-             y /carta se toma hasta 55s por carga esperando los 400+ iconos del catálogo de
-             campeones. Con el tope en 180s esa ruta moría por timeout —o sea, se perdía la
-             captura entera— en vez de salir con su aviso de imágenes pendientes. Vale más
-             una celda lenta y marcada que una celda ausente. */
+          /* Seis minutos por celda, holgado a propósito: son TRES cargas completas, y cada
+             una puede gastar hasta 55s por vuelta —son dos vueltas— esperando imágenes
+             (`asentarImagenes`). Con el tope en 180s una celda así moría por timeout —o
+             sea, se perdía la captura entera— en vez de salir con su aviso de imágenes
+             pendientes. Vale más una celda lenta y marcada que una celda ausente. */
           360000,
           'la captura de ' + ruta,
         )

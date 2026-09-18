@@ -1093,13 +1093,12 @@ npm run capturas -- HEAD~3    # contra otro commit
 npm run capturas -- --no-abrir
 ```
 
-**Tarda unos 15 minutos** (medido: 871s con las 8 rutas en los dos anchos). No es rápido y
-conviene saber en qué se va, porque casi todo es deliberado: son **tres cargas completas por
-celda** —dos del «antes» para medir el piso de ruido, una del «después»— y cada carga espera
-a que la página se asiente de verdad antes de disparar. Los dos builds son apenas 15
-segundos del total. La ruta más cara con diferencia es **`/carta`**, que monta el catálogo
-entero de campeones y se toma hasta 55s por carga esperando iconos de un CDN ajeno: ella
-sola son unos 5 minutos.
+**Tarda unos 4 minutos** (medido: 242 s con las 8 rutas en los dos anchos, de los que los
+dos builds son unos 17). El resto es deliberado: son **tres cargas completas por celda**
+—dos del «antes» para medir el piso de ruido, una del «después»— y cada carga espera a que
+la página se asiente de verdad antes de disparar. La versión de `0db42bb` tardaba 871 s, y
+la diferencia se iba casi toda en esperar imágenes lazy que nunca se pedían (ver «Solo cuentan
+las imágenes que salen en la foto», abajo).
 
 Construye los dos lados (el «antes» en un `git worktree` aparte, así tu árbol de trabajo no
 se toca), los sirve a la vez en dos puertos y los recorre con un solo Chrome. Necesita
@@ -1147,29 +1146,57 @@ pagada con un día de depuración):
   mano en el navegador.
 - **La carga perezosa y el revelado por scroll se desactivan durante la captura.**
   `fullPage` fotografía más allá del viewport **sin** disparar el `IntersectionObserver`,
-  así que las fotos de `/galeria` salían como placeholders vacíos —y, peor, cargadas de un
-  lado y vacías del otro, con la hoja reportando esa diferencia como si fuera tuya—.
-  Pasear el scroll ayudaba pero no convergía siempre. El script reemplaza el observador por
-  uno que declara todo visible apenas lo observan: es agnóstico de la librería y da el mismo
-  resultado en los dos lados. De paso arregla `Reveal.tsx`, que sin esto capturaba sus
-  bloques en su estado previo a la animación. Si aun así queda una imagen a medio bajar, la
-  celda lo dice en la hoja (**«OJO: N imágenes sin terminar de cargar»**) en vez de fingir
-  que la comparación vale.
+  así que `Reveal.tsx` capturaba sus bloques en su estado previo a la animación. El script
+  reemplaza el observador por uno que declara todo visible apenas lo observan: es agnóstico
+  de la librería y da el mismo resultado en los dos lados. **Eso no alcanza al
+  `loading="lazy"` nativo**, que Chrome resuelve por dentro sin pasar por el observador, y
+  que usan `/galeria`, el pie, Home y `/carta`. En `/galeria` de teléfono más de la mitad de
+  las fotos salían como rectángulos vacíos **en los dos lados**. La celda sí salía marcada
+  como no confiable, pero se le echó la culpa a la red; mirando la captura se vio que esas
+  fotos nunca se habían pedido. El script pasa a `eager` las imágenes que salen en la foto.
+  (Una versión anterior de esta viñeta decía que el observador arreglaba las fotos de la
+  galería: era falso, la galería nunca usó uno.) Si aun así queda una imagen a medio bajar,
+  la celda lo dice en la hoja (**«OJO: N imágenes sin terminar de cargar»**) en vez de
+  fingir que la comparación vale.
+- **No se fuerza `img.decode()`, a propósito.** El `revisor` vio, en una reproducción aparte,
+  una foto de `/galeria` salir como rectángulo liso con `complete: true` (descargada pero sin
+  decodificar), y propuso esperar la decodificación antes de disparar. En el pipeline real
+  hizo lo contrario: la misma foto salía con **dos remuestreos distintos** entre cargas
+  —90 070 px en la galería de teléfono, 287 en el logo del pie—, con o sin
+  `decoding = 'sync'`. Sin él: ruido 0 en esas celdas y ninguna foto vacía en seis cargas
+  revisadas. Si alguna vez ves una foto lisa con el recuento en 0, esa es la hipótesis a
+  retomar, pero **medí antes de volver a meterlo**: un arreglo que sube el piso de ruido se
+  traga los cambios reales de la celda entera.
 - **El visor de PDF de `/reglamento` se captura con la caja pero sin el contenido.** El
   `<object>` lo pinta un plugin del navegador cuando quiere y no hay evento que avise: salía
   gris en una carga y azul en la siguiente, con un piso de ruido de 228 px que se comía
   cualquier cambio real de esa página. Se le pone `visibility: hidden`, que apaga el pintado
   **conservando la caja**, así que el marco, el tamaño y la posición del visor —que sí son
   nuestra UI— se siguen comparando. Lo que se deja de mirar es el PDF adentro.
-- **`/carta` monta el catálogo entero de campeones (400+ iconos del CDN de Riot).** Como la
-  captura fuerza todo a cargar de una, depende de una red ajena y a veces no termina. No se
-  disimula: la celda sale marcada **«OJO: N imágenes sin terminar de cargar»** y su veredicto
-  no vale. Si te pasa, volvé a correrlo.
+- **Solo cuentan las imágenes que salen en la foto.** `/carta` monta el catálogo de
+  campeones en una lista con scroll propio de 288 px (`max-h-72 overflow-y-auto`). Los iconos
+  que quedan fuera de esa caja no aparecen en la captura, y como son lazy y nadie la
+  scrollea, nunca se piden. El script los contaba igual: la celda salía **«OJO: 438 imágenes
+  sin terminar de cargar»** (146 por carga, sumadas las tres) y cada carga esperaba dos
+  vueltas de 33 s algo que no podía pasar, más de 6 minutos por corrida. Se le atribuyó al
+  CDN de Riot y **era falso**; se descubrió mirando la captura, que no tenía ningún hueco.
+  `__imagenesEnCaptura` descarta las imágenes recortadas por un ancestro que recorta en ese
+  eje. Ante la duda —una imagen `absolute` o `fixed`, que puede escapar del recorte— cuenta:
+  esperar de más cuesta segundos, contar de menos da un «todo cargado» falso.
 - **El reloj de `TiraHud` cambia solo cada minuto, y está en todas las páginas.** Si el
   minuto avanza entre la captura del «antes» y la del «después», las ocho rutas acusan un
   cambio que no existe. El script inyecta un `Date` fijado en un único instante —la hora
   real del arranque, para que la hoja siga siendo creíble— de modo que los dos lados vean
   el mismo «ahora». Lo mismo cubre cualquier otra cosa que se derive del reloj.
+- **La temperatura de `TiraHud` es un dato ajeno (Open-Meteo), y también está en todas las
+  páginas.** El reloj fijo no la cubre. En la corrida que validaba la herramienta, `/galeria`
+  en teléfono acusó «10 filas cambian»: el «antes» mostraba «22°C» y en el «después» la
+  consulta falló y el segmento desapareció. Mismo remedio que el reloj: el script intercepta
+  `api.open-meteo.com`, pide la temperatura **una vez por corrida** y sirve esa misma
+  respuesta —o el mismo fallo— a los dos lados. Una vez **por URL**: si tu cambio toca la
+  consulta de `src/lib/clima.ts`, el «después» recibe la suya. Efecto colateral: interceptar
+  apaga la caché HTTP del contexto, y Supabase y Data Dragon se vuelven a bajar en cada
+  carga; los tiempos de arriba ya lo incluyen.
 - **Los `.env` no están en git, y `git worktree` solo saca lo versionado.** Sin copiarlos a
   mano, el lado «antes» se construye sin `VITE_SUPABASE_*` y `/galeria` cae a su estado de
   error mientras el «después» trae las fotos reales: el diff deja de comparar código y pasa
@@ -1182,9 +1209,6 @@ pagada con un día de depuración):
 - **Todo bucle que corre dentro de la página lleva tope de vueltas.** `page.evaluate` no
   respeta los timeouts de Playwright: la primera versión se colgó quince minutos en
   `/carta` sin avanzar ni fallar.
-- **Las imágenes de la galería son lazy** y `fullPage` captura más allá del viewport sin
-  disparar el IntersectionObserver. Hay que pasear la página y repetir hasta que la cuenta
-  de imágenes se estabilice.
 
 **Cómo lee los veredictos de la hoja.** Cada celda dice una de estas cosas, y la diferencia
 importa:
@@ -1193,6 +1217,10 @@ importa:
 - **«N filas cambian»** — cambio por encima del umbral. Mirá qué es.
 - **«cambios muy chicos (N px) — miralo igual»** — hay diferencia pero no llega al umbral.
   Un ícono de 12 px o un borde de 1 px caen acá: el chip NO afirma que esté bien.
+  Uno conocido: el wordmark del encabezado (`2 LQC.png`, 2000 px mostrado a 44) puede salir
+  con el contorno rasterizado distinto entre dos cargas del mismo código. En la validación
+  del 2026-09-17 dio 330 px entre las filas 33 y 47 en `/torneos` de escritorio, con el
+  mismo dibujo a ojo. Si el chip cae solo ahí, es eso.
 - **«la página crece/encoge N px»** y **«se ensancha N px (¿desborde horizontal?)»** — lo
   segundo es la pista de un desborde lateral, que es justo lo que el diff no vería solo,
   porque compara hasta el menor de los dos anchos.
@@ -1204,8 +1232,9 @@ script compara **HEAD contra HEAD~1** y lo avisa por consola.
 
 **Lo que NO cubre.** `/admin` (está tras login y no es UI pública), los estados que piden
 interacción (menú móvil abierto, formulario con errores, lightbox de la galería), la
-animación en movimiento (se captura con movimiento reducido) y cualquier cosa que dependa
-de datos que cambian solos. Para eso, mirá a mano.
+animación en movimiento (se captura con movimiento reducido) y los datos ajenos que cambien
+entre una carga y otra, salvo el clima, que se fija: lo de ATAK, Supabase y Data Dragon se
+vuelve a pedir en cada carga. Para eso, mirá a mano.
 
 ## Trampas conocidas (técnicas)
 
