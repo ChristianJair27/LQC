@@ -19,14 +19,19 @@ diseño y reglas de trabajo. Este archivo solo agrega lo específico de Claude C
   renderiza: lo apaga la bandera `INSCRIPCIONES_ABIERTAS` de
   `src/lib/inscripciones.ts`, hoy en `false`. En su lugar la página muestra un
   aviso de cierre, y conserva visibles las tarjetas de Pago, Reglamento y Aviso de
-  Privacidad. **Reabrir es poner esa constante en `true`** (más los textos de
-  `index.html`, que son HTML estático y el flag no alcanza). La misma bandera
-  gobierna los CTA de Home, Torneos y el pie.
+  Privacidad. La misma bandera gobierna los CTA de Home, Torneos y el pie.
   **No "arregles" el formulario porque no lo veas: no está roto, está apagado.**
-  Y ojo con lo que el flag NO hace: **la RPC `registrar_jugador` sigue abierta**
-  para `anon`; esto cierra la puerta del sitio, no la base. El detalle completo
-  —los consumidores, cómo está implementado y qué no alcanza— está en AGENTS.md,
-  sección [«Inscripciones CERRADAS desde el 2026-08-25»](./AGENTS.md#inscripciones-cerradas-desde-el-2026-08-25--inscripciones_abiertas).
+  **Reabrir pide DOS cosas, y la de la base es la que manda:**
+  1. `public.configuracion.inscripciones_abiertas` en `true`: es lo que hace que
+     la base acepte registros. Sin esto no entra nadie, aunque el formulario se
+     vea. Es un UPDATE, sin deploy; para meter a alguien vos, alcanza con esto.
+  2. `INSCRIPCIONES_ABIERTAS` en `true`: solo hace visible el formulario, y pide
+     build y deploy (más los textos de `index.html`, que son HTML estático y el
+     flag no alcanza). Solo hace falta si querés que un capitán se registre solo.
+  El detalle y el SQL están en AGENTS.md, subsección
+  [«Candado de inscripciones (2026-09-18)»](./AGENTS.md#candado-de-inscripciones-2026-09-18);
+  los consumidores del flag y cómo está implementado, en la sección
+  [«Inscripciones CERRADAS desde el 2026-08-25»](./AGENTS.md#inscripciones-cerradas-desde-el-2026-08-25--inscripciones_abiertas).
 - **Regla de color: paleta azul/negro (`#0066ff` / acento `#00d4ff` / fondo `#0a0a0f`)
   y nada de `purple-*`.**
 - **`npm run build` (`tsc -b && vite build`) debe pasar antes de commitear.** Que

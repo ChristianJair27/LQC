@@ -21,9 +21,11 @@ Ninguna otra página pública lee nada.
 > **LEER ANTES DE TOCAR `/registro`: las inscripciones están CERRADAS desde el
 > 2026-08-25.** El formulario existe y está entero, pero no se renderiza: lo apaga la
 > bandera `INSCRIPCIONES_ABIERTAS` de `src/lib/inscripciones.ts`. Todo lo que describe la
-> sección de abajo sigue siendo cierto del modelo y de las RPC —la base no cambió—, pero
-> hoy **nada de eso se dispara desde el sitio**. Ver
-> [Inscripciones cerradas](#inscripciones-cerradas-desde-el-2026-08-25--inscripciones_abiertas).
+> sección de abajo sigue siendo cierto del modelo, pero hoy **nada de eso se dispara desde
+> el sitio**, y desde el 2026-09-18 **la base tampoco acepta registros**: las RPC consultan
+> primero un candado propio. Reabrir pide las dos cosas. Ver
+> [Inscripciones cerradas](#inscripciones-cerradas-desde-el-2026-08-25--inscripciones_abiertas)
+> y [Candado de inscripciones](#candado-de-inscripciones-2026-09-18).
 
 ## Modelo de datos: el equipo es una entidad (migrado el 2026-07-29)
 
@@ -218,18 +220,26 @@ permisos, ese es el primer lugar donde mirar, no el código.
 
 ## Inscripciones CERRADAS desde el 2026-08-25 — `INSCRIPCIONES_ABIERTAS`
 
-**El 2026-08-25 arrancó el pareo suizo y la organización cerró las inscripciones.** El
-estado de la convocatoria vive ahora en **`src/lib/inscripciones.ts`**, en una única
-constante:
+**El 2026-08-25 arrancó el pareo suizo y la organización cerró las inscripciones.** Lo que
+ve el **sitio** vive en **`src/lib/inscripciones.ts`**, en una única constante (lo que
+acepta la **base** vive, desde el 2026-09-18, en `public.configuracion`):
 
 ```ts
 export const INSCRIPCIONES_ABIERTAS: boolean = false
 ```
 
-**Para reabrir: poner `true` ahí y rebuildear.** Es el único cambio de **código**; aparte
-hay que editar a mano las metas de `index.html`, que son HTML estático (ver abajo). Verificado
-el 2026-08-25 en las dos direcciones: con `true` el build también pasa con 0 errores y 0
-warnings, y el chunk de `/registro` vuelve de 16 kB a 43 kB.
+**Para reabrir hacen falta DOS cosas, y la de la base es la que manda** (detalle y SQL en
+[Candado de inscripciones (2026-09-18)](#candado-de-inscripciones-2026-09-18)):
+
+1. **`public.configuracion.inscripciones_abiertas` en `true`.** Es lo que hace que la base
+   acepte registros: sin esto no entra nadie, aunque el formulario se vea. Es un UPDATE,
+   sin deploy; para meter a alguien vos, alcanza con esto.
+2. **Esta constante en `true`, y rebuildear.** Solo hace visible el formulario, y pide build
+   y deploy: hace falta solo si querés que un capitán se registre solo. Es el único cambio
+   de **código**; aparte hay que editar a mano las metas de `index.html`, que son HTML
+   estático (ver abajo). Verificado el 2026-08-25 en las dos direcciones: con `true` el
+   build también pasa con 0 errores y 0 warnings, y el chunk de `/registro` vuelve de 16 kB
+   a 43 kB.
 
 ### Los cinco consumidores
 
@@ -268,10 +278,12 @@ es esto.
 
 ### ⚠ El flag NO cierra la RPC
 
-**`registrar_jugador` sigue abierta.** Es una bandera del frontend y nada más: la función
-sigue siendo pública para `anon` y acepta envíos de cualquiera que la llame con la URL del
-proyecto y la anon key, las dos a la vista en el bundle por diseño. Esto cierra **la puerta
-de entrada del sitio, no la base**. Si hace falta un cierre real, va del lado de Supabase.
+Es una bandera del frontend y nada más: `registrar_jugador` sigue siendo ejecutable por
+`anon` con la URL del proyecto y la anon key, las dos a la vista en el bundle por diseño. El
+flag cierra **la puerta de entrada del sitio, no la base**. Hasta el 2026-09-18 eso
+significaba que la RPC aceptaba envíos de cualquiera con la convocatoria cerrada; desde
+entonces el cierre real está del lado de Supabase, en el candado de `public.configuracion`.
+Ver [Candado de inscripciones (2026-09-18)](#candado-de-inscripciones-2026-09-18).
 
 ### El único texto que el flag NO alcanza
 
@@ -676,7 +688,7 @@ src/
                            con su clasificación; nunca lanza ni bloquea
     datadragon.ts          catálogo y arte de campeones (Riot Data Dragon) para la carta
     reglamento.ts          ruta, nombre de descarga y peso del PDF del reglamento
-    inscripciones.ts       bandera INSCRIPCIONES_ABIERTAS: estado de la convocatoria
+    inscripciones.ts       bandera INSCRIPCIONES_ABIERTAS: si se ve el formulario (no si la base acepta)
   pages/                   Home · Torneos · Galeria · Acerca · Contacto · Registro · Reglamento · Carta
     admin/                 panel protegido: Login · RutaProtegida · Panel ·
                            ListaInscripciones · SubirGaleria · GestionGaleria
