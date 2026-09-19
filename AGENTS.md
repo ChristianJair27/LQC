@@ -1559,24 +1559,46 @@ No romper esto: las llamadas internas (registrar_jugador -> sincronizar_capitan
   `authenticated` no tiene UPDATE sobre `jugadores`. No aflojar ninguna de
   las dos cosas sin hablar con Kister.
 
+### Candado de inscripciones (2026-09-18)
+
+Hay **dos interruptores** y hacen cosas distintas:
+
+- `INSCRIPCIONES_ABIERTAS` en `src/lib/inscripciones.ts` — controla si el
+  FORMULARIO se ve en el sitio. Cambiarlo requiere build y deploy.
+- La fila de `public.configuracion` — controla si la BASE acepta registros.
+  Es el candado real. Cambiarlo es un UPDATE, sin deploy.
+
+`registrar_jugador` y `registrar_equipo` consultan la tabla como primer paso
+y devuelven `{"ok":false,"error":"inscripciones_cerradas"}` si está en false.
+Antes de esto, apagar el formulario NO cerraba la base: cualquiera con la
+anon key podía seguir llamando las RPC.
+
+La tabla tiene RLS activo y CERO permisos para `anon` y `authenticated`; solo
+la leen las funciones, que corren como `supabase_admin`.
+
+**Reabrir para un suplente tardío (sin deploy):**
+```sql
+update public.configuracion set inscripciones_abiertas = true, actualizado_en = now();
+-- registrar al jugador por la RPC o por el formulario si está visible
+update public.configuracion set inscripciones_abiertas = false, actualizado_en = now();
+```
+
+**⚠ Trampa al crear tablas en `public`:** los privilegios por defecto de esta
+base conceden TODO a `anon` y `authenticated` en cada tabla nueva. Toda tabla
+nueva necesita su `revoke all ... from anon, authenticated;` explícito, o nace
+escribible por cualquiera. `configuracion` ya lo tiene.
+
+Respaldo del estado previo de ambas funciones:
+`respaldos/rpc-antes-del-candado-2026-09-18.sql`.
+
 ### Pendiente de esta línea de trabajo
-1. Pasada 2 de revokes: quitar INSERT/TRIGGER a `anon` y
-   INSERT/REFERENCES/TRIGGER/TRUNCATE a `authenticated` en ambas tablas, más
-   EXECUTE de `atak_enviar`, `armar_roster_atak`, `purgar_equipo` y
-   `sincronizar_capitan` a `authenticated`. Ojo: TRUNCATE no dispara el
-   trigger BEFORE DELETE, así que rodea el guardia de `equipos`.
-   Dejar a `authenticated` las RPC del formulario público: un admin logueado
-   que abra /registro entra como `authenticated`, no como `anon`.
-2. Candado `inscripciones_abiertas` en la base, consultado por
-   `registrar_jugador` Y `registrar_equipo`, para que reabrir sea un UPDATE
-   de una fila y no un build+deploy.
-3. Privilegios por defecto: `postgres` y `supabase_admin` conceden EXECUTE a
+1. Privilegios por defecto: `postgres` y `supabase_admin` conceden EXECUTE a
    anon/authenticated en cada función nueva de `public`. Por eso nacen
    públicas. Cambiarlo y documentar que desde entonces hay que exponerlas a
    mano.
-4. `atak_enviar` y `purgar_equipo` son SECURITY DEFINER sin `SET search_path`.
+2. `atak_enviar` y `purgar_equipo` son SECURITY DEFINER sin `SET search_path`.
    Ponérselo.
-5. `notificar_atak()` no aparece en ningún trigger de `equipos` ni
+3. `notificar_atak()` no aparece en ningún trigger de `equipos` ni
    `jugadores`. Confirmar si es huérfana.
-6. `registrar_equipo` no valida tope de 32 equipos ni gamertag duplicado,
+4. `registrar_equipo` no valida tope de 32 equipos ni gamertag duplicado,
    a diferencia de `registrar_jugador`.
