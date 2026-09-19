@@ -1,0 +1,2 @@
+﻿Get-Clipboard | Set-Content -Path respaldos\compose-supabase-coolify-2026-09-18.yml -Encoding UTF8
+(Get-Content respaldos\compose-supabase-coolify-2026-09-18.yml).Count
