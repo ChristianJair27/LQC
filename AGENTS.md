@@ -233,9 +233,9 @@ export const INSCRIPCIONES_ABIERTAS: boolean = false
 
 1. **`public.configuracion.inscripciones_abiertas` en `true`.** Es lo que hace que la base
    acepte registros: sin esto no entra nadie, aunque el formulario se vea. Es un UPDATE,
-   sin deploy; para meter a alguien vos, alcanza con esto.
+   sin deploy; para meter a alguien tú, alcanza con esto.
 2. **Esta constante en `true`, y rebuildear.** Solo hace visible el formulario, y pide build
-   y deploy: hace falta solo si querés que un capitán se registre solo. Es el único cambio
+   y deploy: hace falta solo si quieres que un capitán se registre solo. Es el único cambio
    de **código**; aparte hay que editar a mano las metas de `index.html`, que son HTML
    estático (ver abajo). Verificado el 2026-08-25 en las dos direcciones: con `true` el
    build también pasa con 0 errores y 0 warnings, y el chunk de `/registro` vuelve de 16 kB

@@ -9,9 +9,11 @@
    Vive en src/lib/ por el mismo motivo que reglamento.ts: es una constante con más de un
    consumidor, y duplicarla en cada página la desincroniza en silencio al primer cambio.
 
-   PARA REABRIR LAS INSCRIPCIONES: poner `true` acá y rebuildear. Es el único cambio de
-   código que hace falta. Vuelven todos juntos, porque los cinco consumidores leen esta
-   misma constante:
+   OJO, ESTO SOLO DECIDE SI EL FORMULARIO SE VE. Para que la base acepte registros hace
+   falta además `public.configuracion.inscripciones_abiertas` en true: un UPDATE, sin
+   deploy. Ver AGENTS.md, «Candado de inscripciones (2026-09-18)».
+   Con `true` acá (y rebuild), el formulario vuelve entero, porque los cinco consumidores
+   leen esta misma constante:
      · src/pages/Registro.tsx   — los campos del formulario, la casilla de privacidad y el
                                   botón «Registrarme»; el aviso de cierre del hero se va.
      · src/pages/Home.tsx       — el CTA «Registrarme» del hero y la sección «¿Vas a
@@ -25,14 +27,12 @@
    El tipo es `boolean` explícito y no el literal inferido: sin la anotación, TypeScript
    estrecha la constante a `false` y las dos ramas de cada condicional dejan de tipar
    igual, así que el cambio a `true` podría sacar errores que hoy no se ven. Anotado, las
-   dos direcciones compilan igual y reabrir es de verdad una sola línea.
+   dos direcciones compilan igual y mostrar el formulario es de verdad una sola línea.
 
-   LO QUE ESTE FLAG NO HACE, y conviene tenerlo claro antes de confiarle nada: NO cierra
-   la RPC `registrar_jugador`. Es una bandera del frontend y nada más. La función sigue
-   siendo pública para `anon` y sigue aceptando envíos de cualquiera que la llame con la
-   URL del proyecto y la anon key — las dos van en el bundle por diseño, así que están a la
-   vista de cualquiera que abra las herramientas de desarrollo. Esto cierra la puerta de
-   entrada del sitio, no la base. Si se necesita un cierre real, va del lado de Supabase.
+   LO QUE ESTE FLAG NO HACE: NO cierra la RPC `registrar_jugador`, que sigue siendo
+   ejecutable por `anon` con la URL y la anon key del bundle. Esto cierra la puerta del
+   sitio, no la base. El cierre real, desde el 2026-09-18, es el candado de
+   `public.configuracion` (ver arriba).
 
    Nota sobre el build, para no sacar conclusiones equivocadas al verificar: con el flag en
    `false`, Rollup propaga la constante entre módulos y ELIMINA del bundle el JSX que quedó

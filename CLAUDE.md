@@ -24,10 +24,10 @@ diseño y reglas de trabajo. Este archivo solo agrega lo específico de Claude C
   **Reabrir pide DOS cosas, y la de la base es la que manda:**
   1. `public.configuracion.inscripciones_abiertas` en `true`: es lo que hace que
      la base acepte registros. Sin esto no entra nadie, aunque el formulario se
-     vea. Es un UPDATE, sin deploy; para meter a alguien vos, alcanza con esto.
+     vea. Es un UPDATE, sin deploy; para meter a alguien tú, alcanza con esto.
   2. `INSCRIPCIONES_ABIERTAS` en `true`: solo hace visible el formulario, y pide
      build y deploy (más los textos de `index.html`, que son HTML estático y el
-     flag no alcanza). Solo hace falta si querés que un capitán se registre solo.
+     flag no alcanza). Solo hace falta si quieres que un capitán se registre solo.
   El detalle y el SQL están en AGENTS.md, subsección
   [«Candado de inscripciones (2026-09-18)»](./AGENTS.md#candado-de-inscripciones-2026-09-18);
   los consumidores del flag y cómo está implementado, en la sección
