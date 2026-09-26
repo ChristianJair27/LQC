@@ -1595,10 +1595,12 @@ update public.configuracion set inscripciones_abiertas = true, actualizado_en = 
 update public.configuracion set inscripciones_abiertas = false, actualizado_en = now();
 ```
 
-**⚠ Trampa al crear tablas en `public`:** los privilegios por defecto de esta
-base conceden TODO a `anon` y `authenticated` en cada tabla nueva. Toda tabla
-nueva necesita su `revoke all ... from anon, authenticated;` explícito, o nace
-escribible por cualquiera. `configuracion` ya lo tiene.
+**⚠ Trampa al crear objetos en `public`:** hasta el 2026-09-25, los
+privilegios por defecto concedían TODO a `anon` y `authenticated` en cada
+tabla nueva; por eso `configuracion` se creó con su `revoke all` explícito.
+Desde entonces el problema es el inverso: una tabla o función nueva nace SIN
+permisos, y si el sitio debe usarla hay que concedérselos a mano. Ver
+[«Continuación (19 al 25 de septiembre de 2026)»](#continuación-19-al-25-de-septiembre-de-2026).
 
 Respaldo del estado previo de ambas funciones:
 `respaldos/rpc-antes-del-candado-2026-09-18.sql`.
