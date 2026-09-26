@@ -1603,14 +1603,75 @@ escribible por cualquiera. `configuracion` ya lo tiene.
 Respaldo del estado previo de ambas funciones:
 `respaldos/rpc-antes-del-candado-2026-09-18.sql`.
 
+### Continuación (19 al 25 de septiembre de 2026)
+
+**La tabla `inscripciones` era un rodeo del candado.** Es la tabla del modelo
+viejo, anterior a la migración del 2026-07-29. No la usa ninguna parte del
+frontend (verificado: cero `.from('inscripciones')` en `src/`), pero tenía
+todos los grants para `anon` y `authenticated` —incluidos DELETE y TRUNCATE—
+y una policy llamada «Cualquiera puede registrarse» de INSERT para `anon` con
+`with_check: true`. O sea que cualquiera con la anon key podía hacer POST
+directo a `/rest/v1/inscripciones`, saltándose por completo el candado de
+`public.configuracion`, y cada INSERT disparaba `trg_notificar_atak` hacia
+ATAK.
+
+Lo que NO estaba expuesto: la lectura (el SELECT era solo para
+`authenticated`) y el borrado (RLS lo bloqueaba por falta de policy). Las 12
+filas con datos personales nunca fueron legibles desde fuera.
+
+Cerrado con `revoke all ... from anon, authenticated` y borrando esa policy.
+La policy se quitó además del revoke porque su nombre invita a reabrir el
+hueco sin querer.
+
+**Deuda de datos pendiente:** esas 12 filas siguen ahí con nombre, fecha de
+nacimiento, celular y correo de gente real. Decidir si se archivan o se
+borran; hoy son datos personales en una tabla muerta.
+
+**`SET search_path` en las SECURITY DEFINER que no lo tenían.** Se le puso a
+`atak_enviar`, `purgar_equipo` y `notificar_atak` con ALTER FUNCTION (no hace
+falta reescribir el cuerpo, y así el secreto de `atak_enviar` no vuelve a
+salir a la luz). Sin search_path fijo, una función SECURITY DEFINER de dueño
+superusuario puede ser secuestrada por quien logre crear objetos en un esquema
+que quede antes en la ruta de búsqueda. Verificado después: ninguna de las 10
+SECURITY DEFINER de `public` tiene `proconfig` nulo.
+
+**Privilegios por defecto: la raíz de casi todo lo anterior.** Hasta el
+2026-09-25, `postgres` y `supabase_admin` concedían EXECUTE sobre cada función
+nueva de `public` a `anon` y `authenticated`, y TODOS los privilegios sobre
+cada tabla nueva. Por eso `armar_roster_atak` nació pública sin que nadie lo
+decidiera. Corregido con ALTER DEFAULT PRIVILEGES para los dos roles, sobre
+funciones y tablas. Las secuencias se dejaron como estaban a propósito.
+
+⚠ **Esto cambia cómo se trabaja de aquí en adelante.** Una función nueva que
+el sitio deba llamar necesita su `grant execute on function ... to anon;`
+explícito, o el frontend truena con «permission denied for function». Lo mismo
+para una tabla nueva que PostgREST deba ver. Exponer algo es ahora una
+decisión, no un accidente. Si algo deja de funcionar tras crear un objeto
+nuevo, revisa esto ANTES de buscar en otro lado.
+
+**`registrar_equipo` ya no es pública.** El inventario del frontend encontró
+exactamente tres llamadas `.rpc(`: `buscar_equipos`, `registrar_jugador` y
+`editar_jugador`. `registrar_equipo` no la llama nadie — es resto del modelo
+viejo. Se le revocó EXECUTE a `anon` y a PUBLIC. Sigue existiendo y se puede
+llamar desde el editor SQL.
+
+**Estado final de la superficie pública (verificado el 2026-09-25):**
+- `anon` puede ejecutar: `registrar_jugador` y `buscar_equipos`. Nada más.
+- `authenticated` puede ejecutar además `editar_jugador` y `registrar_equipo`,
+  y sobre las tablas solo tiene SELECT en `equipos`/`jugadores` y UPDATE en
+  `equipos`.
+- `anon` no tiene ningún privilegio directo sobre `equipos`, `jugadores` ni
+  `inscripciones`.
+
 ### Pendiente de esta línea de trabajo
-1. Privilegios por defecto: `postgres` y `supabase_admin` conceden EXECUTE a
-   anon/authenticated en cada función nueva de `public`. Por eso nacen
-   públicas. Cambiarlo y documentar que desde entonces hay que exponerlas a
-   mano.
-2. `atak_enviar` y `purgar_equipo` son SECURITY DEFINER sin `SET search_path`.
-   Ponérselo.
-3. `notificar_atak()` no aparece en ningún trigger de `equipos` ni
-   `jugadores`. Confirmar si es huérfana.
-4. `registrar_equipo` no valida tope de 32 equipos ni gamertag duplicado,
-   a diferencia de `registrar_jugador`.
+
+1. **Validaciones de `registrar_equipo`, con gatillo.** No valida tope de 32
+   equipos ni gamertag duplicado, a diferencia de `registrar_jugador`. Hoy no
+   importa porque no está expuesta. **Antes de volver a darle EXECUTE a `anon`,
+   ponerle las dos validaciones.**
+2. **Las 12 filas de `inscripciones`** (ver arriba): decidir archivar o borrar.
+3. **`atak_enviar` dispara y se olvida.** Debería registrar el código de
+   respuesta, o al menos avisar cuando no sea 2xx. Hoy cualquier fallo de la
+   integración es invisible; así estuvo semanas el 409 de la fase del torneo.
+4. **Policies de `jugadores` / `app_admins`**, con su gatillo de siempre: antes
+   de habilitar cualquier login de jugador o capitán.
