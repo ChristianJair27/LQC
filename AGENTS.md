@@ -1426,33 +1426,90 @@ frontend por completo, vía la API REST de PostgREST) y sacar nombre + correo de
 inscritos, menores incluidos. Es cambio de modelo de auth → va probado en local primero
 (Cabo B), no en caliente sobre prod.
 
-### Cabo B — entorno local que espeje prod (diagnóstico HECHO, montaje pendiente)
+### Cabo B — entorno local que espeje prod (MONTADO y verificado el 2026-09-26)
+
+**⚠ Dos servidores con nombres parecidos. El ancla es el HOSTNAME, no el usuario ni la IP:**
+
+| Dirección SSH | Hostname | Qué es |
+| --- | --- | --- |
+| `revolution505@192.168.1.98` | `revolutionserv` | **El de LQC**: Coolify, Supabase self-hosted, backend de ATAK. |
+| `rev@192.168.1.92` | `revolution505` | **OTRO servidor** (Dokploy, classify, sonora-musicplayer). **Nada de LQC**: no tiene el contenedor `supabase-db-dd3pab1anj2tgzmw5xt6nvxd`. |
+
+Todo comando de infra sobre prod lleva un **guardia de hostname** que aborta si no es el correcto:
+`test \`hostname\` = revolutionserv && docker exec $(docker ps -q -f name=supabase-db-dd3pab1anj2tgzmw5xt6nvxd) ...`.
+Para PowerShell 5, los comandos con redirección van dentro de `cmd /c '...'` con comillas simples:
+el `>` de PowerShell guarda en UTF-16 y las comillas dobles se comen los backticks del guardia.
 
 **Cómo está montado prod (verificado 2026-08-10, vía SSH a revolutionserv):**
 Supabase self-hosted armado con el **compose oficial de Supabase vía Coolify** (NO
 instalación a mano, NO el CLI de Supabase). Raíz del proyecto en el servidor:
-`/data/coolify/services/dd3pab1anj2tgzmw5xt6nvxd/`. Los scripts de init de la DB
-viven en `volumes/db/` (roles.sql, jwt.sql, realtime.sql, webhooks.sql, pooler.sql,
-logs.sql, _supabase.sql). `roles.sql` es el crítico para espejar roles/grants.
+`/data/coolify/services/dd3pab1anj2tgzmw5xt6nvxd/` (de root: el usuario SSH no lo lee; el
+`roles.sql` se lee desde dentro del contenedor, en
+`/docker-entrypoint-initdb.d/init-scripts/99-roles.sql`). Los scripts de init de la DB viven en
+`volumes/db/` (roles.sql, jwt.sql, realtime.sql, webhooks.sql, pooler.sql, logs.sql, _supabase.sql);
+`roles.sql` solo fija contraseñas de los roles de servicio (todas desde `POSTGRES_PASSWORD`), no grants ni atributos.
 Datos físicos en el volumen Docker `dd3pab1anj2tgzmw5xt6nvxd_supabase-db-data`.
 
-**Versiones exactas del stack (para pinear el local):**
+**Versiones exactas del stack de prod:**
 - Postgres: supabase/postgres:15.8.1.085 (server_version 15.8)
-- PostgREST: v14.6
-- GoTrue (auth): v2.186.0
-- Storage API: v1.44.2
+- PostgREST: v14.6 · GoTrue (auth): v2.186.0 · Storage API: v1.44.2
 - MinIO: ghcr.io/coollabsio/minio (fork de Coolify, NO el oficial — ojo al espejar Storage)
 - Kong 3.9.1 · Studio 2026.03.16 · supavisor 2.7.4 · realtime v2.76.5 · edge-runtime v1.71.2
 
-**Estrategia elegida: A (CLI oficial de Supabase en local, pineado a estas versiones,
-portando esquema + roles).** NO replicar el compose entero de Coolify (Kong, supavisor,
-analytics, vector — innecesario para probar RLS/policies/RPCs). El objetivo del local es
-probar cambios de RLS/policies/RPCs/triggers ANTES de tocar prod, no correr el stack completo.
+**Estrategia (elegida y ejecutada): CLI oficial de Supabase en local, portando esquema + roles.**
+NO se replica el compose de Coolify. El objetivo es probar RLS/policies/RPCs/triggers ANTES de tocar prod.
 
-**Primeros pasos del montaje (próxima sesión, cabeza fresca):**
-1. `Test-Path supabase` en C:\Dev\LQC — ¿ya hay carpeta de CLI o se arranca de cero?
-2. Extraer esquema de prod: pg_dump --schema-only (comando exacto a definir con cuidado, es lectura sobre prod viva).
-3. Replicar roles base desde roles.sql.
+**Cómo se usa el local (`C:\Dev\LQC`):**
+- El CLI es devDependency (`supabase` **2.118.0**). Se corre con `npx supabase ...`; requiere Docker Desktop.
+- `supabase/config.toml` lleva **`major_version = 15`**. El default del CLI 2.118 es **17**: sin ese cambio el local
+  corre otro motor que prod. Con 15 el CLI levanta `supabase/postgres:15.8.1.085`, **idéntica** a prod.
+- `npx supabase db start` levanta solo Postgres (puerto 54322; el resto del rango 54320-54329 está reservado).
+- `npx supabase db reset` **reconstruye desde cero** con un solo comando: `roles.sql` de la imagen, luego
+  `supabase/migrations/` en orden y por último `supabase/seed.sql`.
+- Conéctate como **`postgres`** (contraseña de desarrollo local: `postgres`; solo existe en tu PC). **No** trabajes como
+  `supabase_admin`: ve permisos que las migraciones no producen (así se falló en una primera carga manual).
+- `supabase/verificar-superficie.sql` es una consulta **solo de lectura** (quién ejecuta qué, privilegios en tablas,
+  RLS, policies, triggers, privilegios por defecto). Correrla en local y en prod y comparar es la prueba de que el
+  espejo sigue fiel.
+
+**Qué contiene `supabase/`:**
+- `migrations/20260926000000_esquema_base_prod.sql` — baseline: `pg_dump --schema-only -n public` de prod (15.8), saneado.
+- `migrations/20260926000100_permisos_como_prod.sql` — reproduce los permisos de prod (ver la trampa de abajo).
+- `seed.sql` — datos **100% ficticios** (5 equipos «Prueba», correos `@ejemplo.invalid`), cargados por la RPC real
+  `registrar_jugador`. **Nunca copiar datos de prod al seed**: hay menores y datos personales.
+- **⚠ Las migraciones son SOLO para el local. NO se aplican en prod**, que ya lo tiene todo. Los cambios nuevos van
+  en migraciones posteriores: se prueban aquí y luego se aplican a mano en prod (el SQL editor de Supabase corre en autocommit).
+
+**Desviaciones conocidas del local respecto de prod (todas medidas, ninguna otra):**
+1. **Dueño de los objetos:** en prod son de `supabase_admin` (superusuario); en local, de `postgres`, porque el CLI migra
+   como `postgres` y este no puede hacer `OWNER TO supabase_admin`. Las sentencias omitidas quedan comentadas con la marca
+   `-- [LOCAL: omitido ...]`. Una `SECURITY DEFINER` de `postgres` salta la RLS igual (tiene `bypassrls`), pero no es superusuario.
+2. **Privilegios por defecto de `supabase_admin` en `public`** siguen permisivos en local (el CLI no permite tocarlos).
+   Los de `postgres`, que es quien crea objetos en las migraciones, quedaron cerrados como en prod.
+3. **`pg_net` no está instalada** y `atak_enviar` es un **no-op** (solo emite un `NOTICE`, sin secreto ni HTTP):
+   un registro de prueba jamás llega a ATAK real. `pg_trgm` se instala en `public`, igual que en prod.
+4. **Solo se espeja el esquema `public`, y solo Postgres.** El dump fue `-n public` y `db start` no levanta Storage, Auth ni Kong:
+   no están en el local `auth.users`, el bucket `galeria` ni las policies de `storage.objects`. Lo que dependa de ellos
+   (login del panel, uploader de galería) NO se puede probar en este local.
+5. Difieren además los privilegios por defecto del esquema `supabase_functions` (de la imagen; el proyecto no lo usa).
+
+**⚠ Trampa: `pg_dump` no reproduce permisos que FALTAN.** Solo emite los que existen. La imagen local otorga todo a
+`anon`/`authenticated` en cada objeto nuevo, y el dump no trae los `REVOKE` que en prod los quitaron. Sin la migración de
+permisos, el local dejaba a `anon` ejecutar las 11 funciones y tocar las 5 tablas: **pruebas de seguridad falsas**. Tras
+cualquier cambio de esquema, vuelve a medir con `verificar-superficie.sql` contra prod.
+
+**⚠ Los dumps de prod traen SECRETOS.** El cuerpo de `atak_enviar` lleva el secreto del webhook de ATAK, y
+`pg_db_role_setting` (`app.settings.jwt_secret`) expone el **JWT secret**. Los dumps viven **fuera del repo**
+(`C:\Dev\LQC-dumps\`); nunca se commitean. Al inspeccionarlos, filtra por conteos/nombres, no imprimas cuerpos ni ajustes.
+Ambos secretos y las credenciales de MinIO quedaron a la vista en una sesión de trabajo el 2026-09-26: **rotarlos es
+pendiente P1**, coordinado (ATAK con Kister; JWT + anon/service_role + rebuild del sitio; MinIO). El procedimiento se
+prueba primero en local.
+
+**Hallazgos de la medición (2026-09-26), aún sin corregir:**
+- `anon` conserva INSERT/UPDATE/DELETE/TRUNCATE sobre `galeria_media` (RLS lo contiene; TRUNCATE no lo cubre RLS).
+- `anon` conserva EXECUTE sobre 3 funciones de trigger (`notificar_atak`, `notificar_atak_equipo`, `guardia_no_borrar_equipos`); no son llamables directamente, pero conviene cerrarlas.
+- `galeria_media` **ya tiene policy de UPDATE en prod** (`galeria_media update authenticated`): las secciones que dicen «falta policy» están desactualizadas.
+- `equipos.capitan_gamertag` es una **columna huérfana**: existe en prod, pero ninguna función ni el frontend la usan. El capitán vive en `capitan_nombre` (Riot ID) y `capitan_celular`.
 
 ## Variables de entorno
 
