@@ -1477,8 +1477,12 @@ NO se replica el compose de Coolify. El objetivo es probar RLS/policies/RPCs/tri
 - `migrations/20260926000100_permisos_como_prod.sql` — reproduce los permisos de prod (ver la trampa de abajo).
 - `seed.sql` — datos **100% ficticios** (5 equipos «Prueba», correos `@ejemplo.invalid`), cargados por la RPC real
   `registrar_jugador`. **Nunca copiar datos de prod al seed**: hay menores y datos personales.
-- **⚠ Las migraciones son SOLO para el local. NO se aplican en prod**, que ya lo tiene todo. Los cambios nuevos van
-  en migraciones posteriores: se prueban aquí y luego se aplican a mano en prod (el SQL editor de Supabase corre en autocommit).
+- `migrations/20260926000200_cerrar_escrituras_anon_y_funciones_de_trigger.sql` — cierre de permisos (ver «Hallazgos»).
+  Trae su `ROLLBACK` en comentarios. `verificar-cierre.sql` son sus 15 pruebas (cada una en su transacción, terminan en ROLLBACK).
+- **⚠ Las dos primeras migraciones (base y permisos) son SOLO para el local. NO se aplican en prod**, que ya lo tiene todo.
+  Los cambios nuevos van en migraciones posteriores: se prueban aquí con antes/después, luego se aplican a mano en prod
+  (el SQL editor de Supabase corre en autocommit) y se **verifica con `verificar-superficie.sql` en prod**, no con el «Success».
+  El editor SQL de prod corre como `postgres` y aun así puede revocar sobre objetos de `supabase_admin` (verificado 2026-09-26).
 
 **Desviaciones conocidas del local respecto de prod (todas medidas, ninguna otra):**
 1. **Dueño de los objetos:** en prod son de `supabase_admin` (superusuario); en local, de `postgres`, porque el CLI migra
@@ -1505,9 +1509,12 @@ Ambos secretos y las credenciales de MinIO quedaron a la vista en una sesión de
 pendiente P1**, coordinado (ATAK con Kister; JWT + anon/service_role + rebuild del sitio; MinIO). El procedimiento se
 prueba primero en local.
 
-**Hallazgos de la medición (2026-09-26), aún sin corregir:**
-- `anon` conserva INSERT/UPDATE/DELETE/TRUNCATE sobre `galeria_media` (RLS lo contiene; TRUNCATE no lo cubre RLS).
-- `anon` conserva EXECUTE sobre 3 funciones de trigger (`notificar_atak`, `notificar_atak_equipo`, `guardia_no_borrar_equipos`); no son llamables directamente, pero conviene cerrarlas.
+**Hallazgos de la medición (2026-09-26):**
+- ✅ **CERRADO en prod el 2026-09-26.** `anon` tenía INSERT/UPDATE/DELETE/TRUNCATE sobre `galeria_media` (la RLS contenía las tres primeras;
+  TRUNCATE no pasa por RLS). Ahora solo tiene `SELECT`. Probado en local antes/después y verificado en prod con la foto de permisos.
+- ✅ **CERRADO en prod el 2026-09-26.** `anon`/`authenticated` tenían EXECUTE sobre 3 funciones de trigger (`notificar_atak`,
+  `notificar_atak_equipo`, `guardia_no_borrar_equipos`). PostgreSQL solo exige EXECUTE al CREAR el trigger, no al dispararlo:
+  probado en local que archivar y restaurar equipos siguen disparando. (En prod NO se probó el disparo: llamaría a ATAK de verdad.)
 - `galeria_media` **ya tiene policy de UPDATE en prod** (`galeria_media update authenticated`): las secciones que dicen «falta policy» están desactualizadas.
 - `equipos.capitan_gamertag` es una **columna huérfana**: existe en prod, pero ninguna función ni el frontend la usan. El capitán vive en `capitan_nombre` (Riot ID) y `capitan_celular`.
 
